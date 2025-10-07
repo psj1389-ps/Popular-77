@@ -135,7 +135,7 @@ const PdfToDocPage: React.FC = () => {
         </div>
       </div>
       
-      <style jsx>{`
+      <style>{`
         @keyframes float {
           0% { transform: translateX(0px) translateY(0px); }
           33% { transform: translateX(-25px) translateY(18px); }
