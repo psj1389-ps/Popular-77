@@ -23,6 +23,9 @@ const PdfToDocPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
   const [isConverting, setIsConverting] = useState(false);
+  const [conversionProgress, setConversionProgress] = useState(0);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -42,6 +45,9 @@ const PdfToDocPage: React.FC = () => {
   const handleReset = () => {
     setSelectedFile(null);
     setErrorMessage('');
+    setShowSuccessMessage(false);
+    setSuccessMessage('');
+    setConversionProgress(0);
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -54,6 +60,20 @@ const PdfToDocPage: React.FC = () => {
     }
     setIsConverting(true);
     setErrorMessage('');
+    setShowSuccessMessage(false);
+    setConversionProgress(0);
+    
+    // 진행률 애니메이션 시뮬레이션
+    const progressInterval = setInterval(() => {
+      setConversionProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+    
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
@@ -63,13 +83,32 @@ const PdfToDocPage: React.FC = () => {
         const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
         throw new Error(errorData.error || `서버 오류: ${response.status}`);
       }
+      
+      // 변환 완료 시 진행률을 100%로 설정
+      clearInterval(progressInterval);
+      setConversionProgress(100);
+      
       const blob = await response.blob();
       const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".docx";
-      downloadBlob(blob, downloadFilename);
+      
+      // 성공 메시지 표시
+      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      setShowSuccessMessage(true);
+      
+      // 잠시 후 다운로드 시작
+      setTimeout(() => {
+        downloadBlob(blob, downloadFilename);
+      }, 1000);
+      
     } catch (error) {
+      clearInterval(progressInterval);
+      setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
     } finally {
-      setIsConverting(false);
+      setTimeout(() => {
+        setIsConverting(false);
+        setConversionProgress(0);
+      }, 2000);
     }
   };
 
@@ -122,11 +161,43 @@ const PdfToDocPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* 변환 진행률 표시 */}
+              {isConverting && (
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${conversionProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex items-center justify-center mt-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
+                    <span className="text-sm text-gray-600">PDF를 DOCX로 변환 중...</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 성공 메시지 */}
+              {showSuccessMessage && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium">{successMessage}</span>
+                  </div>
+                </div>
+              )}
+
               <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400">
+                <button onClick={handleConvert} disabled={isConverting} className="flex-1 bg-blue-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
                   {isConverting ? '변환 중...' : '변환하기'}
                 </button>
-                <button onClick={handleReset} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700">
+                <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
                   파일 초기화
                 </button>
               </div>
