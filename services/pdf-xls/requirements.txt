@@ -29,6 +29,10 @@ pytesseract==0.3.10
 Flask-Cors
 pdf2docx
 
+# Data processing - Python 3.12 compatible
+pandas>=2.0.0,<3.0.0
+openpyxl>=3.1.0
+
 # Utilities
 qrcode>=7.4.2
 requests>=2.31.0
