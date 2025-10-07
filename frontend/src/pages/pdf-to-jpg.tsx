@@ -95,9 +95,25 @@ const PdfToJpgPage: React.FC = () => {
       let downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip"; // 기본값
       
       if (contentDisposition) {
-        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
-        if (filenameMatch && filenameMatch[1]) {
-          downloadFilename = filenameMatch[1].replace(/['"]/g, '');
+        // 더 강력한 파일명 추출 로직
+        let filenameMatch = null;
+        
+        // filename*=UTF-8''encoded_filename 형식 먼저 확인 (RFC 5987)
+        const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
+        if (utf8Match) {
+          try {
+            downloadFilename = decodeURIComponent(utf8Match[1]);
+          } catch (e) {
+            console.warn('UTF-8 filename decoding failed:', e);
+          }
+        } else {
+          // 일반적인 filename="..." 또는 filename=... 형식
+          filenameMatch = contentDisposition.match(/filename[^;=\n]*=\s*"?([^";\n]*)"?/i);
+          if (filenameMatch && filenameMatch[1]) {
+            downloadFilename = filenameMatch[1].trim();
+            // 따옴표 제거
+            downloadFilename = downloadFilename.replace(/^["']|["']$/g, '');
+          }
         }
       } else {
         // Content-Type으로 파일 형식 판단
