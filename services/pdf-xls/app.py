@@ -98,13 +98,6 @@ def extract_pdf_content_with_adobe(pdf_path):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-        print(f"일반 오류: {str(e)}")
-        return {'success': False, 'error': '파일 처리 중 오류가 발생했습니다.'}, 500
-        print(f"전체 처리 중 오류 발생: {str(e)}")
-        return {'success': False, 'error': f'서버 오류가 발생했습니다: {str(e)}'}, 500
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
 
 def pdf_to_xlsx(pdf_path, output_path, quality='medium'):
     """PDF를 XLSX로 변환하는 함수 (텍스트 추출 후 Excel 시트로 구조화)"""
