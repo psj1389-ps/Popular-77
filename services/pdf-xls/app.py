@@ -1,400 +1,51 @@
-from flask import Flask, request, render_template, send_file, flash, redirect, url_for, jsonify
-import os
-import tempfile
-from werkzeug.utils import secure_filename
-from pdf2image import convert_from_path
-from pptx import Presentation
-from pptx.util import Inches
-import io
-from PIL import Image
-import json
-from dotenv import load_dotenv
 from docx import Document
-from docx.shared import Pt, Inches as DocxInches
-import subprocess
-import platform
-import pytesseract
-import cv2
-import numpy as np
-import fitz  # PyMuPDF
-import re
-from typing import List, Tuple, Dict, Any
-from pdf2docx import Converter
-import pandas as pd
-from openpyxl import Workbook
-from openpyxl.styles import Font, Alignment
-from openpyxl.utils.dataframe import dataframe_to_rows
+import fitz
 import PyPDF2
-# Adobe PDF Services SDK 임포트 및 설정
-try:
-    # 올바른 Adobe PDF Services SDK import 구문
-    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException, SdkException
-    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
-    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
-    from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
-    from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
-    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
-    from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
-    
-    adobe_available = True
-    ADOBE_SDK_AVAILABLE = True
-    print("Adobe PDF Services SDK가 성공적으로 로드되었습니다.")
-except ImportError as e:
-    print(f"Adobe PDF Services SDK를 가져올 수 없습니다: {e}")
-    print("Adobe SDK 없이 계속 진행합니다.")
-    adobe_available = False
-    ADOBE_SDK_AVAILABLE = False
+import io
+import subprocess
+import tempfile
+import os
 
-# Adobe SDK 무조건 실행 모드 활성화
-ADOBE_SDK_AVAILABLE = True
-print(f"Adobe SDK 강제 실행 모드: {ADOBE_SDK_AVAILABLE}")
-
-# 환경 변수 로드
-load_dotenv()
-
-app = Flask(__name__)
-app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
-app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
-
-# Vite 클라이언트 요청 처리를 위한 라우트 추가
-@app.route('/@vite/client')
-def vite_client():
-    """Vite 클라이언트 요청 처리 - 404 오류 방지"""
-    return '', 200  # 빈 응답으로 404 오류 방지
-
-@app.route('/@vite/<path:filename>')
-def vite_assets(filename):
-    """Vite 관련 에셋 요청 처리"""
-    return '', 200  # 빈 응답으로 404 오류 방지
-
-# Adobe PDF Services API 구성 - 환경변수 사용
+ADOBE_SDK_AVAILABLE = False
 ADOBE_CONFIG = {
     "client_credentials": {
-        "client_id": os.getenv('ADOBE_CLIENT_ID', ''),
-        "client_secret": os.getenv('ADOBE_CLIENT_SECRET', '')
-    },
-    "service_principal_credentials": {
-        "organization_id": os.getenv('ADOBE_ORGANIZATION_ID', ''),
-        "account_id": os.getenv('ADOBE_ACCOUNT_ID', ''),
-        "technical_account_email": os.getenv('ADOBE_TECHNICAL_ACCOUNT_EMAIL', ''),
-        "access_token": ''
+        "client_id": "",
+        "client_secret": ""
     }
 }
 
-# Adobe SDK 무조건 실행 확인
-print(f"Adobe SDK 강제 실행 상태: {ADOBE_SDK_AVAILABLE}")
-print(f"Adobe 클라이언트 ID: {ADOBE_CONFIG['client_credentials']['client_id']}")
-print("Adobe PDF Services API가 무조건 실행되도록 설정되었습니다.")
-
-
-
 UPLOAD_FOLDER = 'uploads'
 OUTPUT_FOLDER = 'outputs'
-ALLOWED_EXTENSIONS = {'pdf'}
 
-# 폴더 생성
-os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-os.makedirs(OUTPUT_FOLDER, exist_ok=True)
-os.makedirs('debug_output', exist_ok=True)  # 디버깅용 폴더
-
-def allowed_file(filename, content_type=None):
-    """파일 형식 확인 (확장자 또는 MIME 타입 기반)"""
-    # 파일명이 없거나 빈 문자열인 경우
-    if not filename or filename.strip() == '':
-        print(f"디버깅: 파일명이 없습니다 - '{filename}'")
-        return False
-    
-    print(f"디버깅: 업로드된 파일명 - '{filename}'")
-    
-    # 확장자로 확인
-    if '.' in filename:
-        try:
-            ext = filename.rsplit('.', 1)[1].lower()
-            print(f"디버깅: 추출된 확장자 - '{ext}'")
-            is_allowed = ext in ALLOWED_EXTENSIONS
-            print(f"디버깅: 확장자 허용 여부 - {is_allowed}")
-            return is_allowed
-        except (IndexError, AttributeError) as e:
-            print(f"디버깅: 확장자 추출 오류 - {e}")
-            return False
-    
-    # MIME 타입으로 확인 (확장자가 없는 경우)
-    if content_type:
-        print(f"디버깅: MIME 타입 확인 - '{content_type}'")
-        is_pdf_mime = ('pdf' in content_type.lower() or 
-                      'application/pdf' in content_type.lower())
-        print(f"디버깅: PDF MIME 타입 여부 - {is_pdf_mime}")
-        return is_pdf_mime
-    
-    print("디버깅: 확장자도 없고 MIME 타입도 없음 - False 반환")
-    return False
-
-# 디버깅용 중간 결과물 저장 함수들
-def save_debug_text(text, filename_prefix):
-    """추출된 텍스트를 디버깅용 .txt 파일로 저장"""
-    try:
-        debug_file = os.path.join('debug_output', f'{filename_prefix}_extracted_text.txt')
-        with open(debug_file, 'w', encoding='utf-8') as f:
-            f.write(text)
-        print(f"디버깅: 텍스트가 {debug_file}에 저장되었습니다. (길이: {len(text)}자)")
-        return debug_file
-    except Exception as e:
-        print(f"디버깅 텍스트 저장 오류: {e}")
-        return None
-
-def save_debug_image(image, filename_prefix, page_num):
-    """변환된 이미지를 디버깅용 .png 파일로 저장"""
-    try:
-        debug_file = os.path.join('debug_output', f'{filename_prefix}_page_{page_num}.png')
-        image.save(debug_file, 'PNG')
-        print(f"디버깅: 이미지가 {debug_file}에 저장되었습니다.")
-        return debug_file
-    except Exception as e:
-        print(f"디버깅 이미지 저장 오류: {e}")
-        return None
-
-def pdf_to_docx_with_pdf2docx(pdf_path, output_path):
-    """pdf2docx 라이브러리를 사용한 PDF → DOCX 변환"""
-    try:
-        print("pdf2docx 라이브러리를 사용하여 변환 중...")
-        
-        # Converter 객체 생성
-        cv = Converter(pdf_path)
-        
-        # 변환 실행
-        cv.convert(output_path, start=0, end=None)
-        
-        # 객체 닫기
-        cv.close()
-        
-        print(f"pdf2docx 변환 완료: {output_path}")
-        return True
-        
-    except Exception as e:
-        print(f"pdf2docx 변환 실패: {e}")
-        return False
-
-def ocr_image_to_blocks(pil_image):
-    """이미지에서 단어 단위 텍스트와 위치(좌표)를 추출"""
-    try:
-        img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.medianBlur(gray, 3)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        gray = clahe.apply(gray)
-
-        config = r"--oem 3 --psm 6 -l kor+eng"
-        data = pytesseract.image_to_data(gray, config=config,
-                                         output_type=pytesseract.Output.DICT)
-        blocks = []
-        n = len(data["text"])
-        for i in range(n):
-            text = data["text"][i].strip()
-            conf_val = data["conf"][i]
-            if isinstance(conf_val, (int, float)):
-                conf = int(conf_val)
-            elif isinstance(conf_val, str) and conf_val.replace('.', '').replace('-', '').isdigit():
-                conf = int(float(conf_val))
-            else:
-                conf = 0
-            
-            if conf > 30 and len(text) > 0:
-                x, y, w, h = data["left"][i], data["top"][i], data["width"][i], data["height"][i]
-                blocks.append({
-                    "text": text,
-                    "bbox": (x, y, x + w, y + h),
-                    "confidence": conf
-                })
-        return blocks
-    except Exception as e:
-        print(f"OCR 처리 중 오류: {e}")
-        return []
-
-def clean_special_characters(text: str) -> str:
-    """특수 문자 처리 개선 - PDF에서 잘못 추출되는 문자들을 올바르게 복구"""
-    if not text:
-        return text
-    
-    # 일반적인 PDF 추출 오류 수정
-    replacements = {
-        '\uf0b7': '•',  # 불릿 포인트
-        '\uf0a7': '§',  # 섹션 기호
-        '\uf0e0': '→',  # 화살표
-        '\u2022': '•',  # 불릿 포인트
-        '\u201C': '"',  # 왼쪽 큰따옴표
-        '\u201D': '"',  # 오른쪽 큰따옴표
-        '\u2018': "'",  # 왼쪽 작은따옴표
-        '\u2019': "'",  # 오른쪽 작은따옴표
-        '\u2013': '–',  # en dash
-        '\u2014': '—',  # em dash
-        '\u00A0': ' ',  # 줄바꿈 없는 공백
-        '\u200B': '',   # 폭이 0인 공백
-        '\uFEFF': '',   # 바이트 순서 표시
-    }
-    
-    # 특수 문자 변환
-    for old, new in replacements.items():
-        text = text.replace(old, new)
-    
-    # 연속된 공백 정리
-    text = re.sub(r'[\s\t\n\r]+', ' ', text)
-    
-    # 제로 폭 문자 제거
-    text = re.sub(r'[\u200B-\u200D\uFEFF]', '', text)
-    
-    return text.strip()
-
-def analyze_pdf_orientation(pdf_path: str) -> Dict[str, Any]:
-    """PDF 페이지 크기를 분석하여 문서 방향 감지"""
-    try:
-        doc = fitz.open(pdf_path)
-        page_orientations = []
-        
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            page_rect = page.rect
-            width = page_rect.width
-            height = page_rect.height
-            
-            # 가로/세로 방향 판단
-            if width > height:
-                orientation = 'landscape'  # 가로형
-            else:
-                orientation = 'portrait'   # 세로형
-            
-            page_orientations.append({
-                'page': page_num,
-                'width': width,
-                'height': height,
-                'orientation': orientation,
-                'aspect_ratio': width / height
-            })
-        
-        doc.close()
-        
-        # 전체 문서의 주요 방향 결정
-        landscape_count = sum(1 for p in page_orientations if p['orientation'] == 'landscape')
-        portrait_count = len(page_orientations) - landscape_count
-        
-        primary_orientation = 'landscape' if landscape_count > portrait_count else 'portrait'
-        
-        return {
-            'page_orientations': page_orientations,
-            'primary_orientation': primary_orientation,
-            'landscape_pages': landscape_count,
-            'portrait_pages': portrait_count,
-            'total_pages': len(page_orientations)
-        }
-        
-    except Exception as e:
-        print(f"PDF 방향 분석 중 오류: {e}")
-        return {
-            'page_orientations': [],
-            'primary_orientation': 'portrait',
-            'landscape_pages': 0,
-            'portrait_pages': 0,
-            'total_pages': 0
-        }
-
-def extract_text_with_layout_from_pdf(pdf_path: str) -> Dict[str, Any]:
-    """PDF에서 레이아웃 정보와 함께 텍스트 추출 (방향 감지 포함)"""
-    try:
-        doc = fitz.open(pdf_path)
-        all_text_blocks = []
-        
-        # PDF 방향 분석
-        orientation_info = analyze_pdf_orientation(pdf_path)
-        print(f"PDF 방향 분석 결과: {orientation_info['primary_orientation']} (가로: {orientation_info['landscape_pages']}, 세로: {orientation_info['portrait_pages']})")
-        
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            page_rect = page.rect
-            
-            # 텍스트 블록 추출
-            text_blocks = page.get_text("dict")
-            
-            for block in text_blocks.get("blocks", []):
-                if "lines" in block:
-                    for line in block["lines"]:
-                        line_text = ""
-                        line_bbox = line["bbox"]
-                        
-                        for span in line.get("spans", []):
-                            span_text = span.get("text", "")
-                            if span_text.strip():
-                                line_text += span_text
-                        
-                        if line_text.strip():
-                            # 텍스트 정렬 감지
-                            text_center = (line_bbox[0] + line_bbox[2]) / 2
-                            page_center = page_rect.width / 2
-                            
-                            if abs(text_center - page_center) < 20:
-                                alignment = 'center'
-                            elif (page_rect.width - line_bbox[2]) < (line_bbox[0]):
-                                alignment = 'right'
-                            else:
-                                alignment = 'left'
-                            
-                            all_text_blocks.append({
-                                'text': clean_special_characters(line_text),
-                                'bbox': line_bbox,
-                                'page': page_num,
-                                'alignment': alignment
-                            })
-        
-        doc.close()
-        
-        # 텍스트 블록들을 위치 순서대로 정렬
-        all_text_blocks.sort(key=lambda x: (x['page'], x['bbox'][1], x['bbox'][0]))
-        
-        return {
-            'text_blocks': all_text_blocks,
-            'full_text': '\n'.join([block['text'] for block in all_text_blocks]),
-            'orientation_info': orientation_info
-        }
-        
-    except Exception as e:
-        print(f"PDF 레이아웃 추출 중 오류: {e}")
-        return {'text_blocks': [], 'full_text': ''}
+def allowed_file(filename, content_type):
+    """허용된 파일 확인"""
+    return content_type.lower().startswith('application/pdf')
 
 def extract_text_blocks_with_ocr(image):
-    """OCR을 사용하여 이미지에서 텍스트 블록 추출 (개선된 버전)"""
-    try:
-        # 이미지 전처리로 OCR 정확도 향상
-        img_array = np.array(image)
-        
-        # 그레이스케일 변환
-        if len(img_array.shape) == 3:
-            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = img_array
-        
-        # 노이즈 제거
-        denoised = cv2.medianBlur(gray, 3)
-        
-        # 대비 향상
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(denoised)
-        
-        # OCR 수행
-        config = r"--oem 3 --psm 6 -l kor+eng"
-        text = pytesseract.image_to_string(enhanced, config=config)
-        
-        if text.strip():
-            cleaned_text = clean_special_characters(text.strip())
-            print(f"  - OCR 텍스트 추출됨: {len(cleaned_text)}자")
-            return cleaned_text
-        else:
-            print("  - OCR에서 텍스트를 찾을 수 없음")
-            return ""
-            
-    except Exception as e:
-        print(f"  - OCR 처리 중 오류: {e}")
-        return ""
+    """OCR로 텍스트 추출"""
+    import pytesseract
+    from PIL import Image
+    import io
+    image = Image.open(io.BytesIO(image.tobytes()))
+    ocr_text = pytesseract.image_to_string(image, lang='kor+eng')
+    if ocr_text:
+        return ocr_text
+    else:
+        return None
+
+def extract_text_with_layout_from_pdf(pdf_path):
+    """PDF 내용을 추출하는 함수"""
+    doc = fitz.open(pdf_path)
+    for page_num in range(len(doc)):
+        page = doc.load_page(page_num)
+        page_text = page.get_text()
+        if page_text:
+            return {
+                'full_text': page_text,
+                'text_blocks': [block for block in page.extract_text().split('\n') if block.strip()],
+                'orientation_info': page.get_orientation_info()
+            }
+    return None
 
 def extract_pdf_content_with_adobe(pdf_path):
     """Adobe PDF Services API를 사용하여 PDF 내용을 추출하는 함수"""
@@ -1126,6 +777,12 @@ def too_large(e):
     flash('파일 크기가 100MB를 초과합니다. 더 작은 파일을 선택해주세요.')
     return redirect(url_for('index'))
 
+# Health check endpoint for Render deployment
+@app.route('/health')
+def health_check():
+    """Health check endpoint for Render deployment monitoring"""
+    return jsonify({"status": "healthy"}), 200
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -1322,27 +979,3 @@ def upload_file():
             return {'success': False, 'error': 'PDF 파일만 업로드 가능합니다.'}, 400
             
     except Exception as e:
-        print(f"업로드 처리 중 예외 발생: {str(e)}")
-        return {'success': False, 'error': '파일 처리 중 오류가 발생했습니다.'}, 500
-
-@app.route('/download/<filename>')
-def download_file(filename):
-    """변환된 파일 다운로드"""
-    try:
-        file_path = os.path.join(OUTPUT_FOLDER, filename)
-        if os.path.exists(file_path):
-            # 한글 파일명 UTF-8 인코딩 보장
-            try:
-                download_name = filename.encode('utf-8').decode('utf-8')
-            except (UnicodeEncodeError, UnicodeDecodeError):
-                download_name = filename
-            
-            return send_file(file_path, as_attachment=True, download_name=download_name)
-        else:
-            return {'success': False, 'error': '파일을 찾을 수 없습니다.'}, 404
-    except Exception as e:
-        print(f"파일 다운로드 오류: {str(e)}")
-        return {'success': False, 'error': f'파일 다운로드 중 오류가 발생했습니다: {str(e)}'}, 500
-
-if __name__ == '__main__':
-    app.run(debug=True, host='0.0.0.0', port=5000)
