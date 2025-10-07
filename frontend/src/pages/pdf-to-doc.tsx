@@ -58,15 +58,10 @@ const PdfToDocPage: React.FC = () => {
     }
   };
 
-  const triggerFileSelect = () => {
-    fileInputRef.current?.click();
-  };
-
   return (
-    // 이 페이지 전체를 감싸는 Wrapper. MainLayout의 배경색을 덮고, 자체 배경을 가집니다.
-    <div className="w-full bg-white"> 
+    <div className="w-full bg-gray-50">
       {/* 상단 보라색 배경 섹션 */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center">
+      <div className="relative bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center">
         <div className="flex justify-center items-center gap-4 mb-4">
           <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           <h1 className="text-4xl font-bold">PDF → DOCX 변환기</h1>
@@ -75,23 +70,36 @@ const PdfToDocPage: React.FC = () => {
       </div>
 
       {/* 메인 변환기 카드 섹션 */}
-      <div className="container mx-auto px-4 -mt-24 pb-16"> {/* <--- 마진 조절 */}
+      {/* z-10과 relative를 추가하여 흰색 카드가 항상 위로 오도록 합니다. */}
+      <div className="relative container mx-auto px-4 -mt-24 pb-16 z-10"> 
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-semibold text-gray-800">PDF → DOCX 변환기</h2>
-            <p className="text-gray-500">탄력있는 변환</p>
+            <p className="text-gray-500">끝없는 변환</p>
           </div>
            
-          <div onClick={triggerFileSelect} className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
-            <input ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
+          {/* <label> 태그를 사용하여 클릭 영역을 명확히 하고, input과 직접 연결합니다. */}
+          <label htmlFor="file-upload" className="block border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
+            <input 
+              id="file-upload"
+              ref={fileInputRef}
+              type="file" 
+              accept=".pdf" 
+              onChange={handleFileChange}
+              className="hidden" 
+            />
             <p className="font-semibold text-gray-700">파일을 선택하세요</p>
             <p className="text-sm text-gray-500 mt-1">PDF 파일을 클릭하여 선택 (최대 100MB)</p>
-          </div>
+          </label>
 
           {selectedFile && <p className="mt-4 text-center text-gray-700">선택된 파일: {selectedFile.name}</p>}
 
           <div className="text-center mt-6">
-            <button onClick={handleConvert} disabled={!selectedFile || isConverting} className="w-full bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed">
+            <button 
+              onClick={handleConvert}
+              disabled={!selectedFile || isConverting}
+              className="w-full bg-blue-600 text-white px-8 py-3 rounded-lg text-lg font-semibold hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed"
+            >
               {isConverting ? '변환 중...' : '변환하기'}
             </button>
           </div>
