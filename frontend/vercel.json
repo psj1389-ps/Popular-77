@@ -5,6 +5,10 @@
       "destination": "https://popular-77-deoe.vercel.app/tools/pdf-doc/:path*"
     },
     {
+      "source": "/api/pdf-jpg/:path*",
+      "destination": "https://pdf-jpg-jh3s.onrender.com/:path*"
+    },
+    {
       "source": "/:path*",
       "destination": "/index.html"
     }

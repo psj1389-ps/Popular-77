@@ -1,182 +1,235 @@
-// Popular-77/frontend/src/pages/pdf-to-jpg.tsx
 import React, { useState, useRef } from 'react';
-import { Image, FileText, UploadCloud, Loader2, CheckCircle, Download } from 'lucide-react';
-import { TOOLS } from '../data/constants';
 
-// 도구 정보 가져오기
-const toolInfo = TOOLS.find(tool => tool.id === 'pdf-to-jpg');
-const IconComponent = Image;
+const downloadBlob = (blob: Blob, filename: string) => {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+};
+
+const formatFileSize = (bytes: number) => {
+  if (bytes === 0) return '0 Bytes';
+  const k = 1024;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
+};
 
 const PdfToJpgPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [fileName, setFileName] = useState<string>('');
-  const [isLoading, setIsLoading] = useState<boolean>(false);
-  const [error, setError] = useState<string | null>(null);
-  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null); // 변환된 ZIP 파일의 URL
-  const [convertedFileName, setConvertedFileName] = useState<string | null>(null); // 변환된 ZIP 파일의 이름
-
+  const [quality, setQuality] = useState('medium'); // 'low', 'medium', 'high'
+  const [isConverting, setIsConverting] = useState(false);
+  const [conversionProgress, setConversionProgress] = useState(0);
+  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
+  const [successMessage, setSuccessMessage] = useState('');
+  const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  // 파일 선택 핸들러
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    const file = event.target.files?.[0];
-    if (file && file.type === 'application/pdf') {
-      setSelectedFile(file);
-      setFileName(file.name);
-      setError(null);
-      setConvertedFileUrl(null); // 새 파일 선택 시 이전 결과 초기화
-      setConvertedFileName(null);
-    } else {
-      setSelectedFile(null);
-      setFileName('');
-      setError('PDF 파일만 업로드할 수 있습니다.');
-      setConvertedFileUrl(null);
-      setConvertedFileName(null);
+    if (event.target.files && event.target.files[0]) {
+      const file = event.target.files[0];
+      if (file.size > 100 * 1024 * 1024) {
+        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
+        setSelectedFile(null);
+      } else {
+        setSelectedFile(file);
+        setErrorMessage('');
+      }
     }
   };
 
-  // PDF를 JPG로 변환 요청 핸들러
-  const handleConvertPdfToJpg = async () => {
+  const handleReset = () => {
+    setSelectedFile(null);
+    setErrorMessage('');
+    setShowSuccessMessage(false);
+    setSuccessMessage('');
+    setConversionProgress(0);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ""; // 파일 입력 초기화
+    }
+  };
+
+  const handleConvert = async () => {
     if (!selectedFile) {
-      setError('PDF 파일을 먼저 선택해주세요.');
+      setErrorMessage('먼저 파일을 선택해주세요.');
       return;
     }
-
-    setIsLoading(true);
-    setError(null);
-    setConvertedFileUrl(null);
-    setConvertedFileName(null);
-
-    const formData = new FormData();
-    formData.append('pdfFile', selectedFile); // 'pdfFile'은 백엔드에서 파일을 받을 때 사용할 키 이름입니다.
-
-    try {
-      // 💡 백엔드 API 엔드포인트는 실제 환경에 맞게 변경해야 합니다.
-      //    예: 'http://localhost:5000/api/pdf-to-jpg' 또는 '/api/pdf-to-jpg' (프록시 설정 시)
-      const response = await fetch('/api/pdf-to-jpg', {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.message || 'PDF를 JPG로 변환 중 오류가 발생했습니다.');
-      }
-
-      // 백엔드가 변환된 JPG들을 ZIP 파일로 묶어 보낼 경우
-      const blob = await response.blob();
-      const url = window.URL.createObjectURL(blob);
-      setConvertedFileUrl(url);
-
-      // 백엔드에서 파일 이름을 헤더로 보내줄 경우 (예: Content-Disposition)
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let suggestedFileName = 'converted_images.zip';
-      if (contentDisposition) {
-        const fileNameMatch = contentDisposition.match(/filename="([^"]+)"/);
-        if (fileNameMatch && fileNameMatch[1]) {
-          suggestedFileName = fileNameMatch[1];
+    setIsConverting(true);
+    setErrorMessage('');
+    setShowSuccessMessage(false);
+    setConversionProgress(0);
+    
+    // 진행률 애니메이션 시뮬레이션
+    const progressInterval = setInterval(() => {
+      setConversionProgress(prev => {
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
         }
-      } else {
-        // Content-Disposition 헤더가 없으면 원본 파일명 기반으로 생성
-        const baseName = fileName.split('.').slice(0, -1).join('.');
-        suggestedFileName = `${baseName}_images.zip`;
+        return prev + Math.random() * 15;
+      });
+    }, 200);
+    
+    const formData = new FormData();
+    formData.append('file', selectedFile);
+    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    try {
+      const response = await fetch('/api/pdf-jpg/convert', { method: 'POST', body: formData });
+      if (!response.ok) {
+        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
+        throw new Error(errorData.error || `서버 오류: ${response.status}`);
       }
-      setConvertedFileName(suggestedFileName);
-
-    } catch (err: any) {
-      console.error('PDF-to-JPG 변환 오류:', err);
-      setError(err.message || 'PDF를 JPG로 변환하는 데 실패했습니다. 다시 시도해주세요.');
+      
+      // 변환 완료 시 진행률을 100%로 설정
+      clearInterval(progressInterval);
+      setConversionProgress(100);
+      
+      const blob = await response.blob();
+      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip";
+      
+      // 성공 메시지 표시
+      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      setShowSuccessMessage(true);
+      
+      // 잠시 후 다운로드 시작
+      setTimeout(() => {
+        downloadBlob(blob, downloadFilename);
+      }, 1000);
+      
+    } catch (error) {
+      clearInterval(progressInterval);
+      setConversionProgress(0);
+      setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
     } finally {
-      setIsLoading(false);
-    }
-  };
-
-  // 변환된 ZIP 파일 다운로드 핸들러
-  const handleDownloadConvertedFile = () => {
-    if (convertedFileUrl && convertedFileName) {
-      const link = document.createElement('a');
-      link.href = convertedFileUrl;
-      link.download = convertedFileName;
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(convertedFileUrl); // URL 해제
+      setTimeout(() => {
+        setIsConverting(false);
+        setConversionProgress(0);
+      }, 2000);
     }
   };
 
   return (
-    <div className="p-8 bg-white rounded-lg shadow-md max-w-4xl mx-auto">
-      {toolInfo && (
-        <>
-          <div className="text-green-600 mb-4">
-            {IconComponent && <IconComponent size={48} className="mx-auto" />}
-          </div>
-          <h1 className="text-4xl font-bold mb-4 text-center">{toolInfo.name}</h1>
-          <p className="text-xl text-gray-700 mb-8 text-center">{toolInfo.description}</p>
-        </>
-      )}
-
-      {/* 파일 업로드 영역 */}
-      <div
-        className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center cursor-pointer hover:border-blue-500 transition-colors duration-200"
-        onClick={() => fileInputRef.current?.click()}
-      >
-        <input
-          type="file"
-          ref={fileInputRef}
-          accept=".pdf" // PDF 파일만 허용
-          onChange={handleFileChange}
-          className="hidden"
+    <div className="w-full bg-white">
+      {/* 상단 보라색 배경 섹션 */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
+        {/* 애니메이션 배경 패턴 */}
+        <div 
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><pattern id='grain' width='100' height='100' patternUnits='userSpaceOnUse'><circle cx='12' cy='8' r='0.6' fill='%23ffffff' opacity='0.18'/><circle cx='37' cy='23' r='1.8' fill='%23ffffff' opacity='0.06'/><circle cx='68' cy='15' r='0.9' fill='%23ffffff' opacity='0.14'/><circle cx='91' cy='42' r='1.3' fill='%23ffffff' opacity='0.09'/><circle cx='24' cy='56' r='0.7' fill='%23ffffff' opacity='0.16'/><circle cx='55' cy='73' r='1.5' fill='%23ffffff' opacity='0.07'/><circle cx='83' cy='88' r='1.1' fill='%23ffffff' opacity='0.11'/><circle cx='6' cy='34' r='2.0' fill='%23ffffff' opacity='0.05'/><circle cx='45' cy='47' r='0.8' fill='%23ffffff' opacity='0.13'/><circle cx='72' cy='61' r='1.2' fill='%23ffffff' opacity='0.10'/><circle cx='18' cy='79' r='0.5' fill='%23ffffff' opacity='0.19'/><circle cx='63' cy='29' r='1.7' fill='%23ffffff' opacity='0.08'/><circle cx='89' cy='18' r='0.9' fill='%23ffffff' opacity='0.15'/><circle cx='31' cy='91' r='1.4' fill='%23ffffff' opacity='0.12'/><circle cx='76' cy='5' r='0.6' fill='%23ffffff' opacity='0.17'/><circle cx='9' cy='67' r='1.6' fill='%23ffffff' opacity='0.06'/><circle cx='52' cy='12' r='1.0' fill='%23ffffff' opacity='0.14'/><circle cx='95' cy='76' r='0.8' fill='%23ffffff' opacity='0.11'/></pattern></defs><rect width='100' height='100' fill='url(%23grain)'/></svg>")`,
+            backgroundRepeat: 'repeat',
+            animation: 'float 20s ease-in-out infinite'
+          }}
         />
-        {selectedFile ? (
-          <p className="text-lg text-gray-700">
-            <FileText size={24} className="inline-block mr-2 text-blue-500" />
-            파일 선택됨: <span className="font-semibold">{fileName}</span>
-          </p>
-        ) : (
-          <>
-            <UploadCloud size={48} className="mx-auto mb-4 text-gray-400" />
-            <p className="text-lg text-gray-700">여기를 클릭하거나 PDF 파일을 드래그하여 업로드하세요.</p>
-            <p className="text-sm text-gray-500 mt-2">PDF 파일만 가능합니다.</p>
-          </>
-        )}
+        
+        <div className="container mx-auto relative z-10">
+            <div className="flex justify-center items-center gap-4 mb-4">
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+              <h1 className="text-4xl font-bold">PDF → JPG 변환기</h1>
+            </div>
+            <p className="text-lg opacity-90 max-w-2xl mx-auto">고화질 이미지 변환 서비스로 PDF를 JPG 이미지로 쉽게 변환하세요.</p>
+        </div>
       </div>
+      
+      <style>{`
+        @keyframes float {
+          0% { transform: translateX(0px) translateY(0px); }
+          33% { transform: translateX(-25px) translateY(18px); }
+          66% { transform: translateX(22px) translateY(-15px); }
+          100% { transform: translateX(0px) translateY(0px); }
+        }
+      `}</style>
 
-      {error && (
-        <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative mt-4" role="alert">
-          <span className="block sm:inline">{error}</span>
-        </div>
-      )}
+      <div className="container mx-auto px-4 py-16">
+        <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
+          <div className="text-center mb-6">
+            <h2 className="text-2xl font-semibold text-gray-800">PDF → JPG 변환기</h2>
+            <p className="text-gray-500">고화질 이미지 변환</p>
+          </div>
+          
+          {!selectedFile ? (
+            // 파일 선택 전 UI
+            <label htmlFor="file-upload" className="block border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
+              <input id="file-upload" ref={fileInputRef} type="file" accept=".pdf" onChange={handleFileChange} className="hidden" />
+              <p className="font-semibold text-gray-700">파일을 선택하세요</p>
+              <p className="text-sm text-gray-500 mt-1">PDF 파일을 클릭하여 선택 (최대 100MB)</p>
+            </label>
+          ) : (
+            // 파일 선택 후 UI
+            <div className="space-y-6">
+              <div>
+                <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
+                <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
+              </div>
+              
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                  </label>
+                </div>
+              </div>
 
-      {selectedFile && !convertedFileUrl && (
-        <div className="mt-8">
-          <button
-            onClick={handleConvertPdfToJpg}
-            disabled={isLoading || !selectedFile}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors duration-200 disabled:bg-blue-300 disabled:cursor-not-allowed flex items-center justify-center"
-          >
-            {isLoading && <Loader2 className="animate-spin mr-2" size={20} />}
-            {isLoading ? '변환 중...' : 'PDF를 JPG로 변환'}
-          </button>
-        </div>
-      )}
+              {/* 변환 진행률 표시 */}
+              {isConverting && (
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
+                      style={{ width: `${conversionProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="flex items-center justify-center mt-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
+                    <span className="text-sm text-gray-600">PDF를 JPG로 변환 중...</span>
+                  </div>
+                </div>
+              )}
 
-      {convertedFileUrl && convertedFileName && (
-        <div className="mt-8 text-center">
-          <h2 className="text-2xl font-semibold mb-4">변환 완료!</h2>
-          <p className="text-lg text-gray-700 mb-4">
-            <CheckCircle size={24} className="inline-block mr-2 text-green-500" />
-            파일이 성공적으로 변환되었습니다.
-          </p>
-          <button
-            onClick={handleDownloadConvertedFile}
-            className="w-full bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors duration-200 flex items-center justify-center"
-          >
-            <Download size={20} className="inline-block mr-2" />
-            {convertedFileName} 다운로드
-          </button>
+              {/* 성공 메시지 */}
+              {showSuccessMessage && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
+                    <span className="text-green-700 font-medium">{successMessage}</span>
+                  </div>
+                </div>
+              )}
+
+              <div className="flex gap-4">
+                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                  {isConverting ? '변환 중...' : '변환하기'}
+                </button>
+                <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                  파일 초기화
+                </button>
+              </div>
+            </div>
+          )}
+          
+          {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
         </div>
-      )}
+      </div>
     </div>
   );
 };
