@@ -1,9 +1,7 @@
 from flask import Flask, render_template, request, send_file, jsonify
 import os
 import zipfile
-from pdf2image import convert_from_bytes
-from PIL import Image
-import io
+import fitz  # PyMuPDF
 import tempfile
 
 app = Flask(__name__)
@@ -18,6 +16,10 @@ def index():
 
 @app.route('/convert', methods=['POST'])
 def convert():
+    input_path = None
+    image_paths = []
+    zip_path = None
+    
     try:
         file = request.files['file']
         quality = request.form.get('quality', 'medium')
@@ -29,8 +31,15 @@ def convert():
         if not file.filename.lower().endswith('.pdf'):
             return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
         
-        # PDF를 이미지로 변환
-        pdf_bytes = file.read()
+        # 출력 폴더 생성
+        if not os.path.exists('outputs'):
+            os.makedirs('outputs')
+        
+        # 임시 PDF 파일 저장
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', dir='outputs')
+        file.save(temp_pdf.name)
+        input_path = temp_pdf.name
+        temp_pdf.close()
         
         # 품질 설정
         dpi_map = {'low': 150, 'medium': 200, 'high': 300}
@@ -40,58 +49,72 @@ def convert():
         dpi = int(dpi * scale)
         
         # PDF를 이미지로 변환
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
+        doc = fitz.open(input_path)
+        base_filename = os.path.splitext(os.path.basename(file.filename))[0]
         
-        if not os.path.exists('outputs'):
-            os.makedirs('outputs')
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap(dpi=dpi)
+            # 파일 이름을 원본 파일 이름 기반으로 만듭니다.
+            output_image_filename = f"{base_filename}_page_{i+1}.jpg"
+            image_path = os.path.join('outputs', output_image_filename)
+            pix.save(image_path)
+            image_paths.append(image_path)
         
-        # 단일 페이지인 경우 JPG로, 다중 페이지인 경우 ZIP으로
-        if len(images) == 1:
-            # 단일 이미지 처리
-            img = images[0]
+        page_count = len(doc)
+        doc.close()
+        
+        # --- 여기가 핵심 로직 ---
+        if page_count == 1:
+            # 페이지가 1장이면, 첫 번째 이미지를 바로 보냅니다.
+            single_image_path = image_paths[0]
+            download_name = os.path.basename(single_image_path)
+            print(f"페이지가 1장이라 JPG 파일({download_name})을 직접 보냅니다.")
+            return send_file(single_image_path, as_attachment=True, download_name=download_name)
+        
+        elif page_count > 1:
+            # 페이지가 2장 이상이면, ZIP 파일로 압축합니다.
+            zip_filename = f"{base_filename}_images.zip"
+            zip_path = os.path.join('outputs', zip_filename)
+            print(f"페이지가 {page_count}장이라 ZIP 파일({zip_filename})로 압축합니다.")
             
-            # 크기 조정
-            if scale != 1.0:
-                new_width = int(img.width * scale)
-                new_height = int(img.height * scale)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for file_path in image_paths:
+                    zipf.write(file_path, os.path.basename(file_path))
             
-            # 임시 파일로 저장
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.jpg', dir='outputs')
-            img.save(temp_file.name, 'JPEG', quality=95)
-            temp_file.close()
-            
-            return send_file(temp_file.name, 
-                           as_attachment=True, 
-                           download_name=f"{os.path.splitext(file.filename)[0]}.jpg",
-                           mimetype='image/jpeg')
-        else:
-            # 다중 이미지를 ZIP으로 압축
-            zip_filename = f"outputs/{os.path.splitext(file.filename)[0]}_jpg.zip"
-            
-            with zipfile.ZipFile(zip_filename, 'w') as zipf:
-                for i, img in enumerate(images):
-                    # 크기 조정
-                    if scale != 1.0:
-                        new_width = int(img.width * scale)
-                        new_height = int(img.height * scale)
-                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    
-                    # 메모리에서 이미지 처리
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, 'JPEG', quality=95)
-                    img_bytes.seek(0)
-                    
-                    # ZIP에 추가
-                    zipf.writestr(f"page_{i+1:03d}.jpg", img_bytes.getvalue())
-            
-            return send_file(zip_filename, 
-                           as_attachment=True, 
-                           download_name=f"{os.path.splitext(file.filename)[0]}_jpg.zip",
-                           mimetype='application/zip')
+            # ZIP 파일을 보냅니다.
+            return send_file(zip_path, as_attachment=True, download_name=zip_filename)
+        
+        else:  # page_count == 0
+            # 페이지가 없는 PDF일 경우
+            return jsonify({'error': 'PDF 파일에 페이지가 없습니다.'}), 400
     
     except Exception as e:
         return jsonify({'error': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
+    
+    finally:
+        # 작업이 끝난 후 임시 파일들을 정리합니다.
+        # 입력 PDF 파일 정리
+        try:
+            if input_path and os.path.exists(input_path):
+                os.remove(input_path)
+        except Exception as e:
+            print(f"입력 파일 삭제 실패 (무시됨): {e}")
+            
+        # 생성된 이미지 파일들 정리 (ZIP으로 묶었거나 1장 보낸 후)
+        for path in image_paths:
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+            except Exception as e:
+                print(f"이미지 파일 삭제 실패 (무시됨): {e}")
+        
+        # 생성된 ZIP 파일 정리 (다운로드 보낸 후)
+        if zip_path:
+            try:
+                if os.path.exists(zip_path):
+                    os.remove(zip_path)
+            except Exception as e:
+                print(f"ZIP 파일 삭제 실패 (무시됨): {e}")
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
