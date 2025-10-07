@@ -2,7 +2,7 @@
   "rewrites": [
     {
       "source": "/api/pdf-doc/:path*",
-      "destination": "https://popular-77-deoe.vercel.app/tools/pdf-doc/:path*"
+      "destination": "https://pdf-doc-306w.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-jpg/:path*",
