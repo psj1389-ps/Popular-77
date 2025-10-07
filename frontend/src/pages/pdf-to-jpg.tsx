@@ -108,8 +108,7 @@ const PdfToJpgPage: React.FC = () => {
       }
       
       // 성공 메시지 표시
-      const fileType = downloadFilename.endsWith('.jpg') ? 'JPG 이미지' : 'ZIP 파일';
-      setSuccessMessage(`변환 완료! ${fileType}(${downloadFilename})이 다운로드됩니다.`);
+      setSuccessMessage(`변환 완료! 파일명: ${downloadFilename}로 다운로드됩니다.`);
       setShowSuccessMessage(true);
       
       // 잠시 후 다운로드 시작
