@@ -98,8 +98,6 @@ def extract_pdf_content_with_adobe(pdf_path):
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
-        print(f"일반 오류: {str(e)}")
-        return None
 
 def pdf_to_xlsx(pdf_path, output_path, quality='medium'):
     """PDF를 XLSX로 변환하는 함수 (텍스트 추출 후 Excel 시트로 구조화)"""
