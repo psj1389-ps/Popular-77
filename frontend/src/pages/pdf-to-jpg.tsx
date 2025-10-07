@@ -230,6 +230,54 @@ const PdfToJpgPage: React.FC = () => {
           {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
         </div>
       </div>
+
+      {/* PDF를 이미지로 변환하는 방법 가이드 섹션 */}
+      <div className="bg-gray-50 py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 이미지로 변환하는 방법</h2>
+            <p className="text-gray-600">간단한 4단계로 PDF를 고품질 이미지로 변환하세요</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* 1단계: PDF 업로드 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-blue-600">1️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">PDF 업로드</h3>
+              <p className="text-gray-600 text-sm text-center">PDF 파일을 드래그하거나 클릭하여 선택해주세요.</p>
+            </div>
+
+            {/* 2단계: 설정 선택 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-green-600">2️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">설정을 선택하세요</h3>
+              <p className="text-gray-600 text-sm text-center">품질, 용량 및 해상도를 선택해주세요.</p>
+            </div>
+
+            {/* 3단계: 자동 변환 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-yellow-600">3️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환</h3>
+              <p className="text-gray-600 text-sm text-center">잠시만 기다리면 변환이 시작됩니다.</p>
+            </div>
+
+            {/* 4단계: 다운로드 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-purple-600">4️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">다운로드</h3>
+              <p className="text-gray-600 text-sm text-center">개별 페이지 또는 전체 다운로드 선택.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
