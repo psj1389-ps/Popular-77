@@ -4,8 +4,8 @@ import React from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
 
 // 페이지들을 가져옵니다.
-import Home from "@/pages/Home";
-import PdfConverterPage from "@/pages/PdfConverterPage";
+import HomePage from "@/pages/HomePage";
+import PdfToDocPage from "@/pages/pdf-to-doc";
 
 // 방금 만든 MainLayout 컴포넌트를 가져옵니다.
 import MainLayout from '@/components/MainLayout';
@@ -20,7 +20,7 @@ function App() {
           path="/"
           element={
             <MainLayout>
-              <Home />
+              <HomePage />
             </MainLayout>
           }
         />
@@ -28,7 +28,7 @@ function App() {
           path="/tools/pdf-doc"
           element={
             <MainLayout>
-              <PdfConverterPage />
+              <PdfToDocPage />
             </MainLayout>
           }
         />
