@@ -1,5 +1,5 @@
 // Popular-77/frontend/src/pages/Home.tsx (또는 HomePage.tsx)
-import React from 'react';
+import React, { useRef } from 'react';
 import Hero from '../components/Hero';               // Hero 섹션 컴포넌트
 import PopularTools from '../components/PopularTools'; // 인기 도구 섹션 컴포넌트
 import ToolsPreview from '../components/ToolsPreview'; // 전체 도구 미리보기 섹션 컴포넌트
@@ -8,6 +8,21 @@ import ToolsPreview from '../components/ToolsPreview'; // 전체 도구 미리�
 import { TOOLS } from '../data/constants';
 
 const Home: React.FC = () => {
+  // 각 섹션을 가리킬 ref들을 만듭니다.
+  const allToolsRef = useRef<HTMLDivElement>(null);
+  const pdfToolsRef = useRef<HTMLDivElement>(null);
+  const imageToolsRef = useRef<HTMLDivElement>(null);
+  const aiToolsRef = useRef<HTMLDivElement>(null);
+  const imageConvertRef = useRef<HTMLDivElement>(null);
+  const documentToolsRef = useRef<HTMLDivElement>(null);
+  const youtubeToolsRef = useRef<HTMLDivElement>(null);
+  const videoToolsRef = useRef<HTMLDivElement>(null);
+
+  // 클릭 시 스크롤을 실행하는 함수
+  const scrollToSection = (ref: React.RefObject<HTMLDivElement>) => {
+    ref.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+
   // 💡 featured: true 인 도구들만 필터링하여 인기 도구 섹션에 전달
   const featuredTools = TOOLS.filter(tool => tool.featured);
 
@@ -21,7 +36,20 @@ const Home: React.FC = () => {
 
       {/* 2. 인기 도구 섹션 */}
       {/* 💡 featuredTools를 prop으로 전달 */}
-      <PopularTools tools={featuredTools} />
+      <PopularTools 
+        tools={featuredTools} 
+        refs={{
+          allToolsRef,
+          pdfToolsRef,
+          imageToolsRef,
+          aiToolsRef,
+          imageConvertRef,
+          documentToolsRef,
+          youtubeToolsRef,
+          videoToolsRef
+        }}
+        scrollToSection={scrollToSection}
+      />
 
       {/* 3. 도구 미리보기 섹션 (모든 도구 목록) */}
       {/* 💡 TOOLS 전체를 prop으로 전달 */}
