@@ -115,8 +115,18 @@ const PdfToDocPage: React.FC = () => {
   return (
     <div className="w-full bg-white">
       {/* 상단 보라색 배경 섹션 */}
-      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center">
-        <div className="container mx-auto">
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
+        {/* 애니메이션 배경 패턴 */}
+        <div 
+          className="absolute inset-0 opacity-30"
+          style={{
+            backgroundImage: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><pattern id='grain' width='100' height='100' patternUnits='userSpaceOnUse'><circle cx='12' cy='8' r='0.6' fill='%23ffffff' opacity='0.18'/><circle cx='37' cy='23' r='1.8' fill='%23ffffff' opacity='0.06'/><circle cx='68' cy='15' r='0.9' fill='%23ffffff' opacity='0.14'/><circle cx='91' cy='42' r='1.3' fill='%23ffffff' opacity='0.09'/><circle cx='24' cy='56' r='0.7' fill='%23ffffff' opacity='0.16'/><circle cx='55' cy='73' r='1.5' fill='%23ffffff' opacity='0.07'/><circle cx='83' cy='88' r='1.1' fill='%23ffffff' opacity='0.11'/><circle cx='6' cy='34' r='2.0' fill='%23ffffff' opacity='0.05'/><circle cx='45' cy='47' r='0.8' fill='%23ffffff' opacity='0.13'/><circle cx='72' cy='61' r='1.2' fill='%23ffffff' opacity='0.10'/><circle cx='18' cy='79' r='0.5' fill='%23ffffff' opacity='0.19'/><circle cx='63' cy='29' r='1.7' fill='%23ffffff' opacity='0.08'/><circle cx='89' cy='18' r='0.9' fill='%23ffffff' opacity='0.15'/><circle cx='31' cy='91' r='1.4' fill='%23ffffff' opacity='0.12'/><circle cx='76' cy='5' r='0.6' fill='%23ffffff' opacity='0.17'/><circle cx='9' cy='67' r='1.6' fill='%23ffffff' opacity='0.06'/><circle cx='52' cy='12' r='1.0' fill='%23ffffff' opacity='0.14'/><circle cx='95' cy='76' r='0.8' fill='%23ffffff' opacity='0.11'/></pattern></defs><rect width='100' height='100' fill='url(%23grain)'/></svg>")`,
+            backgroundRepeat: 'repeat',
+            animation: 'float 20s ease-in-out infinite'
+          }}
+        />
+        
+        <div className="container mx-auto relative z-10">
             <div className="flex justify-center items-center gap-4 mb-4">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
               <h1 className="text-4xl font-bold">PDF → DOCX 변환기</h1>
@@ -124,6 +134,15 @@ const PdfToDocPage: React.FC = () => {
             <p className="text-lg opacity-90 max-w-2xl mx-auto">AI 기반 PDF to DOCX 변환 서비스로 문서를 Word 파일로 쉽게 변환하세요.</p>
         </div>
       </div>
+      
+      <style jsx>{`
+        @keyframes float {
+          0% { transform: translateX(0px) translateY(0px); }
+          33% { transform: translateX(-25px) translateY(18px); }
+          66% { transform: translateX(22px) translateY(-15px); }
+          100% { transform: translateX(0px) translateY(0px); }
+        }
+      `}</style>
 
       <div className="container mx-auto px-4 py-16">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
