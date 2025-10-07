@@ -44,13 +44,26 @@ const PdfToDocPage: React.FC = () => {
     formData.append('quality', 'low');
     try {
       const response = await fetch('/api/pdf-doc/convert', { method: 'POST', body: formData });
+
+      // 서버 응답이 정상이 아닐 때, 더 자세한 에러 메시지를 처리합니다.
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+        // 서버가 JSON 형태의 에러 메시지를 보냈는지 확인
+        const contentType = response.headers.get("content-type");
+        if (contentType && contentType.indexOf("application/json") !== -1) {
+            const errorData = await response.json();
+            throw new Error(errorData.error || `서버 오류: ${response.status}`);
+        } else {
+            // JSON이 아닌 다른 응답(HTML 등)이 왔을 경우
+            const errorText = await response.text();
+            console.error("서버 응답:", errorText); // 개발자 도구 콘솔에 전체 에러 내용을 출력
+            throw new Error(`서버에서 예상치 못한 응답이 왔습니다. (상태: ${response.status})`);
+        }
       }
+       
       const blob = await response.blob();
       const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".docx";
       downloadBlob(blob, downloadFilename);
+
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
     } finally {
@@ -58,10 +71,12 @@ const PdfToDocPage: React.FC = () => {
     }
   };
 
+  const triggerFileSelect = () => {
+    fileInputRef.current?.click();
+  };
+
   return (
-    // 이 페이지 전체를 감싸는 부분입니다. MainLayout 안으로 들어갑니다.
-    <div className="w-full bg-white pb-16"> {/* 페이지 하단에 여백 추가 */}
-       
+    <div className="w-full bg-gray-50">
       {/* 상단 보라색 배경 섹션 */}
       <div className="relative bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center">
         <div className="container mx-auto">
@@ -75,7 +90,7 @@ const PdfToDocPage: React.FC = () => {
 
       {/* 메인 변환기 카드 섹션 */}
       {/* z-10과 relative를 추가하여 흰색 카드가 항상 위로 오도록 합니다. */}
-      <div className="relative container mx-auto px-4 -mt-24 z-10"> 
+      <div className="relative container mx-auto px-4 -mt-24 pb-16 z-10"> 
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-semibold text-gray-800">PDF → DOCX 변환기</h2>
@@ -113,6 +128,5 @@ const PdfToDocPage: React.FC = () => {
     </div>
   );
 };
-
 
 export default PdfToDocPage;
