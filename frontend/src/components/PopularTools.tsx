@@ -32,7 +32,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
     const element = document.getElementById(targetId);
     if (element) {
       const elementPosition = element.offsetTop;
-      const offsetPosition = elementPosition - 100; // 100px 오프셋으로 조정하여 헤더나 고정 요소 고려
+      const offsetPosition = elementPosition - 200; // 200px 오프셋으로 조정하여 h3 제목이 화면 중간에 적절히 위치하도록 개선
       
       window.scrollTo({
         top: offsetPosition,
@@ -103,7 +103,10 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             PDF변환도구
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank')}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to DOCX</h4>
               <p className="text-gray-600">PDF 파일을 DOCX로 변환합니다.</p>
             </div>
