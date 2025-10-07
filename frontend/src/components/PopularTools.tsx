@@ -32,7 +32,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
     const element = document.getElementById(targetId);
     if (element) {
       const elementPosition = element.offsetTop;
-      const offsetPosition = elementPosition - 30; // 30px 오프셋 추가
+      const offsetPosition = elementPosition - 100; // 100px 오프셋으로 조정하여 헤더나 고정 요소 고려
       
       window.scrollTo({
         top: offsetPosition,
