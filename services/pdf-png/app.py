@@ -54,6 +54,10 @@ app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
+@app.route("/health")
+def health():
+    return "ok", 200
+
 # Adobe PDF Services API 구성 - 환경변수 사용
 ADOBE_CONFIG = {
     "client_credentials": {

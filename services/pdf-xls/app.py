@@ -1,3 +1,6 @@
+from flask import Flask, request, render_template, send_file, jsonify, send_from_directory
+from flask_cors import CORS
+from werkzeug.utils import secure_filename
 from docx import Document
 import fitz
 import PyPDF2
@@ -5,6 +8,19 @@ import io
 import subprocess
 import tempfile
 import os
+import pandas as pd
+import re
+import platform
+from pptx import Presentation
+from pptx.util import Inches as PptxInches
+from pptx.enum.text import PP_ALIGN
+
+app = Flask(__name__)
+CORS(app)
+
+@app.route("/health")
+def health():
+    return "ok", 200
 
 ADOBE_SDK_AVAILABLE = False
 ADOBE_CONFIG = {
