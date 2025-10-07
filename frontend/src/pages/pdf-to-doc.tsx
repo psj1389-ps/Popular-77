@@ -70,7 +70,7 @@ const PdfToDocPage: React.FC = () => {
       </div>
 
       {/* 메인 변환기 카드 섹션 */}
-      <div className="container mx-auto px-4 -mt-24 pb-16">
+      <div className="container mx-auto px-4 py-16">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
           <div className="text-center mb-6">
             <h2 className="text-2xl font-semibold text-gray-800">PDF → DOCX 변환기</h2>
