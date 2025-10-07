@@ -93,6 +93,8 @@ def extract_pdf_content_with_adobe(pdf_path):
         print(f"Adobe API 오류: {str(e)}")
         return None
     except Exception as e:
+        print(f"일반 오류: {str(e)}")
+        return {'success': False, 'error': '파일 처리 중 오류가 발생했습니다.'}, 500
         print(f"전체 처리 중 오류 발생: {str(e)}")
         return {'success': False, 'error': f'서버 오류가 발생했습니다: {str(e)}'}, 500
 
