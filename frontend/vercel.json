@@ -3,13 +3,10 @@
     {
       "source": "/api/pdf-doc/:path*",
       "destination": "https://pdf-doc-306w.onrender.com/:path*"
-    }
-  ],
-  "routes": [
+    },
     {
-      "src": "/[^.]+",
-      "dest": "/index.html",
-      "status": 200
+      "source": "/:path*",
+      "destination": "/index.html"
     }
   ]
 }
