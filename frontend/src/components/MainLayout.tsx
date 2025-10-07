@@ -1,20 +1,20 @@
 // src/components/MainLayout.tsx
 
 import React from 'react';
-import Navbar from '@/components/Navbar';
-import Footer from '@/components/Footer';
+import Navbar from '@/components/Navbar'; // 당신의 Navbar 컴포넌트 경로
+import Footer from '@/components/Footer'; // 당신의 Footer 컴포넌트 경로
 
+// 'children'은 이 레이아웃으로 감싸질 페이지 내용을 의미합니다.
 interface MainLayoutProps {
   children: React.ReactNode;
 }
 
 const MainLayout: React.FC<MainLayoutProps> = ({ children }) => {
   return (
-    <div className="flex flex-col min-h-screen bg-gray-50"> {/* 전체 배경색을 연한 회색으로 */}
+    <div className="flex flex-col min-h-screen">
       <Navbar />
-      {/* main 영역 자체는 배경 없이 자식 컴포넌트가 배경을 처리하도록 합니다. */}
       <main className="flex-grow">
-        {children}
+        {children} {/* 여기에 Home.tsx나 PdfConverterPage.tsx 같은 페이지 내용이 들어옵니다. */}
       </main>
       <Footer />
     </div>
