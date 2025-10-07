@@ -1,10 +1,12 @@
 from flask import Flask, render_template, request, send_file, jsonify
+from flask_cors import CORS
 import os
 import zipfile
-import fitz  # PyMuPDF
+from pdf2image import convert_from_path
 import tempfile
 
 app = Flask(__name__)
+CORS(app)
 
 @app.route("/health")
 def health():
@@ -49,19 +51,19 @@ def convert():
         dpi = int(dpi * scale)
         
         # PDF를 이미지로 변환
-        doc = fitz.open(input_path)
         base_filename = os.path.splitext(os.path.basename(file.filename))[0]
         
-        for i, page in enumerate(doc):
-            pix = page.get_pixmap(dpi=dpi)
+        # pdf2image를 사용하여 PDF를 이미지로 변환
+        images = convert_from_path(input_path, dpi=dpi, fmt='JPEG')
+        
+        for i, image in enumerate(images):
             # 파일 이름을 원본 파일 이름 기반으로 만듭니다.
             output_image_filename = f"{base_filename}_page_{i+1}.jpg"
             image_path = os.path.join('outputs', output_image_filename)
-            pix.save(image_path)
+            image.save(image_path, 'JPEG')
             image_paths.append(image_path)
         
-        page_count = len(doc)
-        doc.close()
+        page_count = len(images)
         
         # --- 여기가 핵심 로직 ---
         if page_count == 1:
