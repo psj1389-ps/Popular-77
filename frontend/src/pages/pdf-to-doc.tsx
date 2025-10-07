@@ -226,6 +226,54 @@ const PdfToDocPage: React.FC = () => {
           {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
         </div>
       </div>
+
+      {/* PDF를 DOCX로 변환하는 방법 가이드 섹션 */}
+      <div className="bg-gray-50 py-16">
+        <div className="max-w-4xl mx-auto px-4">
+          <div className="text-center mb-12">
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 DOCX로 변환하는 방법</h2>
+            <p className="text-gray-600">간단한 4단계로 PDF를 편집 가능한 DOCX 문서로 변환하세요</p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            {/* 1단계: PDF 업로드 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-blue-600">1️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">PDF 업로드</h3>
+              <p className="text-gray-600 text-sm text-center">PDF 파일을 드래그하거나 "파일 선택" 버튼을 클릭하여 업로드해주세요.</p>
+            </div>
+
+            {/* 2단계: 변환 옵션 선택 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-green-600">2️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">변환 옵션 선택 (선택 사항)</h3>
+              <p className="text-gray-600 text-sm text-center">빠른 변환 또는 OCR을 포함한 표준 변환 등 원하는 품질 옵션을 선택해주세요.</p>
+            </div>
+
+            {/* 3단계: 자동 변환 시작 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-yellow-600">3️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환 시작</h3>
+              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 문서의 레이아웃과 텍스트를 분석하여 변환을 시작합니다.</p>
+            </div>
+
+            {/* 4단계: DOCX 파일 다운로드 */}
+            <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+              <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto">
+                <span className="text-xl font-bold text-purple-600">4️⃣</span>
+              </div>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">DOCX 파일 다운로드</h3>
+              <p className="text-gray-600 text-sm text-center">변환이 완료되면, 완벽하게 편집 가능한 Word(.docx) 파일을 즉시 다운로드할 수 있습니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };
