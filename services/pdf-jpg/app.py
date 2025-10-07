@@ -8,6 +8,10 @@ import tempfile
 
 app = Flask(__name__)
 
+@app.route("/health")
+def health():
+    return "ok", 200
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -89,5 +93,6 @@ def convert():
     except Exception as e:
         return jsonify({'error': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
 
-if __name__ == '__main__':
-    app.run(host='0.0.0.0', port=8080, debug=True)
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
