@@ -89,10 +89,27 @@ const PdfToJpgPage: React.FC = () => {
       setConversionProgress(100);
       
       const blob = await response.blob();
-      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip";
+      
+      // Content-Disposition 헤더에서 파일명 추출
+      const contentDisposition = response.headers.get('Content-Disposition');
+      let downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip"; // 기본값
+      
+      if (contentDisposition) {
+        const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+        if (filenameMatch && filenameMatch[1]) {
+          downloadFilename = filenameMatch[1].replace(/['"]/g, '');
+        }
+      } else {
+        // Content-Type으로 파일 형식 판단
+        const contentType = response.headers.get('Content-Type');
+        if (contentType && contentType.includes('image/jpeg')) {
+          downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".jpg";
+        }
+      }
       
       // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      const fileType = downloadFilename.endsWith('.jpg') ? 'JPG 이미지' : 'ZIP 파일';
+      setSuccessMessage(`변환 완료! ${fileType}(${downloadFilename})이 다운로드됩니다.`);
       setShowSuccessMessage(true);
       
       // 잠시 후 다운로드 시작

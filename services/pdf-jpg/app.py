@@ -52,9 +52,11 @@ def convert():
         
         # PDF를 이미지로 변환
         base_filename = os.path.splitext(os.path.basename(file.filename))[0]
+        print(f"[DEBUG] 변환 시작 - 파일명: {file.filename}, 기본 파일명: {base_filename}")
         
         # pdf2image를 사용하여 PDF를 이미지로 변환
         images = convert_from_path(input_path, dpi=dpi, fmt='JPEG')
+        print(f"[DEBUG] PDF 변환 완료 - 총 {len(images)}개 페이지 발견")
         
         for i, image in enumerate(images):
             # 파일 이름을 원본 파일 이름 기반으로 만듭니다.
@@ -62,28 +64,32 @@ def convert():
             image_path = os.path.join('outputs', output_image_filename)
             image.save(image_path, 'JPEG')
             image_paths.append(image_path)
+            print(f"[DEBUG] 페이지 {i+1} 저장 완료: {output_image_filename}")
         
         page_count = len(images)
+        print(f"[DEBUG] 최종 페이지 수: {page_count}")
         
         # --- 여기가 핵심 로직 ---
         if page_count == 1:
             # 페이지가 1장이면, 첫 번째 이미지를 바로 보냅니다.
             single_image_path = image_paths[0]
-            download_name = os.path.basename(single_image_path)
-            print(f"페이지가 1장이라 JPG 파일({download_name})을 직접 보냅니다.")
+            download_name = f"{base_filename}.jpg"  # 원본 파일명으로 단순화
+            print(f"[DEBUG] 단일 페이지 처리 - JPG 파일({download_name})을 직접 반환")
             return send_file(single_image_path, as_attachment=True, download_name=download_name)
         
         elif page_count > 1:
             # 페이지가 2장 이상이면, ZIP 파일로 압축합니다.
             zip_filename = f"{base_filename}_images.zip"
             zip_path = os.path.join('outputs', zip_filename)
-            print(f"페이지가 {page_count}장이라 ZIP 파일({zip_filename})로 압축합니다.")
+            print(f"[DEBUG] 다중 페이지 처리 - {page_count}장을 ZIP 파일({zip_filename})로 압축")
             
             with zipfile.ZipFile(zip_path, 'w') as zipf:
                 for file_path in image_paths:
                     zipf.write(file_path, os.path.basename(file_path))
+                    print(f"[DEBUG] ZIP에 추가: {os.path.basename(file_path)}")
             
             # ZIP 파일을 보냅니다.
+            print(f"[DEBUG] ZIP 파일 반환: {zip_filename}")
             return send_file(zip_path, as_attachment=True, download_name=zip_filename)
         
         else:  # page_count == 0
