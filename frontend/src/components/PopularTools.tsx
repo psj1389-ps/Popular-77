@@ -20,14 +20,21 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
   const scrollToSection = (targetId: string) => {
     const element = document.getElementById(targetId);
     if (element) {
-      element.scrollIntoView({
-        behavior: 'smooth',
-        block: 'start',
+      const elementPosition = element.offsetTop;
+      const offsetPosition = elementPosition - 30; // 30px 오프셋 추가
+      
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: 'smooth'
       });
     }
   };
 
   const handleToolClick = () => {
+    window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank');
+  };
+
+  const handleCategoryHeaderClick = () => {
     window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank');
   };
 
@@ -54,7 +61,14 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
           })}
         </div>
         <div className="text-center mt-12">
-          <a href="#" className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center text-xl">
+          <a 
+            href="#" 
+            onClick={(e) => {
+              e.preventDefault();
+              window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank');
+            }}
+            className="text-blue-600 hover:text-blue-800 font-semibold inline-flex items-center text-xl"
+          >
             77개 이상의 인기 도구가 제공하는 강력한 기능을 확인해보세요.
             <ArrowRight className="ml-2 w-4 h-4" />
           </a>
@@ -65,7 +79,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-16">
         {/* 모든 도구 섹션 */}
         <div id="all-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">모든 도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            모든 도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
             <div 
               onClick={handleToolClick}
@@ -79,10 +98,15 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* PDF변환도구 섹션 */}
         <div id="pdf-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">PDF변환도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            PDF변환도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
-              onClick={() => window.open('https://pdf-doc-306w.onrender.com/', '_blank')}
+              onClick={handleToolClick}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
               <h4 className="font-semibold text-lg mb-2">PDF to DOCX</h4>
@@ -107,7 +131,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* 이미지도구 섹션 */}
         <div id="image-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">이미지도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            이미지도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
               onClick={handleToolClick}
@@ -135,7 +164,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* AI도구 섹션 */}
         <div id="ai-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">AI도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            AI도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
               onClick={handleToolClick}
@@ -163,7 +197,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* 이미지변환도구 섹션 */}
         <div id="image-conversion-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">이미지변환도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            이미지변환도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div 
               onClick={handleToolClick}
@@ -198,7 +237,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* 문서도구 섹션 */}
         <div id="document-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">문서도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            문서도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
               onClick={handleToolClick}
@@ -226,7 +270,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* YOUTUBE도구 섹션 */}
         <div id="youtube-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">YOUTUBE도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            YOUTUBE도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
               onClick={handleToolClick}
@@ -254,7 +303,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools }) => {
 
         {/* 동영상도구 섹션 */}
         <div id="video-tools" className="mb-16">
-          <h3 className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer">동영상도구</h3>
+          <h3 
+            onClick={handleCategoryHeaderClick}
+            className="text-2xl font-bold text-gray-900 mb-6 hover:text-[#5e17eb] transition-colors duration-200 cursor-pointer"
+          >
+            동영상도구
+          </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div 
               onClick={handleToolClick}
