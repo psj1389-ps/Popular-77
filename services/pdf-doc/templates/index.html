@@ -19,10 +19,8 @@
         .gradient-header::before {
             content: '';
             position: absolute;
-            top: -50%;
-            left: -50%;
-            width: 200%;
-            height: 200%;
+            inset: 0;
+            opacity: 0.3;
             background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="12" cy="8" r="0.6" fill="%23ffffff" opacity="0.18"/><circle cx="37" cy="23" r="1.8" fill="%23ffffff" opacity="0.06"/><circle cx="68" cy="15" r="0.9" fill="%23ffffff" opacity="0.14"/><circle cx="91" cy="42" r="1.3" fill="%23ffffff" opacity="0.09"/><circle cx="24" cy="56" r="0.7" fill="%23ffffff" opacity="0.16"/><circle cx="55" cy="73" r="1.5" fill="%23ffffff" opacity="0.07"/><circle cx="83" cy="88" r="1.1" fill="%23ffffff" opacity="0.11"/><circle cx="6" cy="34" r="2.0" fill="%23ffffff" opacity="0.05"/><circle cx="45" cy="47" r="0.8" fill="%23ffffff" opacity="0.13"/><circle cx="72" cy="61" r="1.2" fill="%23ffffff" opacity="0.10"/><circle cx="18" cy="79" r="0.5" fill="%23ffffff" opacity="0.19"/><circle cx="63" cy="29" r="1.7" fill="%23ffffff" opacity="0.08"/><circle cx="89" cy="18" r="0.9" fill="%23ffffff" opacity="0.15"/><circle cx="31" cy="91" r="1.4" fill="%23ffffff" opacity="0.12"/><circle cx="76" cy="5" r="0.6" fill="%23ffffff" opacity="0.17"/><circle cx="9" cy="67" r="1.6" fill="%23ffffff" opacity="0.06"/><circle cx="52" cy="12" r="1.0" fill="%23ffffff" opacity="0.14"/><circle cx="95" cy="76" r="0.8" fill="%23ffffff" opacity="0.11"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
             animation: float 20s ease-in-out infinite;
         }
@@ -36,7 +34,7 @@
         
         .header-content {
             position: relative;
-            z-index: 2;
+            z-index: 10;
             max-width: 800px;
             margin: 0 auto;
             text-align: center;
