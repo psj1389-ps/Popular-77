@@ -1,19 +1,43 @@
 services:
+  # Frontend Service
+  - type: web
+    name: frontend-service
+    env: node
+    rootDir: frontend
+    buildCommand: npm install && npm run build
+    startCommand: npm run preview
+    publishDir: dist
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
+
+  # PDF to DOC Service
   - type: web
     name: pdf-doc-service
     env: python
     rootDir: services/pdf-doc
-    buildCommand: chmod +x build.sh && ./build.sh
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
-    plan: free
-    region: oregon
-    branch: main
     envVars:
-      - key: PYTHON_VERSION
-        value: 3.12.7
       - key: FLASK_ENV
         value: production
-      - key: FLASK_APP
-        value: app.py
+      - key: PORT
+        value: 10000
     healthCheckPath: /
-    autoDeploy: true
+
+  # PDF to JPG Service
+  - type: web
+    name: pdf-jpg-service
+    env: python
+    rootDir: services/pdf-jpg
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
