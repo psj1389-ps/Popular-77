@@ -51,16 +51,21 @@ print(f"Adobe SDK 강제 실행 모드: {ADOBE_SDK_AVAILABLE}")
 load_dotenv()
 
 app = Flask(__name__)
-app.secret_key = 'your-secret-key-here'
+app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
 # Adobe PDF Services API 구성 - 환경변수 사용
 ADOBE_CONFIG = {
-    "client_id": os.getenv("ADOBE_CLIENT_ID"),
-    "client_secret": os.getenv("ADOBE_CLIENT_SECRET"),
-    "organization_id": os.getenv("ADOBE_ORGANIZATION_ID"),
-    "account_id": os.getenv("ADOBE_ACCOUNT_ID"),
-    "technical_account_email": os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")
+    "client_credentials": {
+        "client_id": os.getenv('ADOBE_CLIENT_ID', ''),
+        "client_secret": os.getenv('ADOBE_CLIENT_SECRET', '')
+    },
+    "service_principal_credentials": {
+        "organization_id": os.getenv('ADOBE_ORGANIZATION_ID', ''),
+        "account_id": os.getenv('ADOBE_ACCOUNT_ID', ''),
+        "technical_account_email": os.getenv('ADOBE_TECHNICAL_ACCOUNT_EMAIL', ''),
+        "access_token": ''
+    }
 }
 
 # Adobe SDK 무조건 실행 확인
