@@ -43,7 +43,7 @@ export const TOOLS: Tool[] = [
     tags: ['pdf', 'jpg', 'image', 'converter'],
     icon: 'Image',
     featured: true,
-    path: '/tool/pdf-to-jpg'
+    path: '/tools/pdf-to-jpg'
   },
   {
     id: 'pdf-to-excel',
