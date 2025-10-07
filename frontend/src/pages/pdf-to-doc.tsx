@@ -57,7 +57,7 @@ const PdfToDocPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-white">
+    <div className="w-full bg-gray-50">
       {/* 상단 보라색 배경 섹션 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center">
         <div className="container mx-auto">
