@@ -41,3 +41,19 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /
+
+  # PDF to XLS Service
+  - type: web
+    name: pdf-xls-service
+    env: python
+    rootDir: services/pdf-xls
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --timeout 180 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.7
+    healthCheckPath: /
