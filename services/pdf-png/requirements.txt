@@ -1,0 +1,10 @@
+Flask==2.3.3
+Werkzeug==2.3.7
+PyMuPDF==1.26.4
+python-docx==0.8.11
+reportlab==4.0.4
+Pillow>=10.2.0
+gunicorn==21.2.0
+python-dotenv==1.0.0
+pdfservices-sdk==4.2.0
+pdf2image==1.17.0

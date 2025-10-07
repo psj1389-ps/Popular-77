@@ -1,0 +1,19 @@
+services:
+  - type: web
+    name: pdf-doc-service
+    env: python
+    rootDir: services/pdf-doc
+    buildCommand: chmod +x build.sh && ./build.sh
+    startCommand: python app.py
+    plan: free
+    region: oregon
+    branch: main
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: FLASK_ENV
+        value: production
+      - key: FLASK_APP
+        value: app.py
+    healthCheckPath: /
+    autoDeploy: true

@@ -1,0 +1,619 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PDF → JPG 변환기</title>
+    <style>
+        body{font-family:Arial;background:#f5f5f5;margin:0;padding:0}
+        
+        /* 🔥 상단 그라디언트 헤더 영역 */
+        .gradient-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 40px 20px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .gradient-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="12" cy="8" r="0.6" fill="%23ffffff" opacity="0.18"/><circle cx="37" cy="23" r="1.8" fill="%23ffffff" opacity="0.06"/><circle cx="68" cy="15" r="0.9" fill="%23ffffff" opacity="0.14"/><circle cx="91" cy="42" r="1.3" fill="%23ffffff" opacity="0.09"/><circle cx="24" cy="56" r="0.7" fill="%23ffffff" opacity="0.16"/><circle cx="55" cy="73" r="1.5" fill="%23ffffff" opacity="0.07"/><circle cx="83" cy="88" r="1.1" fill="%23ffffff" opacity="0.11"/><circle cx="6" cy="34" r="2.0" fill="%23ffffff" opacity="0.05"/><circle cx="45" cy="47" r="0.8" fill="%23ffffff" opacity="0.13"/><circle cx="72" cy="61" r="1.2" fill="%23ffffff" opacity="0.10"/><circle cx="18" cy="79" r="0.5" fill="%23ffffff" opacity="0.19"/><circle cx="63" cy="29" r="1.7" fill="%23ffffff" opacity="0.08"/><circle cx="89" cy="18" r="0.9" fill="%23ffffff" opacity="0.15"/><circle cx="31" cy="91" r="1.4" fill="%23ffffff" opacity="0.12"/><circle cx="76" cy="5" r="0.6" fill="%23ffffff" opacity="0.17"/><circle cx="9" cy="67" r="1.6" fill="%23ffffff" opacity="0.06"/><circle cx="52" cy="12" r="1.0" fill="%23ffffff" opacity="0.14"/><circle cx="95" cy="76" r="0.8" fill="%23ffffff" opacity="0.11"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0% { transform: translateX(0px) translateY(0px); }
+            33% { transform: translateX(-25px) translateY(18px); }
+            66% { transform: translateX(22px) translateY(-15px); }
+            100% { transform: translateX(0px) translateY(0px); }
+        }
+        
+        .header-content {
+            position: relative;
+            z-index: 2;
+            max-width: 800px;
+            margin: 0 auto;
+            text-align: center;
+        }
+        
+        /* 🔥 아이콘과 텍스트를 가로로 배치 */
+        .title-row {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 20px;
+            margin-bottom: 20px;
+        }
+        
+        .logo-icon {
+            width: 60px;
+            height: 60px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 15px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 30px;
+            backdrop-filter: blur(10px);
+            flex-shrink: 0;
+        }
+        
+        .main-title {
+            font-size: 2.8em;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .main-subtitle {
+            font-size: 1.3em;
+            opacity: 0.9;
+            margin: 0;
+            font-weight: 300;
+            line-height: 1.4;
+        }
+        
+        /* 🔥 화이트 메인 컨테이너 */
+        .main-container {
+            background: white;
+            max-width: 800px;
+            margin: 0 auto;
+            border-radius: 0 0 15px 15px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.15);
+            min-height: calc(100vh - 300px);
+        }
+        
+        .container-content {
+            padding: 40px;
+        }
+        
+        .content-section {
+            background: #f8f9fa;
+            color: #333;
+            border-radius: 15px;
+            padding: 30px;
+            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
+        }
+        
+        .content-header{
+            text-align:center;
+            margin-bottom:30px;
+            color: #333;
+        }
+        
+        .content-header h2 {
+            font-size: 1.8em;
+            margin-bottom: 10px;
+            color: #495057;
+        }
+        
+        .content-header h4 {
+            color: #6c757d;
+            font-weight: bold;
+        }
+        
+        .upload-area{
+            border:2px dashed #ddd;
+            padding:40px;
+            text-align:center;
+            border-radius:10px;
+            cursor:pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .upload-area:hover{
+            border-color:#007bff;
+            background:#f8f9ff;
+            transform: translateY(-2px);
+        }
+        
+        .file-input{display:none}
+        
+        .btn{
+            background:#007bff;
+            color:white;
+            border:none;
+            padding:12px 24px;
+            border-radius:8px;
+            cursor:pointer;
+            font-size:16px;
+            transition: all 0.3s ease;
+        }
+        
+        .btn:hover{
+            background:#0056b3;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 12px rgba(0,123,255,0.3);
+        }
+        
+        .btn:disabled{background:#6c757d;cursor:not-allowed;transform:none;box-shadow:none}
+        
+        .file-info{
+            background:#f8f9fa;
+            padding:20px;
+            border-radius:10px;
+            margin-top:20px;
+            display:none;
+            border: 1px solid #e9ecef;
+        }
+        
+        .error{
+            background:#f8d7da;
+            color:#721c24;
+            padding:15px;
+            border-radius:8px;
+            margin-top:15px;
+            display:none;
+            border: 1px solid #f5c6cb;
+        }
+        
+        .success{
+            background:#d4edda;
+            color:#155724;
+            padding:15px;
+            border-radius:8px;
+            margin-top:15px;
+            display:none;
+            border: 1px solid #c3e6cb;
+        }
+        
+        .loading{
+            display:none;
+            text-align:center;
+            margin-top:25px;
+        }
+        
+        .spinner{
+            border:4px solid #f3f3f3;
+            border-top:4px solid #007bff;
+            border-radius:50%;
+            width:40px;
+            height:40px;
+            animation:spin 1s linear infinite;
+            margin:0 auto 15px;
+        }
+        
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        
+        .button-group{
+            display:flex;
+            gap:15px;
+            justify-content:center;
+            margin-top:20px;
+        }
+        
+        .reset-btn{
+            background:#6c757d;
+        }
+        
+        .reset-btn:hover{
+            background:#545b62;
+        }
+        
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .title-row {
+                flex-direction: column;
+                gap: 15px;
+            }
+            
+            .main-title {
+                font-size: 2.2em;
+            }
+            
+            .main-subtitle {
+                font-size: 1.1em;
+            }
+            
+            .container-content {
+                padding: 20px;
+            }
+            
+            .content-section {
+                padding: 20px;
+            }
+            
+            .button-group {
+                flex-direction: column;
+            }
+        }
+        
+        /* 하단 네비게이션 아이콘 호버 효과 */
+        .bottom-nav .nav-icon:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+        }
+    </style>
+</head>
+<body>
+    <!-- Flash Messages -->
+    {% with messages = get_flashed_messages() %}
+        {% if messages %}
+            <div class="flash-messages">
+                {% for message in messages %}
+                    <div class="alert alert-info">{{ message }}</div>
+                {% endfor %}
+            </div>
+        {% endif %}
+    {% endwith %}
+
+    <!-- 🔥 상단 그라디언트 헤더 -->
+    <div class="gradient-header">
+        <div class="header-content">
+            <div class="title-row">
+                <div class="logo-icon">📄</div>
+                <h1 class="main-title">PDF → JPG 변환기</h1>
+            </div>
+            <p class="main-subtitle">AI 기반 PDF to JPG 변환 서비스로 각 페이지를 고화질 이미지 파일로 쉽게 변환하세요.</p>
+        </div>
+    </div>
+
+    <!-- 🔥 화이트 메인 컨테이너 -->
+    <div class="main-container">
+        <div class="container-content">
+            <div class="content-section">
+                <div class="content-header">
+                    <h2>PDF → JPG 변환기</h2>
+                    <h4>고화질 이미지 변환</h4>
+                </div>
+                
+                <form id="uploadForm" enctype="multipart/form-data">
+                    <div class="upload-area" id="uploadArea">
+                        <div id="uploadText">
+                            <strong>파일을 선택하세요</strong>
+                            <p>PDF 파일을 클릭하여 선택 (최대 100MB)</p>
+                        </div>
+                        <input type="file" id="fileInput" class="file-input" accept=".pdf">
+                    </div>
+                </form>
+                
+                <div class="file-info" id="fileInfo">
+                    <div id="fileName"></div>
+                    <div id="fileSize"></div>
+                    
+                    <div class="advanced-options" id="advancedOptions">
+                        <!-- 품질 선택 섹션 -->
+                        <div class="quality-section" style="margin: 20px 0;">
+                            <h5 style="margin-bottom: 10px; color: #495057;">변환 품질 선택:</h5>
+                            <div style="display: flex; flex-direction: column; gap: 8px;">
+                                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <input type="radio" name="quality" value="low" style="margin-right: 8px;"> 
+                                    <span>저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <input type="radio" name="quality" value="medium" checked style="margin-right: 8px;"> 
+                                    <span>중간 품질 (중간 품질 및 파일 크기)</span>
+                                </label>
+                                <label style="display: flex; align-items: center; cursor: pointer; padding: 8px; border-radius: 4px; transition: background-color 0.2s;" onmouseover="this.style.backgroundColor='#f8f9fa'" onmouseout="this.style.backgroundColor='transparent'">
+                                    <input type="radio" name="quality" value="high" style="margin-right: 8px;"> 
+                                    <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                                </label>
+                            </div>
+                        </div>
+                        
+                        <!-- 크기 조절 섹션 -->
+                        <div class="size-control-section" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px; border: 2px solid #dee2e6;">
+                            <h4>고급 옵션:</h4>
+                            <label for="scaleSlider" style="display: block; margin-bottom: 10px; font-weight: 500; color: #495057;">크기 x</label>
+                            <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                                <input type="range" id="scaleSlider" min="0.5" max="3" step="0.1" value="1.0" style="flex: 1; height: 6px; background: #ddd; border-radius: 3px; outline: none; -webkit-appearance: none;">
+                                <input type="number" id="scaleInput" min="0.5" max="3" step="0.1" value="1.0" style="width: 80px; padding: 5px 8px; border: 1px solid #ced4da; border-radius: 4px; text-align: center; font-size: 14px;">
+                            </div>
+                            <div id="scaleDimensions" style="font-size: 12px; color: #6c757d; margin-top: 8px;">443×591 px</div>
+                        </div>
+                    </div>
+                    
+                    <div class="button-group">
+                        <button class="btn" id="convertBtn" onclick="convertFile()">변환하기</button>
+                        <button class="btn reset-btn" id="resetBtn" onclick="resetFile()">파일 초기화</button>
+                    </div>
+                </div>
+                
+                <div class="loading" id="loading">
+                    <div class="spinner"></div>
+                    <p>변환 중입니다... 잠시만 기다려주세요.</p>
+                </div>
+                
+                <div class="error" id="errorMsg"></div>
+                <div class="success" id="successMsg"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 우측 하단 파일 업로드 아이콘 -->
+    <div class="bottom-nav" style="position: fixed; bottom: 20px; right: 20px; display: flex; background: rgba(255,255,255,0.95); padding: 15px; border-radius: 50px; box-shadow: 0 8px 25px rgba(0,0,0,0.15); backdrop-filter: blur(10px); z-index: 1000; transform: scale(0.7);">
+        <a href="#" onclick="scrollToTop()" class="nav-icon" title="파일 업로드" style="width: 50px; height: 50px; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); border-radius: 50%; display: flex; align-items: center; justify-content: center; color: white; font-size: 20px; cursor: pointer; transition: all 0.3s ease; text-decoration: none;">📤</a>
+    </div>
+
+    <!-- PDF 변환 방법 가이드 섹션 -->
+    <div class="guide-section" style="max-width: 1200px; margin: 60px auto; padding: 0 20px;">
+        <h2 style="text-align: center; margin-bottom: 50px; color: #495057; font-size: 2.2em; font-weight: 600;">PDF를 이미지로 변환하는 방법</h2>
+        
+        <div class="guide-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 20px; margin-bottom: 40px;">
+            <!-- 1단계: PDF 업로드 -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.1); transition: all 0.3s ease; border: 2px solid #dee2e6; position: relative; overflow: hidden;">
+                <div class="card-number" style="width: 50px; height: 50px; background: white; border: 2px solid #d3d3d3; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 20px; color: #495057; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">1️⃣</div>
+                <h3 style="color: #495057; margin-bottom: 10px; font-size: 1.2em; font-weight: 600;">PDF 업로드</h3>
+                <p style="color: #6c757d; line-height: 1.6; margin: 0; font-size: 0.9em; font-weight: bold;">PDF 파일을 드래그하거나 클릭하여 선택해주세요.</p>
+            </div>
+
+            <!-- 2단계: 설정 선택 -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.1); transition: all 0.3s ease; border: 2px solid #dee2e6; position: relative; overflow: hidden;">
+                <div class="card-number" style="width: 50px; height: 50px; background: white; border: 2px solid #d3d3d3; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 20px; color: #495057; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">2️⃣</div>
+                <h3 style="color: #495057; margin-bottom: 10px; font-size: 1.2em; font-weight: 600;">설정을 선택하세요</h3>
+                <p style="color: #6c757d; line-height: 1.6; margin: 0; font-size: 0.9em; font-weight: bold;">품질, 용량 및 해상도를 선택해주세요.</p>
+            </div>
+
+            <!-- 3단계: 자동 변환 -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.1); transition: all 0.3s ease; border: 2px solid #dee2e6; position: relative; overflow: hidden;">
+                <div class="card-number" style="width: 50px; height: 50px; background: white; border: 2px solid #d3d3d3; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 20px; color: #495057; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">3️⃣</div>
+                <h3 style="color: #495057; margin-bottom: 10px; font-size: 1.2em; font-weight: 600;">자동 변환</h3>
+                <p style="color: #6c757d; line-height: 1.6; margin: 0; font-size: 0.9em; font-weight: bold;">잠시만 기다리면 변환이 시작됩니다.</p>
+            </div>
+
+            <!-- 4단계: 다운로드 -->
+            <div class="guide-card" style="background: linear-gradient(135deg, #f8f9fa 0%, #e9ecef 100%); border-radius: 20px; padding: 20px; text-align: center; box-shadow: 0 8px 25px rgba(0,0,0,0.1); transition: all 0.3s ease; border: 2px solid #dee2e6; position: relative; overflow: hidden;">
+                <div class="card-number" style="width: 50px; height: 50px; background: white; border: 2px solid #d3d3d3; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 15px; font-size: 20px; color: #495057; font-weight: bold; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">4️⃣</div>
+                <h3 style="color: #495057; margin-bottom: 10px; font-size: 1.2em; font-weight: 600;">다운로드</h3>
+                <p style="color: #6c757d; line-height: 1.6; margin: 0; font-size: 0.9em; font-weight: bold;">개별 페이지 또는 전체 다운로드 선택.</p>
+            </div>
+        </div>
+    </div>
+
+    <style>
+        .guide-card:hover {
+            transform: translateY(-10px);
+            box-shadow: 0 15px 35px rgba(0,0,0,0.15);
+            border-color: #667eea;
+        }
+        
+        .guide-card:hover .card-number {
+            transform: scale(1.1);
+            box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+        }
+        
+        @media (max-width: 768px) {
+            .guide-grid {
+                grid-template-columns: 1fr;
+                gap: 20px;
+            }
+            
+            .guide-section h2 {
+                font-size: 1.8em;
+                margin-bottom: 30px;
+            }
+            
+            .guide-card {
+                padding: 25px;
+            }
+        }
+    </style>
+
+    <script>
+        let selectedFile = null;
+
+        document.getElementById('uploadArea').addEventListener('click', function(e) {
+            if (e.target.tagName.toLowerCase() !== 'input') {
+                document.getElementById('fileInput').click();
+            }
+        });
+
+        document.getElementById('fileInput').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                // 파일 크기 체크
+                if (file.size > 100 * 1024 * 1024) {
+                    showError(`파일 크기가 너무 큽니다: ${(file.size/1024/1024).toFixed(1)}MB (최대 100MB)`);
+                    return;
+                }
+                
+                selectedFile = file;
+                document.getElementById('fileName').textContent = `파일명: ${file.name}`;
+                document.getElementById('fileSize').textContent = `크기: ${(file.size/1024/1024).toFixed(2)}MB`;
+                document.getElementById('fileInfo').style.display = 'block';
+                
+                // PDF 파일인 경우에만 고급 옵션 표시
+                if (file.name.toLowerCase().endsWith('.pdf')) {
+                    document.getElementById('advancedOptions').style.display = 'block';
+                    updateScaleDimensions(1.0); // 초기 크기 표시
+                } else {
+                    document.getElementById('advancedOptions').style.display = 'none';
+                }
+                
+                hideMessages();
+            }
+        });
+        
+        // 크기 조절 슬라이더와 입력 필드 동기화
+        document.getElementById('scaleSlider').addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            document.getElementById('scaleInput').value = value.toFixed(1);
+            updateScaleDimensions(value);
+        });
+        
+        document.getElementById('scaleInput').addEventListener('input', function() {
+            const value = parseFloat(this.value);
+            if (value >= 0.5 && value <= 3.0) {
+                document.getElementById('scaleSlider').value = value;
+                updateScaleDimensions(value);
+            }
+        });
+        
+        // 크기 계산 및 표시 함수
+        function updateScaleDimensions(scale) {
+            const baseWidth = 443;
+            const baseHeight = 591;
+            const newWidth = Math.round(baseWidth * scale);
+            const newHeight = Math.round(baseHeight * scale);
+            document.getElementById('scaleDimensions').textContent = `${newWidth}×${newHeight} px`;
+        }
+
+        async function convertFile() {
+            if (!selectedFile) return;
+            
+            const formData = new FormData();
+            formData.append('file', selectedFile);
+            
+            // 품질 설정 추가
+            const quality = document.querySelector('input[name="quality"]:checked')?.value || 'medium';
+            formData.append('quality', quality);
+            
+            // 크기 조절 설정 추가
+            const scale = document.getElementById('scaleSlider')?.value || '1';
+            formData.append('scale', scale);
+            
+            // UI 업데이트
+            document.getElementById('convertBtn').disabled = true;
+            document.getElementById('convertBtn').textContent = '변환 중...';
+            document.getElementById('loading').style.display = 'block';
+            hideMessages();
+            
+            console.log('변환 요청 시작:', selectedFile.name, '품질:', quality, '크기:', scale);
+            
+            fetch('/convert', {
+                    method: 'POST',
+                    body: formData
+                })
+                .then(response => {
+                    if (!response.ok) {
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+                    }
+                    
+                    // 서버 응답에서 파일 이름 정보(헤더)를 추출
+                    const disposition = response.headers.get('Content-Disposition');
+                    let filename = "converted.jpg"; // 기본값
+                    if (disposition && disposition.indexOf('attachment') !== -1) {
+                        // RFC 6266 표준에 따라 UTF-8 인코딩된 파일명 추출 및 디코딩
+                        const filenameMatch = disposition.match(/filename\*=UTF-8''(.+)/);
+                        if (filenameMatch && filenameMatch[1]) {
+                            // decodeURIComponent를 사용하여 암호문을 원래 한글 파일명으로 복원
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        } else {
+                            // 표준 방식이 아닐 경우를 대비한 예비 로직
+                            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                            const matches = filenameRegex.exec(disposition);
+                            if (matches != null && matches[1]) {
+                                filename = matches[1].replace(/['"]/g, '');
+                            }
+                        }
+                    }
+                    return response.blob().then(blob => ({ blob, filename }));
+                })
+                .then(({ blob, filename }) => {
+                    // 파일 다운로드
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    // 수정: 서버가 알려준 파일명(filename)을 그대로 사용
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    // 디코딩된 정상적인 파일명을 메시지에 표시
+                    showSuccess(`변환 완료! ${filename} 파일이 다운로드됩니다.`);
+                })
+                .catch(error => {
+                    console.error('변환 오류:', error);
+                    showError(error.message || '변환 중 오류가 발생했습니다.');
+                })
+                .finally(() => {
+                    // UI 복원
+                    document.getElementById('convertBtn').disabled = false;
+                    document.getElementById('convertBtn').textContent = '변환하기';
+                    document.getElementById('loading').style.display = 'none';
+                });
+        }
+
+        function resetFile() {
+            selectedFile = null;
+            document.getElementById('fileInput').value = '';
+            document.getElementById('fileInfo').style.display = 'none';
+            document.getElementById('advancedOptions').style.display = 'none';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('convertBtn').disabled = false;
+            document.getElementById('convertBtn').textContent = '변환하기';
+            
+            // 품질 설정 초기화
+            document.querySelector('input[name="quality"][value="medium"]').checked = true;
+            
+            // 크기 조절 초기화
+            document.getElementById('scaleSlider').value = '1.0';
+            document.getElementById('scaleInput').value = '1.0';
+            updateScaleDimensions(1.0);
+            
+            hideMessages();
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            const successDiv = document.getElementById('successMsg');
+            successDiv.textContent = msg;
+            successDiv.style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+        
+        // 네비게이션 함수들
+        function goToHome() {
+            window.location.href = '/';
+        }
+        
+        function goToSettings() {
+            alert('설정 페이지로 이동합니다.');
+            // 실제로는 설정 페이지로 이동하는 코드를 작성
+        }
+        
+        function goToHelp() {
+            alert('도움말 페이지를 표시합니다.');
+            // 실제로는 도움말 모달이나 페이지를 표시하는 코드를 작성
+        }
+        
+        // 페이지 상단으로 스크롤하는 함수
+        function scrollToTop() {
+            window.scrollTo({
+                top: 0,
+                behavior: 'smooth'
+            });
+        }
+    </script>
+</body>
+</html>
