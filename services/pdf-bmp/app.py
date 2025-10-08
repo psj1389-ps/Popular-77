@@ -3,8 +3,9 @@ from flask_cors import CORS
 import os
 import zipfile
 import tempfile
-import fitz  # PyMuPDF
+from pdf2image import convert_from_bytes
 from PIL import Image
+import io
 
 app = Flask(__name__)
 CORS(app)
@@ -55,31 +56,23 @@ def convert():
         base_filename = os.path.splitext(os.path.basename(file.filename))[0]
         print(f"[DEBUG] 변환 시작 - 파일명: {file.filename}, 기본 파일명: {base_filename}")
         
-        # PyMuPDF를 사용하여 PDF를 이미지로 변환
-        pdf_document = fitz.open(input_path)
-        page_count = pdf_document.page_count
+        # pdf2image를 사용하여 PDF를 이미지로 변환
+        with open(input_path, 'rb') as pdf_file:
+            pdf_bytes = pdf_file.read()
+        
+        # PDF를 PIL 이미지로 변환
+        images = convert_from_bytes(pdf_bytes, dpi=dpi)
+        page_count = len(images)
         print(f"[DEBUG] PDF 변환 완료 - 총 {page_count}개 페이지 발견")
         
         # 각 페이지를 BMP로 변환
-        for page_num in range(page_count):
-            page = pdf_document[page_num]
-            
-            # 페이지를 이미지로 렌더링 (DPI 적용)
-            mat = fitz.Matrix(dpi/72, dpi/72)  # 72 DPI가 기본값
-            pix = page.get_pixmap(matrix=mat)
-            
-            # PIL Image로 변환
-            img_data = pix.tobytes("ppm")
-            pil_image = Image.open(tempfile.BytesIO(img_data))
-            
+        for page_num, pil_image in enumerate(images):
             # BMP 파일로 저장
             output_image_filename = f"{base_filename}_page_{page_num+1}.bmp"
             image_path = os.path.join('outputs', output_image_filename)
             pil_image.save(image_path, 'BMP')
             image_paths.append(image_path)
             print(f"[DEBUG] 페이지 {page_num+1} 저장 완료: {output_image_filename}")
-        
-        pdf_document.close()
         print(f"[DEBUG] 최종 페이지 수: {page_count}")
         
         # --- 여기가 핵심 로직 ---
