@@ -1,5 +1,7 @@
 import React, { useState, useRef } from 'react';
 
+// Force Vercel deployment - Updated: 2024-12-30
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
