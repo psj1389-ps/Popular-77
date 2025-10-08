@@ -125,29 +125,61 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               <h4 className="font-semibold text-lg mb-2">PDF to JPG</h4>
               <p className="text-gray-600">PDF 파일을 JPG 이미지로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-png'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to PNG</h4>
               <p className="text-gray-600">PDF 파일을 PNG 이미지로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-xls'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to Excel</h4>
               <p className="text-gray-600">PDF 파일을 Excel 스프레드시트로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-pptx'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to PPTX</h4>
               <p className="text-gray-600">PDF 파일을 PPTX로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-svg'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to SVG</h4>
               <p className="text-gray-600">PDF 파일을 SVG 벡터 방식으로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-tiff'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to TIFF</h4>
               <p className="text-gray-600">PDF 파일을 TIFF 이미지로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-bmp'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
               <h4 className="font-semibold text-lg mb-2">PDF to BMP</h4>
               <p className="text-gray-600">PDF 파일을 BMP 이미지로 변환합니다.</p>
+            </div>
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-gif'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
+              <h4 className="font-semibold text-lg mb-2">PDF to GIF</h4>
+              <p className="text-gray-600">PDF 파일을 GIF 애니메이션으로 변환합니다.</p>
+            </div>
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-ai'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
+              <h4 className="font-semibold text-lg mb-2">PDF to AI 분석</h4>
+              <p className="text-gray-600">PDF 파일을 AI로 분석하여 텍스트를 추출합니다.</p>
             </div>
           </div>
         </div>
