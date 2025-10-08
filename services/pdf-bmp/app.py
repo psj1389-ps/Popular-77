@@ -1,3 +1,5 @@
+# services/pdf-bmp/app.py
+
 from flask import Flask, request, send_file, jsonify
 import os
 import fitz  # PyMuPDF
@@ -16,7 +18,7 @@ def health():
     return "ok", 200
 # --------------------------
 
-# --- 실제 변환 기능 ---
+# --- ✨ 실제 변환 기능 ✨ ---
 @app.route("/convert", methods=['POST'])
 def convert_file():
     if 'file' not in request.files:
@@ -26,13 +28,10 @@ def convert_file():
     if file.filename == '':
         return jsonify({'error': '파일이 선택되지 않았습니다'}), 400
 
-    # --- 임시 파일 저장을 위한 폴더 설정 ---
-    # Render에서는 /tmp 폴더를 사용하는 것이 안전합니다.
     upload_folder = '/tmp/uploads'
     output_folder = '/tmp/outputs'
     os.makedirs(upload_folder, exist_ok=True)
     os.makedirs(output_folder, exist_ok=True)
-    # ------------------------------------
 
     filename = secure_filename(file.filename)
     input_path = os.path.join(upload_folder, filename)
@@ -45,7 +44,6 @@ def convert_file():
 
         for i, page in enumerate(doc):
             pix = page.get_pixmap()
-            # 파일 이름을 BMP로 지정
             output_image_filename = f"{base_filename}_page_{i+1}.bmp"
             image_path = os.path.join(output_folder, output_image_filename)
             pix.save(image_path)
@@ -65,15 +63,11 @@ def convert_file():
                     zipf.write(file_path, os.path.basename(file_path))
             
             return send_file(zip_path, as_attachment=True, download_name=zip_filename)
-
         else:
             return jsonify({'error': 'PDF에 페이지가 없습니다'}), 400
-
     except Exception as e:
         return jsonify({'error': str(e)}), 500
-    
     finally:
-        # --- 임시 파일 정리 ---
         try:
             if os.path.exists(input_path): os.remove(input_path)
             for path in image_paths:
