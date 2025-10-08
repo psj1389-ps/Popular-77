@@ -95,69 +95,81 @@ const PdfToBmpPage: React.FC = () => {
     setShowSuccessMessage(false);
     setConversionProgress(0);
     
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('quality', quality); // 품질 추가
-    formData.append('scale', String(scale)); // 배율 추가
+    formData.append('quality', quality);
+    formData.append('scale', String(scale));
     
     try {
-      // 새로운 API_BASE 사용
-      const res = await fetch(`${BMP_API_BASE}/convert`, { method: "POST", body: formData });
-
-      if (!res.ok) {
-        const msg = await getErrorMessage(res);
-        throw new Error(msg);
+      // 업로드 - 비동기 엔드포인트 사용
+      const up = await fetch(`${BMP_API_BASE}/convert-async`, { method: "POST", body: formData });
+      if (!up.ok) {
+        const msg = await up.text().catch(() => `요청 실패(${up.status})`);
+        setErrorMessage(msg);
+        return;
       }
-
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
-
-      // ZIP인지 BMP인지 판별 후 파일명 결정
-      const contentType = (res.headers.get("content-type") || "").toLowerCase();
-      const base = selectedFile.name.replace(/\.pdf$/i, "");
-      let name = safeGetFilename(res, base);
-
-      // 확장자 보정: 헤더/파일명에 zip 단서가 있으면 .zip, 아니면 .bmp
-      const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
-      if (!/\.(zip|bmp)$/i.test(name)) {
-        name = isZip ? `${name}.zip` : `${name}.bmp`;
-      }
-
-      // Blob 만들고 상태 업데이트
-      const blob = await res.blob();
-      const url = URL.createObjectURL(blob);
-      setConvertedFileUrl(url);
-      setConvertedFileName(name);
+      const { job_id } = await up.json();
       
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
+      // 폴링 함수 (2초 간격)
+      const poll = async () => {
+        const r = await fetch(`${BMP_API_BASE}/job/${job_id}`);
+        const j = await r.json();
+        
+        if (j.status === "done") {
+          // 다운로드
+          const d = await fetch(`${BMP_API_BASE}/download/${job_id}`);
+          if (!d.ok) {
+            const msg = await d.text().catch(() => `요청 실패(${d.status})`);
+            setErrorMessage(msg);
+            return true;
+          }
+          
+          // 파일명/타입 처리
+          const contentType = (d.headers.get("content-type") || "").toLowerCase();
+          const base = selectedFile.name.replace(/\.pdf$/i, "");
+          let name = safeGetFilename(d, base);
+          const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
+          if (!/\.(zip|bmp)$/i.test(name)) {
+            name = isZip ? `${name}.zip` : `${name}.bmp`;
+          }
+          
+          const blob = await d.blob();
+          const url = URL.createObjectURL(blob);
+          setConvertedFileUrl(url);
+          setConvertedFileName(name);
+          setConversionProgress(100);
+          
+          // 성공 메시지 표시
+          setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
+          setShowSuccessMessage(true);
+          
+          // 잠시 후 다운로드 시작
+          setTimeout(() => {
+            downloadBlob(blob, name);
+          }, 1000);
+          setIsConverting(false);
+          return true;
+        }
+        
+        if (j.status === "error") {
+          setErrorMessage(j.error || "변환 중 오류");
+          setIsConverting(false);
+          return true;
+        }
+        
+        return false; // 계속 대기
+      };
       
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, name);
-      }, 1000);
+      // 폴링 시작 (2초 간격)
+      const timer = setInterval(async () => {
+        const done = await poll();
+        if (done) clearInterval(timer);
+      }, 2000);
       
     } catch (error) {
-      clearInterval(progressInterval);
       setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-      }, 2000);
+      setIsConverting(false);
     }
   };
 
