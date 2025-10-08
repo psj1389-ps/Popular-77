@@ -1,102 +1,88 @@
-from flask import Flask, render_template, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify
 import os
+import fitz  # PyMuPDF
 import zipfile
-from pdf2image import convert_from_bytes
-from PIL import Image
-import io
-import tempfile
+from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
 
-@app.route('/')
+# --- 기본 경로 및 헬스 체크 ---
+@app.route("/")
 def index():
-    return render_template('index.html')
-
-@app.route('/@vite/client')
-def vite_client():
-    # Vite 클라이언트 요청을 무시하고 빈 응답 반환
-    return '', 204
-
-@app.route('/convert', methods=['POST'])
-def convert():
-    try:
-        file = request.files['file']
-        quality = request.form.get('quality', 'medium')
-        scale = float(request.form.get('scale', '1'))
-        
-        if not file or file.filename == '':
-            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
-        
-        if not file.filename.lower().endswith('.pdf'):
-            return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
-        
-        # PDF를 이미지로 변환
-        pdf_bytes = file.read()
-        
-        # 품질 설정
-        dpi_map = {'low': 150, 'medium': 200, 'high': 300}
-        dpi = dpi_map.get(quality, 200)
-        
-        # 크기 조절 적용
-        dpi = int(dpi * scale)
-        
-        # PDF를 이미지로 변환
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
-        
-        if not os.path.exists('outputs'):
-            os.makedirs('outputs')
-        
-        # 단일 페이지인 경우 JPG로, 다중 페이지인 경우 ZIP으로
-        if len(images) == 1:
-            # 단일 이미지 처리
-            img = images[0]
-            
-            # 크기 조정
-            if scale != 1.0:
-                new_width = int(img.width * scale)
-                new_height = int(img.height * scale)
-                img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-            
-            # 임시 파일로 저장
-            temp_file = tempfile.NamedTemporaryFile(delete=False, suffix='.bmp', dir='outputs')
-            img.save(temp_file.name, 'BMP')
-            temp_file.close()
-            
-            return send_file(temp_file.name, 
-                           as_attachment=True, 
-                           download_name=f"{os.path.splitext(file.filename)[0]}.bmp",
-                           mimetype='image/bmp')
-        else:
-            # 다중 이미지를 ZIP으로 압축
-            zip_filename = f"outputs/{os.path.splitext(file.filename)[0]}_bmp.zip"
-            
-            with zipfile.ZipFile(zip_filename, 'w') as zipf:
-                for i, img in enumerate(images):
-                    # 크기 조정
-                    if scale != 1.0:
-                        new_width = int(img.width * scale)
-                        new_height = int(img.height * scale)
-                        img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
-                    
-                    # 메모리에서 이미지 처리
-                    img_bytes = io.BytesIO()
-                    img.save(img_bytes, 'BMP')
-                    img_bytes.seek(0)
-                    
-                    # ZIP에 추가
-                    zipf.writestr(f"page_{i+1:03d}.bmp", img_bytes.getvalue())
-            
-            return send_file(zip_filename, 
-                           as_attachment=True, 
-                           download_name=f"{os.path.splitext(file.filename)[0]}_bmp.zip",
-                           mimetype='application/zip')
-    
-    except Exception as e:
-        return jsonify({'error': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
+    return "PDF to BMP Converter is running!"
 
 @app.route("/health")
 def health():
     return "ok", 200
+# --------------------------
 
-if __name__ == '__main__':
-    app.run(debug=True)
+# --- 실제 변환 기능 ---
+@app.route("/convert", methods=['POST'])
+def convert_file():
+    if 'file' not in request.files:
+        return jsonify({'error': '파일이 없습니다'}), 400
+    
+    file = request.files['file']
+    if file.filename == '':
+        return jsonify({'error': '파일이 선택되지 않았습니다'}), 400
+
+    # --- 임시 파일 저장을 위한 폴더 설정 ---
+    # Render에서는 /tmp 폴더를 사용하는 것이 안전합니다.
+    upload_folder = '/tmp/uploads'
+    output_folder = '/tmp/outputs'
+    os.makedirs(upload_folder, exist_ok=True)
+    os.makedirs(output_folder, exist_ok=True)
+    # ------------------------------------
+
+    filename = secure_filename(file.filename)
+    input_path = os.path.join(upload_folder, filename)
+    file.save(input_path)
+
+    image_paths = []
+    try:
+        doc = fitz.open(input_path)
+        base_filename = os.path.splitext(filename)[0]
+
+        for i, page in enumerate(doc):
+            pix = page.get_pixmap()
+            # 파일 이름을 BMP로 지정
+            output_image_filename = f"{base_filename}_page_{i+1}.bmp"
+            image_path = os.path.join(output_folder, output_image_filename)
+            pix.save(image_path)
+            image_paths.append(image_path)
+        page_count = len(doc)
+        doc.close()
+
+        if page_count == 1:
+            return send_file(image_paths[0], as_attachment=True, download_name=os.path.basename(image_paths[0]))
+        
+        elif page_count > 1:
+            zip_filename = f"{base_filename}_images.zip"
+            zip_path = os.path.join(output_folder, zip_filename)
+            
+            with zipfile.ZipFile(zip_path, 'w') as zipf:
+                for file_path in image_paths:
+                    zipf.write(file_path, os.path.basename(file_path))
+            
+            return send_file(zip_path, as_attachment=True, download_name=zip_filename)
+
+        else:
+            return jsonify({'error': 'PDF에 페이지가 없습니다'}), 400
+
+    except Exception as e:
+        return jsonify({'error': str(e)}), 500
+    
+    finally:
+        # --- 임시 파일 정리 ---
+        try:
+            if os.path.exists(input_path): os.remove(input_path)
+            for path in image_paths:
+                if os.path.exists(path): os.remove(path)
+            if 'zip_path' in locals() and os.path.exists(zip_path): os.remove(zip_path)
+        except Exception as e:
+            print(f"임시 파일 정리 중 오류: {e}")
+# ---------------------------------
+
+if __name__ == "__main__":
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
