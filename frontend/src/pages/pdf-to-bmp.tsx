@@ -1,4 +1,10 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+// PDF.js(레거시 빌드가 Vite에서 가장 안정적)
+import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
+// 워커 파일 URL을 workerSrc로 지정
+import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.js?url";
+pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
@@ -59,6 +65,22 @@ const PdfToBmpPage: React.FC = () => {
   const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 픽셀 기준(1.0 배율일 때의 가로/세로 픽셀)
+  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null);
+
+  // PDF 첫 페이지 크기 측정
+  async function measurePdfFirstPage(file: File): Promise<{ width: number; height: number } | null> {
+    try {
+      const buf = await file.arrayBuffer();
+      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 }); // 1.0 기준
+      return { width: Math.round(viewport.width), height: Math.round(viewport.height) };
+    } catch {
+      return null; // 실패 시 표시 생략
+    }
+  }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
@@ -72,6 +94,15 @@ const PdfToBmpPage: React.FC = () => {
     }
   };
 
+  // 파일 선택 시 픽셀 기준 계산
+  useEffect(() => {
+    if (!selectedFile) {
+      setBaseSize(null);
+      return;
+    }
+    measurePdfFirstPage(selectedFile).then(setBaseSize);
+  }, [selectedFile]);
+
   const handleReset = () => {
     setSelectedFile(null);
     setErrorMessage('');
@@ -80,6 +111,7 @@ const PdfToBmpPage: React.FC = () => {
     setConversionProgress(0);
     setConvertedFileUrl(null);
     setConvertedFileName('');
+    setBaseSize(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -291,6 +323,12 @@ const PdfToBmpPage: React.FC = () => {
                     className="w-16 text-right border rounded px-2 py-1" 
                   />
                 </div>
+                {/* 슬라이더 아래 픽셀 표기 */}
+                {baseSize && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    {Math.round(baseSize.width * scale)}×{Math.round(baseSize.height * scale)} px
+                  </div>
+                )}
               </div>
 
               {/* 변환 진행률 표시 */}

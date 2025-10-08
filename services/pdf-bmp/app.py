@@ -8,6 +8,9 @@ import tempfile
 from pdf2image import convert_from_bytes
 from PIL import Image
 import io
+import logging
+
+logging.basicConfig(level=logging.INFO)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "http://localhost:5173"]}})
@@ -194,12 +197,22 @@ def job_download(job_id):
         return jsonify({"error": "job not found"}), 404
     if info.get("status") != "done":
         return jsonify({"error": "not ready"}), 409
-    return send_file(
-        info["path"],
-        mimetype=info["ctype"],
-        as_attachment=True,
-        download_name=info["name"]
-    )
+    
+    path = info.get("path")
+    name = info.get("name") or (os.path.basename(path) if path else "output.bmp")
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file missing"}), 500
+    
+    ctype = info.get("ctype")
+    if not ctype:
+        ctype = "application/zip" if path.lower().endswith(".zip") else "image/bmp"
+    
+    return send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+
+@app.errorhandler(Exception)
+def handle_any_error(e):
+    app.logger.exception("Unhandled error")
+    return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
