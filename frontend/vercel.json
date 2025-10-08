@@ -9,8 +9,43 @@
       "destination": "https://pdf-jpg-jh3s.onrender.com/:path*"
     },
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "source": "/api/pdf-png/:path*",
+      "destination": "https://pdf-png.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-xls/:path*",
+      "destination": "https://pdf-xls.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-ai/:path*",
+      "destination": "https://popular-77.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-bmp/:path*",
+      "destination": "https://pdf-bmp.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-gif/:path*",
+      "destination": "https://pdf-gif.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-pptx/:path*",
+      "destination": "https://pdf-pptx.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-svg/:path*",
+      "destination": "https://pdf-svg.onrender.com/:path*"
+    },
+    {
+      "source": "/api/pdf-tiff/:path*",
+      "destination": "https://pdf-tiff.onrender.com/:path*"
+    }
+  ],
+  "routes": [
+    {
+      "src": "/[^.]+",
+      "dest": "/index.html",
+      "status": 200
     }
   ]
 }
