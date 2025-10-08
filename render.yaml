@@ -57,3 +57,17 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.7
     healthCheckPath: /
+
+  # PDF to TIFF Service
+  - type: web
+    name: pdf-tiff-service
+    env: python
+    rootDir: services/pdf-tiff
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
