@@ -46,6 +46,16 @@ export const TOOLS: Tool[] = [
     path: '/tool/pdf-to-jpg'
   },
   {
+    id: 'pdf-to-bmp',
+    name: 'PDF to BMP 변환기',
+    description: 'PDF 파일을 고품질 BMP 이미지로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'bmp', 'image', 'converter'],
+    icon: 'Image',
+    featured: true,
+    path: '/tools/pdf-bmp'
+  },
+  {
     id: 'pdf-to-excel',
     name: 'PDF to Excel 변환기',
     description: 'PDF 파일을 Excel 스프레드시트로 변환',
