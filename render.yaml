@@ -58,6 +58,20 @@ services:
         value: 3.12.7
     healthCheckPath: /
 
+  # PDF to PNG Service
+  - type: web
+    name: pdf-png-service
+    env: python
+    rootDir: services/pdf-png
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /
+
   # PDF to TIFF Service
   - type: web
     name: pdf-tiff-service
