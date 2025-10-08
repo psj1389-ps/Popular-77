@@ -78,7 +78,7 @@ const PdfToTiffPage: React.FC = () => {
     formData.append('file', selectedFile);
     formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
     try {
-      const response = await fetch('/api/pdf-tiff', { method: 'POST', body: formData });
+      const response = await fetch('/api/pdf-tiff/convert', { method: 'POST', body: formData });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
         throw new Error(errorData.error || `서버 오류: ${response.status}`);
