@@ -133,3 +133,4 @@ adobe-dc-pdf-services-sdk-*/
 # OCR tools
 tesseract/
 poppler/
+.vercel

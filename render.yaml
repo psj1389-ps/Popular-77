@@ -26,7 +26,7 @@ services:
         value: production
       - key: PORT
         value: 10000
-    healthCheckPath: /
+    healthCheckPath: /health
 
   # PDF to JPG Service
   - type: web
@@ -40,7 +40,7 @@ services:
         value: production
       - key: PORT
         value: 10000
-    healthCheckPath: /
+    healthCheckPath: /health
 
   # PDF to XLS Service
   - type: web
@@ -56,7 +56,7 @@ services:
         value: 10000
       - key: PYTHON_VERSION
         value: 3.12.7
-    healthCheckPath: /
+    healthCheckPath: /health
 
   # PDF to PNG Service
   - type: web
@@ -70,7 +70,77 @@ services:
         value: production
       - key: PORT
         value: 10000
-    healthCheckPath: /
+    healthCheckPath: /health
+
+  # PDF to AI Service
+  - type: web
+    name: pdf-ai-service
+    env: python
+    rootDir: services/pdf-ai
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
+  # PDF to BMP Service
+  - type: web
+    name: pdf-bmp-service
+    env: python
+    rootDir: services/pdf-bmp
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
+  # PDF to GIF Service
+  - type: web
+    name: pdf-gif-service
+    env: python
+    rootDir: services/pdf-gif
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
+  # PDF to PPTX Service
+  - type: web
+    name: pdf-pptx-service
+    env: python
+    rootDir: services/pdf-pptx
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
+  # PDF to SVG Service
+  - type: web
+    name: pdf-svg-service
+    env: python
+    rootDir: services/pdf-svg
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
 
   # PDF to TIFF Service
   - type: web
@@ -84,4 +154,4 @@ services:
         value: production
       - key: PORT
         value: 10000
-    healthCheckPath: /
+    healthCheckPath: /health
