@@ -173,7 +173,9 @@ def convert_legacy():
     # 기존 /convert 엔드포인트를 새로운 AI 변환으로 리다이렉트
     return convert_file()
 
-
+@app.route("/health")
+def health():
+    return "ok", 200
 
 if __name__ == '__main__':
     app.run(debug=True)
