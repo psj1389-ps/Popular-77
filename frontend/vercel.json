@@ -10,35 +10,35 @@
     },
     {
       "source": "/api/pdf-png/:path*",
-      "destination": "https://pdf-png.onrender.com/:path*"
+      "destination": "https://pdf-png-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-xls/:path*",
-      "destination": "https://pdf-xls.onrender.com/:path*"
+      "destination": "https://pdf-xls-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-ai/:path*",
-      "destination": "https://popular-77.onrender.com/:path*"
+      "destination": "https://pdf-ai-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-bmp/:path*",
-      "destination": "https://pdf-bmp.onrender.com/:path*"
+      "destination": "https://pdf-bmp-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-gif/:path*",
-      "destination": "https://pdf-gif.onrender.com/:path*"
+      "destination": "https://pdf-gif-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-pptx/:path*",
-      "destination": "https://pdf-pptx.onrender.com/:path*"
+      "destination": "https://pdf-pptx-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-svg/:path*",
-      "destination": "https://pdf-svg.onrender.com/:path*"
+      "destination": "https://pdf-svg-service.onrender.com/:path*"
     },
     {
       "source": "/api/pdf-tiff/:path*",
-      "destination": "https://pdf-tiff.onrender.com/:path*"
+      "destination": "https://pdf-tiff-service.onrender.com/:path*"
     }
   ],
   "routes": [
