@@ -102,7 +102,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
             PDF변환도구
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div 
               onClick={() => window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank')}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
@@ -132,6 +132,22 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
               <h4 className="font-semibold text-lg mb-2">PDF to Excel</h4>
               <p className="text-gray-600">PDF 파일을 Excel 스프레드시트로 변환합니다.</p>
+            </div>
+            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+              <h4 className="font-semibold text-lg mb-2">PDF to PPTX</h4>
+              <p className="text-gray-600">PDF 파일을 PPTX로 변환합니다.</p>
+            </div>
+            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+              <h4 className="font-semibold text-lg mb-2">PDF to SVG</h4>
+              <p className="text-gray-600">PDF 파일을 SVG 벡터 방식으로 변환합니다.</p>
+            </div>
+            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+              <h4 className="font-semibold text-lg mb-2">PDF to TIFF</h4>
+              <p className="text-gray-600">PDF 파일을 TIFF 이미지로 변환합니다.</p>
+            </div>
+            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
+              <h4 className="font-semibold text-lg mb-2">PDF to BMP</h4>
+              <p className="text-gray-600">PDF 파일을 BMP 이미지로 변환합니다.</p>
             </div>
           </div>
         </div>
