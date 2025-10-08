@@ -42,3 +42,4 @@ Icon?
 # Temporary files
 *.tmp
 *.temp
+.vercel

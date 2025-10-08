@@ -40,12 +40,5 @@
       "source": "/api/pdf-tiff/:path*",
       "destination": "https://pdf-tiff-service.onrender.com/:path*"
     }
-  ],
-  "routes": [
-    {
-      "src": "^(?!/api).*",
-      "dest": "/index.html",
-      "status": 200
-    }
   ]
 }
