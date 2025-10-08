@@ -19,6 +19,15 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// Content-Disposition 헤더에서 파일명 추출
+const getFilenameFromCD = (cd: string): string | null => {
+  // filename*=UTF-8''... 우선, 없으면 filename="..." 
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) return decodeURIComponent(star[1]);
+  const normal = /filename="?([^";]+)"?/i.exec(cd);
+  return normal?.[1] || null;
+};
+
 const PdfToDocPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
@@ -75,13 +84,28 @@ const PdfToDocPage: React.FC = () => {
     }, 200);
     
     const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    formData.append('file', selectedFile); // 'file' 필드명 사용
+    formData.append('quality', quality === 'fast' ? 'low' : 'standard'); // 서버 로그에 맞춤
+    
     try {
-      const response = await fetch('/api/pdf-doc/convert', { method: 'POST', body: formData });
+      const response = await fetch('/api/pdf-doc/convert', { 
+        method: 'POST', 
+        body: formData 
+      });
+      
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+        // 서버가 JSON 에러를 줄 수 있으므로 시도
+        const ct = response.headers.get("content-type") || "";
+        let msg = `요청 실패(${response.status})`;
+        
+        if (ct.includes("application/json")) {
+          const j = await response.json().catch(() => null);
+          if (j?.error) msg = j.error;
+        } else {
+          const t = await response.text().catch(() => "");
+          if (t) msg = t;
+        }
+        throw new Error(msg);
       }
       
       // 변환 완료 시 진행률을 100%로 설정
@@ -89,15 +113,18 @@ const PdfToDocPage: React.FC = () => {
       setConversionProgress(100);
       
       const blob = await response.blob();
-      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".docx";
+      
+      // 파일명 파싱
+      const cd = response.headers.get("content-disposition") || "";
+      const guessed = getFilenameFromCD(cd) || (selectedFile.name.replace(/\.pdf$/i, "") + ".docx");
       
       // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      setSuccessMessage(`변환 완료! ${guessed} 파일이 다운로드됩니다.`);
       setShowSuccessMessage(true);
       
       // 잠시 후 다운로드 시작
       setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
+        downloadBlob(blob, guessed);
       }, 1000);
       
     } catch (error) {

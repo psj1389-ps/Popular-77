@@ -5,7 +5,11 @@
   "rewrites": [
     {
       "source": "/api/pdf-doc/(.*)",
-      "destination": "https://pdf-doc.onrender.com/$1"
+      "destination": "https://pdf-doc-306w.onrender.com/$1"
+    },
+    {
+      "source": "/api/pdf-to-doc/(.*)",
+      "destination": "https://pdf-doc-306w.onrender.com/$1"
     },
     {
       "source": "/api/pdf-jpg/:path*",
