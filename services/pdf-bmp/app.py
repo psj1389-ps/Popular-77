@@ -94,5 +94,9 @@ def convert():
     except Exception as e:
         return jsonify({'error': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
 
+@app.route("/health")
+def health():
+    return "ok", 200
+
 if __name__ == '__main__':
     app.run(debug=True)
