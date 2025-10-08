@@ -21,6 +21,17 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+// 응답 처리 공통 유틸
+function safeGetFilename(res: Response, fallback: string) {
+  const cd = res.headers.get("content-disposition") || "";
+  const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) {
+    try { return decodeURIComponent(star[1]); } catch {}
+  }
+  const normal = /filename="?([^";]+)"?/i.exec(cd);
+  return normal?.[1] || fallback;
+}
+
 const PdfToBmpPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
@@ -29,6 +40,8 @@ const PdfToBmpPage: React.FC = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -50,6 +63,8 @@ const PdfToBmpPage: React.FC = () => {
     setShowSuccessMessage(false);
     setSuccessMessage('');
     setConversionProgress(0);
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -79,27 +94,52 @@ const PdfToBmpPage: React.FC = () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    
     try {
-      const response = await fetch('/api/pdf-bmp/convert', { method: 'POST', body: formData });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+      // 변환 요청 후
+      const res = await fetch("/api/pdf-bmp/convert", { method: "POST", body: formData });
+
+      if (!res.ok) {
+        const ct = res.headers.get("content-type") || "";
+        let msg = `요청 실패(${res.status})`;
+        if (ct.includes("application/json")) {
+          const j = await res.json().catch(() => null);
+          if (j?.error) msg = j.error;
+        } else {
+          const t = await res.text().catch(() => "");
+          if (t) msg = t;
+        }
+        throw new Error(msg);
       }
-      
+
       // 변환 완료 시 진행률을 100%로 설정
       clearInterval(progressInterval);
       setConversionProgress(100);
-      
-      const blob = await response.blob();
-      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".bmp";
+
+      // ZIP인지 BMP인지 판별 후 파일명 결정
+      const contentType = (res.headers.get("content-type") || "").toLowerCase();
+      const base = selectedFile.name.replace(/\.pdf$/i, "");
+      let name = safeGetFilename(res, base);
+
+      // 확장자 보정: 헤더/파일명에 zip 단서가 있으면 .zip, 아니면 .bmp
+      const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
+      if (!/\.(zip|bmp)$/i.test(name)) {
+        name = isZip ? `${name}.zip` : `${name}.bmp`;
+      }
+
+      // Blob 만들고 상태 업데이트
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      setConvertedFileUrl(url);
+      setConvertedFileName(name);
       
       // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
       setShowSuccessMessage(true);
       
       // 잠시 후 다운로드 시작
       setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
+        downloadBlob(blob, name);
       }, 1000);
       
     } catch (error) {
