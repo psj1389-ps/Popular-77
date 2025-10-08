@@ -35,6 +35,17 @@ function safeGetFilename(res: Response, fallback: string) {
   return normal?.[1] || fallback;
 }
 
+// 에러 메시지 파싱
+async function getErrorMessage(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await res.json().catch(() => null);
+    if (j?.error) return j.error; // 서버가 { error: "메시지" }로 내려줄 때
+  }
+  const t = await res.text().catch(() => "");
+  return t || `요청 실패(${res.status})`;
+}
+
 const PdfToBmpPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<"low" | "medium" | "high">("medium"); // JPG와 동일한 3단계 품질
@@ -105,15 +116,7 @@ const PdfToBmpPage: React.FC = () => {
       const res = await fetch(`${BMP_API_BASE}/convert`, { method: "POST", body: formData });
 
       if (!res.ok) {
-        const ct = res.headers.get("content-type") || "";
-        let msg = `요청 실패(${res.status})`;
-        if (ct.includes("application/json")) {
-          const j = await res.json().catch(() => null);
-          if (j?.error) msg = j.error;
-        } else {
-          const t = await res.text().catch(() => "");
-          if (t) msg = t;
-        }
+        const msg = await getErrorMessage(res);
         throw new Error(msg);
       }
 

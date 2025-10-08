@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 
+// API Base URL - 프로덕션에서는 Render 직접 연결
+const DOC_API_BASE = import.meta.env.PROD ? "https://pdf-doc-306w.onrender.com" : "/api/pdf-doc";
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -19,18 +22,31 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-// Content-Disposition 헤더에서 파일명 추출
-const getFilenameFromCD = (cd: string): string | null => {
-  // filename*=UTF-8''... 우선, 없으면 filename="..." 
-  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
-  if (star?.[1]) return decodeURIComponent(star[1]);
+// 응답 처리 공통 유틸
+function safeGetFilename(res: Response, fallback: string) {
+  const cd = res.headers.get("content-disposition") || "";
+  const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) {
+    try { return decodeURIComponent(star[1]); } catch {}
+  }
   const normal = /filename="?([^";]+)"?/i.exec(cd);
-  return normal?.[1] || null;
-};
+  return normal?.[1] || fallback;
+}
+
+// 에러 메시지 파싱
+async function getErrorMessage(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await res.json().catch(() => null);
+    if (j?.error) return j.error; // 서버가 { error: "메시지" }로 내려줄 때
+  }
+  const t = await res.text().catch(() => "");
+  return t || `요청 실패(${res.status})`;
+}
 
 const PdfToDocPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
+  const [quality, setQuality] = useState<"low" | "medium" | "high">("medium"); // JPG와 동일한 3단계 품질
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -83,28 +99,19 @@ const PdfToDocPage: React.FC = () => {
       });
     }, 200);
     
+    const payloadQuality = (quality === "low") ? "low" : "standard";
     const formData = new FormData();
     formData.append('file', selectedFile); // 'file' 필드명 사용
-    formData.append('quality', quality === 'fast' ? 'low' : 'standard'); // 서버 로그에 맞춤
+    formData.append('quality', payloadQuality); // 2단계로 매핑
     
     try {
-      const response = await fetch('/api/pdf-doc/convert', { 
+      const response = await fetch(`${DOC_API_BASE}/convert`, { 
         method: 'POST', 
         body: formData 
       });
       
       if (!response.ok) {
-        // 서버가 JSON 에러를 줄 수 있으므로 시도
-        const ct = response.headers.get("content-type") || "";
-        let msg = `요청 실패(${response.status})`;
-        
-        if (ct.includes("application/json")) {
-          const j = await response.json().catch(() => null);
-          if (j?.error) msg = j.error;
-        } else {
-          const t = await response.text().catch(() => "");
-          if (t) msg = t;
-        }
+        const msg = await getErrorMessage(response);
         throw new Error(msg);
       }
       
@@ -115,8 +122,7 @@ const PdfToDocPage: React.FC = () => {
       const blob = await response.blob();
       
       // 파일명 파싱
-      const cd = response.headers.get("content-disposition") || "";
-      const guessed = getFilenameFromCD(cd) || (selectedFile.name.replace(/\.pdf$/i, "") + ".docx");
+      const guessed = safeGetFilename(response, selectedFile.name.replace(/\.pdf$/i, "") + ".docx");
       
       // 성공 메시지 표시
       setSuccessMessage(`변환 완료! ${guessed} 파일이 다운로드됩니다.`);
@@ -197,12 +203,37 @@ const PdfToDocPage: React.FC = () => {
                 <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
                 <div className="flex gap-4">
                   <label className="flex items-center">
-                    <input type="radio" name="quality" value="fast" checked={quality === 'fast'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">빠른 변환 (권장)</span>
+                    <input 
+                      type="radio" 
+                      name="quality" 
+                      value="low" 
+                      checked={quality === 'low'} 
+                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
+                      className="w-4 h-4 text-blue-600" 
+                    />
+                    <span className="ml-2 text-gray-700">빠른 변환</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">표준 변환</span>
+                    <input 
+                      type="radio" 
+                      name="quality" 
+                      value="medium" 
+                      checked={quality === 'medium'} 
+                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
+                      className="w-4 h-4 text-blue-600" 
+                    />
+                    <span className="ml-2 text-gray-700">표준 변환 (권장)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input 
+                      type="radio" 
+                      name="quality" 
+                      value="high" 
+                      checked={quality === 'high'} 
+                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
+                      className="w-4 h-4 text-blue-600" 
+                    />
+                    <span className="ml-2 text-gray-700">고품질 변환</span>
                   </label>
                 </div>
               </div>

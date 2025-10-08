@@ -1,5 +1,8 @@
 import React, { useState, useRef } from 'react';
 
+// API Base URL - 프로덕션에서는 Render 직접 연결
+const JPG_API_BASE = import.meta.env.PROD ? "https://pdf-jpg-jh3s.onrender.com" : "/api/pdf-jpg";
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -18,6 +21,28 @@ const formatFileSize = (bytes: number) => {
   const i = Math.floor(Math.log(bytes) / Math.log(k));
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
+
+// 응답 처리 공통 유틸
+function safeGetFilename(res: Response, fallback: string) {
+  const cd = res.headers.get("content-disposition") || "";
+  const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) {
+    try { return decodeURIComponent(star[1]); } catch {}
+  }
+  const normal = /filename="?([^";]+)"?/i.exec(cd);
+  return normal?.[1] || fallback;
+}
+
+// 에러 메시지 파싱
+async function getErrorMessage(res: Response) {
+  const ct = res.headers.get("content-type") || "";
+  if (ct.includes("application/json")) {
+    const j = await res.json().catch(() => null);
+    if (j?.error) return j.error; // 서버가 { error: "메시지" }로 내려줄 때
+  }
+  const t = await res.text().catch(() => "");
+  return t || `요청 실패(${res.status})`;
+}
 
 const PdfToJpgPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -78,10 +103,10 @@ const PdfToJpgPage: React.FC = () => {
     formData.append('file', selectedFile);
     formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
     try {
-      const response = await fetch('/api/pdf-jpg/convert', { method: 'POST', body: formData });
+      const response = await fetch(`${JPG_API_BASE}/convert`, { method: 'POST', body: formData });
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+        const msg = await getErrorMessage(response);
+        throw new Error(msg);
       }
       
       // 변환 완료 시 진행률을 100%로 설정
@@ -90,38 +115,8 @@ const PdfToJpgPage: React.FC = () => {
       
       const blob = await response.blob();
       
-      // Content-Disposition 헤더에서 파일명 추출
-      const contentDisposition = response.headers.get('Content-Disposition');
-      let downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip"; // 기본값
-      
-      if (contentDisposition) {
-        // 더 강력한 파일명 추출 로직
-        let filenameMatch = null;
-        
-        // filename*=UTF-8''encoded_filename 형식 먼저 확인 (RFC 5987)
-        const utf8Match = contentDisposition.match(/filename\*=UTF-8''([^;]+)/i);
-        if (utf8Match) {
-          try {
-            downloadFilename = decodeURIComponent(utf8Match[1]);
-          } catch (e) {
-            console.warn('UTF-8 filename decoding failed:', e);
-          }
-        } else {
-          // 일반적인 filename="..." 또는 filename=... 형식
-          filenameMatch = contentDisposition.match(/filename[^;=\n]*=\s*"?([^";\n]*)"?/i);
-          if (filenameMatch && filenameMatch[1]) {
-            downloadFilename = filenameMatch[1].trim();
-            // 따옴표 제거
-            downloadFilename = downloadFilename.replace(/^["']|["']$/g, '');
-          }
-        }
-      } else {
-        // Content-Type으로 파일 형식 판단
-        const contentType = response.headers.get('Content-Type');
-        if (contentType && contentType.includes('image/jpeg')) {
-          downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".jpg";
-        }
-      }
+      // 파일명 파싱
+      const downloadFilename = safeGetFilename(response, selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip");
       
       // 성공 메시지 표시
       setSuccessMessage(`변환 완료! 파일명: ${downloadFilename}로 다운로드됩니다.`);
