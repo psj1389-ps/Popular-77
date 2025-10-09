@@ -25,7 +25,15 @@ CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "http:
 
 # 비동기 처리를 위한 전역 변수
 executor = ThreadPoolExecutor(max_workers=2)
-JOBS = {}  # job_id -> {"status": "pending|done|error", "path": "", "name": "", "ctype": "", "error": ""}
+JOBS = {}  # job_id -> {"status": "pending|done|error", "path": "", "name": "", "ctype": "", "error": "", "progress": 0, "message": ""}
+
+def set_progress(job_id, p, msg=None):
+    """진행률 업데이트 도우미 함수"""
+    info = JOBS.get(job_id)
+    if not info: return
+    info["progress"] = int(p)
+    if msg:
+        info["message"] = msg
 
 def perform_bmp_conversion(file_path, quality, scale):
     """
@@ -168,16 +176,27 @@ def convert_async():
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
     
-    JOBS[job_id] = {"status": "pending"}
+    JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"}
     
     def run_job():
         try:
+            set_progress(job_id, 10, "변환 준비 중")
+            # 변환 시작 직전
+            set_progress(job_id, 50, "페이지 래스터라이즈 중")
             out_path, name, ctype = perform_bmp_conversion(in_path, quality, scale)
-            JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype}
+            set_progress(job_id, 90, "파일 생성 중")
+            
+            JOBS[job_id] = {
+                "status": "done", "path": out_path, "name": name, "ctype": ctype,
+                "progress": 100, "message": "완료"
+            }
             # 잡 완료 시 경로 로그
             app.logger.info(f"JOB {job_id} done: {out_path} exists={os.path.exists(out_path)}")
         except Exception as e:
-            JOBS[job_id] = {"status": "error", "error": str(e)}
+            JOBS[job_id] = {
+                "status": "error", "error": str(e),
+                "progress": 0, "message": "변환 실패"
+            }
         finally:
             # 입력파일 정리
             try:
@@ -192,7 +211,11 @@ def convert_async():
 def job_status(job_id):
     info = JOBS.get(job_id)
     if not info:
-        return jsonify({"error": "job not found"}), 404
+        return jsonify({"error": "작업을 찾을 수 없습니다"}), 404
+    
+    # progress/message가 없으면 기본값 제공
+    info.setdefault("progress", 0)
+    info.setdefault("message", "")
     return jsonify(info), 200
 
 @app.route('/download/<job_id>', methods=['GET'])

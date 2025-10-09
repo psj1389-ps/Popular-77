@@ -70,6 +70,14 @@ const PdfToBmpPage: React.FC = () => {
   const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 다운로드 방지 및 타이머 관리용 refs
+  const timerRef = useRef<number | null>(null);
+  const downloadedRef = useRef(false);
+
+  // 진행률 상태
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+
   // 픽셀 기준(1.0 배율일 때의 가로/세로 픽셀)
   const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null);
 
@@ -130,7 +138,14 @@ const PdfToBmpPage: React.FC = () => {
       setErrorMessage('먼저 파일을 선택해주세요.');
       return;
     }
+    
+    // 변환 시작 시 초기화
+    downloadedRef.current = false; // 새 작업이므로 초기화
+    if (timerRef.current) clearInterval(timerRef.current); // 기존 폴링 중지
+    
     setIsConverting(true);
+    setProgress(1);
+    setProgressText("PDF를 BMP로 변환 중...");
     setErrorMessage('');
     setShowSuccessMessage(false);
     setConversionProgress(0);
@@ -155,21 +170,34 @@ const PdfToBmpPage: React.FC = () => {
         const r = await fetch(`${BMP_API_BASE}/job/${job_id}`);
         const j = await r.json();
         
+        // 서버 진행률 반영
+        if (typeof j.progress === "number") setProgress(j.progress);
+        if (typeof j.message === "string") setProgressText(j.message);
+        
         if (j.status === "done") {
+          if (downloadedRef.current) return true; // 이미 다운로드했으면 중단
+          downloadedRef.current = true;
+          
+          if (timerRef.current) { 
+            clearInterval(timerRef.current); 
+            timerRef.current = null; 
+          }
+          
           // 다운로드
           const d = await fetch(`${BMP_API_BASE}/download/${job_id}`);
           if (!d.ok) {
-            const msg = await d.text().catch(() => `요청 실패(${d.status})`);
-            setErrorMessage(msg);
+            const errorMsg = await getErrorMessage(d);
+            setErrorMessage(errorMsg);
+            setIsConverting(false);
             return true;
           }
           
           // 파일명/타입 처리
           const contentType = (d.headers.get("content-type") || "").toLowerCase();
-          const base = selectedFile.name.replace(/\.pdf$/i, "");
+          const base = safeGetFilename(selectedFile, "");
           let name = safeGetFilename(d, base);
           const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
-          if (!/\.(zip|bmp)$/i.test(name)) {
+          if (!/\.(bmp|zip)$/i.test(name)) {
             name = isZip ? `${name}.zip` : `${name}.bmp`;
           }
           
@@ -201,9 +229,12 @@ const PdfToBmpPage: React.FC = () => {
       };
       
       // 폴링 시작 (2초 간격)
-      const timer = setInterval(async () => {
+      timerRef.current = setInterval(async () => {
         const done = await poll();
-        if (done) clearInterval(timer);
+        if (done && timerRef.current) {
+          clearInterval(timerRef.current);
+          timerRef.current = null;
+        }
       }, 2000);
       
     } catch (error) {
@@ -373,6 +404,19 @@ const PdfToBmpPage: React.FC = () => {
                 </div>
               )}
 
+              {/* 진행률 바 */}
+              {isConverting && (
+                <div className="mt-4">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
+                    <div 
+                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                      style={{ width: `${progress}%` }}
+                    ></div>
+                  </div>
+                  <p className="text-sm text-gray-600 mt-2">{progressText}</p>
+                </div>
+              )}
+
               <div className="flex gap-4">
                 <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
                   {isConverting ? '변환 중...' : '변환하기'}
@@ -438,5 +482,12 @@ const PdfToBmpPage: React.FC = () => {
     </div>
   );
 };
+
+  // 컴포넌트 언마운트 시 폴링 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
 export default PdfToBmpPage;
