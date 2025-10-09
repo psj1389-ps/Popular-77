@@ -13,8 +13,9 @@ if (typeof window !== "undefined") {
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
-// API Base URL - 프로덕션에서는 Render 직접 연결
-const BMP_API_BASE = import.meta.env.PROD ? "https://pdf-bmp.onrender.com" : "/api/pdf-bmp";
+// 프록시 스위치 - 디버깅용
+const USE_PROXY = false; // true로 바꾸면 /api 프록시 사용
+const BMP_API_BASE = USE_PROXY ? "/api/pdf-bmp" : "https://pdf-bmp.onrender.com";
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);

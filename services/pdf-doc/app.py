@@ -46,7 +46,18 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "https://*.vercel.app", "http://localhost:5173"]}})
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173",
+            "https://popular-77.vercel.app",
+            r"https://.*\.vercel\.app"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "expose_headers": ["Content-Disposition"]
+    }
+})
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "100"))
 app.config["MAX_CONTENT_LENGTH"] = max_mb * 1024 * 1024

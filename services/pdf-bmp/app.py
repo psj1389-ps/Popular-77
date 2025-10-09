@@ -23,7 +23,18 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "http://localhost:5173"]}})
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173",
+            "https://popular-77.vercel.app",
+            r"https://.*\.vercel\.app"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "expose_headers": ["Content-Disposition"]
+    }
+})
 
 # 비동기 처리를 위한 전역 변수
 executor = ThreadPoolExecutor(max_workers=2)
