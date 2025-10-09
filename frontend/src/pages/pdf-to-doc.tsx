@@ -257,7 +257,7 @@ const PdfToDocPage: React.FC = () => {
                 <label className="flex items-center gap-2">
                   <input 
                     type="radio" 
-                    name="doc-quality" 
+                    name="doc-speed" 
                     value="fast" 
                     checked={speed === "fast"} 
                     onChange={() => setSpeed("fast")} 
@@ -267,7 +267,7 @@ const PdfToDocPage: React.FC = () => {
                 <label className="flex items-center gap-2">
                   <input 
                     type="radio" 
-                    name="doc-quality" 
+                    name="doc-speed" 
                     value="standard" 
                     checked={speed === "standard"} 
                     onChange={() => setSpeed("standard")} 
