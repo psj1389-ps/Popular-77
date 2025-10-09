@@ -10,6 +10,8 @@ from pdf2image import convert_from_bytes
 from PIL import Image
 import io
 import logging
+import re
+import urllib.parse
 
 logging.basicConfig(level=logging.INFO)
 
@@ -27,6 +29,18 @@ CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "http:
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}  # job_id -> {"status": "pending|done|error", "path": "", "name": "", "ctype": "", "error": "", "progress": 0, "message": ""}
 
+def safe_base_name(filename: str) -> str:
+    base = os.path.splitext(os.path.basename(filename or "output"))[0]
+    # 위험 문자 제거만(한글/공백/숫자/영문/.-_는 허용)
+    base = base.replace("/", "_").replace("\\", "_")
+    base = re.sub(r'[\r\n\t"]+', "_", base)
+    return base.strip() or "output"
+
+def attach_download_headers(resp, download_name: str):
+    quoted = urllib.parse.quote(download_name)
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
+    return resp
+
 def set_progress(job_id, p, msg=None):
     """진행률 업데이트 도우미 함수"""
     info = JOBS.get(job_id)
@@ -35,7 +49,7 @@ def set_progress(job_id, p, msg=None):
     if msg:
         info["message"] = msg
 
-def perform_bmp_conversion(file_path, quality, scale):
+def perform_bmp_conversion(file_path, quality, scale, base_name):
     """
     PDF를 BMP로 변환하는 핵심 함수
     
@@ -43,14 +57,13 @@ def perform_bmp_conversion(file_path, quality, scale):
         file_path: 저장된 PDF 경로
         quality: "low"|"medium"|"high"
         scale: 문자열/숫자(예: "1.0")
+        base_name: 원본 파일명(확장자 제거)
     
     Returns:
         (output_path, download_name, content_type)
         - 다중 페이지면 zip 경로와 이름(.zip), content_type="application/zip"
         - 단일 페이지면 bmp 경로와 이름(.bmp), content_type="image/bmp"
     """
-    base_filename = os.path.splitext(os.path.basename(file_path))[0]
-    
     # 임시 폴더에서 변환 작업 수행
     with tempfile.TemporaryDirectory() as tmp_dir:
         try:
@@ -61,7 +74,7 @@ def perform_bmp_conversion(file_path, quality, scale):
             # 크기 조절 적용
             dpi = int(dpi * float(scale))
             
-            print(f"[DEBUG] 변환 시작 - 파일: {file_path}, 기본 파일명: {base_filename}")
+            print(f"[DEBUG] 변환 시작 - 파일: {file_path}, 기본 파일명: {base_name}")
             
             # pdf2image를 사용하여 PDF를 이미지로 변환
             with open(file_path, 'rb') as pdf_file:
@@ -76,41 +89,46 @@ def perform_bmp_conversion(file_path, quality, scale):
                 raise Exception('PDF 파일에 페이지가 없습니다.')
             
             # 임시 폴더에 BMP 파일들 생성
-            tmp_image_paths = []
+            result_paths = []
             for page_num, pil_image in enumerate(images):
-                output_image_filename = f"{base_filename}_page_{page_num+1}.bmp"
+                output_image_filename = f"page_{page_num+1}.bmp"
                 tmp_image_path = os.path.join(tmp_dir, output_image_filename)
                 pil_image.save(tmp_image_path, 'BMP')
-                tmp_image_paths.append(tmp_image_path)
+                result_paths.append(tmp_image_path)
                 print(f"[DEBUG] 페이지 {page_num+1} 저장 완료: {output_image_filename}")
             
             print(f"[DEBUG] 최종 페이지 수: {page_count}")
             
-            if page_count == 1:
-                # 단일 페이지: BMP 파일을 OUTPUTS_DIR로 이동
-                final_name = f"{base_filename}.bmp"
+            if len(result_paths) == 1:
+                # 단일 페이지: <base_name>.bmp
+                final_name = f"{base_name}.bmp"
                 final_path = os.path.join(OUTPUTS_DIR, final_name)
-                shutil.move(tmp_image_paths[0], final_path)
+                if os.path.exists(final_path):
+                    os.remove(final_path)
+                shutil.move(result_paths[0], final_path)
                 print(f"[DEBUG] 단일 페이지 처리 - BMP 파일({final_name})을 {final_path}로 이동")
                 return final_path, final_name, "image/bmp"
             
             else:
-                # 다중 페이지: ZIP 파일을 OUTPUTS_DIR에 생성
-                final_name = f"{base_filename}.zip"
+                # 다중 페이지: <base_name>.zip (내부: <base_name>_01.bmp, 02, 03...)
+                pad = max(2, len(str(len(result_paths))))
+                final_name = f"{base_name}.zip"
                 final_path = os.path.join(OUTPUTS_DIR, final_name)
+                if os.path.exists(final_path):
+                    os.remove(final_path)
                 print(f"[DEBUG] 다중 페이지 처리 - {page_count}장을 ZIP 파일({final_name})로 압축")
                 
                 with zipfile.ZipFile(final_path, 'w', zipfile.ZIP_DEFLATED) as zf:
-                    for tmp_path in tmp_image_paths:
-                        zf.write(tmp_path, arcname=os.path.basename(tmp_path))
-                        print(f"[DEBUG] ZIP에 추가: {os.path.basename(tmp_path)}")
+                    for i, p in enumerate(result_paths, start=1):
+                        arcname = f"{base_name}_{i:0{pad}d}.bmp"
+                        zf.write(p, arcname=arcname)
+                        print(f"[DEBUG] ZIP에 추가: {arcname}")
                 
-                print(f"[DEBUG] ZIP 파일 생성 완료: {final_name}")
                 return final_path, final_name, "application/zip"
                 
         except Exception as e:
-            print(f"[ERROR] BMP 변환 중 오류 발생: {e}")
-            raise
+            print(f"[ERROR] 변환 중 오류 발생: {str(e)}")
+            raise e
 
 @app.route("/health")
 def health():
@@ -171,6 +189,9 @@ def convert_async():
     quality = request.form.get("quality", "medium")
     scale = request.form.get("scale", "1.0")
     
+    # 원본 파일명에서 base_name 추출
+    base_name = safe_base_name(f.filename)
+    
     # 업로드 저장
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
@@ -183,7 +204,7 @@ def convert_async():
             set_progress(job_id, 10, "변환 준비 중")
             # 변환 시작 직전
             set_progress(job_id, 50, "페이지 래스터라이즈 중")
-            out_path, name, ctype = perform_bmp_conversion(in_path, quality, scale)
+            out_path, name, ctype = perform_bmp_conversion(in_path, quality, scale, base_name)
             set_progress(job_id, 90, "파일 생성 중")
             
             JOBS[job_id] = {
@@ -226,16 +247,12 @@ def job_download(job_id):
     if info.get("status") != "done":
         return jsonify({"error": "not ready"}), 409
     
-    path = info.get("path")
-    name = info.get("name") or (os.path.basename(path) if path else "output.bmp")
+    path, name, ctype = info["path"], info["name"], info["ctype"]
     if not path or not os.path.exists(path):
         return jsonify({"error": "output file missing"}), 500
     
-    ctype = info.get("ctype")
-    if not ctype:
-        ctype = "application/zip" if path.lower().endswith(".zip") else "image/bmp"
-    
-    return send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+    resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+    return attach_download_headers(resp, name)
 
 @app.errorhandler(Exception)
 def handle_any_error(e):

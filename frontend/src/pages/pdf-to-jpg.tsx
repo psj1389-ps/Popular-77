@@ -313,7 +313,7 @@ const PdfToJpgPage: React.FC = () => {
                 <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
                   <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">크기 배율:</label>
+                    <label className="text-sm font-medium text-gray-700">크기 x</label>
                     <span className="text-sm text-gray-600">{scale}x</span>
                   </div>
                   <input
@@ -339,26 +339,6 @@ const PdfToJpgPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 변환 진행률 표시 */}
-              {isConverting && (
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(progress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${progress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex items-center justify-center mt-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">{progressText}</span>
-                  </div>
-                </div>
-              )}
-
               {/* 성공 메시지 */}
               {showSuccessMessage && (
                 <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
@@ -368,6 +348,25 @@ const PdfToJpgPage: React.FC = () => {
                     </svg>
                     <span className="text-green-700 font-medium">{successMessage}</span>
                   </div>
+                </div>
+              )}
+
+              {/* 진행률 바 - BMP와 동일한 스타일 */}
+              {isConverting && (
+                <div className="mt-4">
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>변환 진행률</span>
+                    <span>{progress}%</span>
+                  </div>
+                  <div className="h-2 bg-gray-200 rounded">
+                    <div 
+                      className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
+                      style={{ width: `${Math.max(2, progress)}%` }}
+                    />
+                  </div>
+                  {isConverting && (
+                    <div className="mt-2 text-sm text-gray-500">⏳ {progressText || "변환 중..."}</div>
+                  )}
                 </div>
               )}
 
