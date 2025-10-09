@@ -60,7 +60,7 @@ async function getErrorMessage(res: Response) {
 const PdfToBmpPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<"low" | "medium" | "high">("medium"); // JPG와 동일한 3단계 품질
-  const [scale, setScale] = useState(1.0); // 크기 배율 (0.2 ~ 2.0)
+  const [scale, setScale] = useState(0.5); // 크기 배율 (0.2 ~ 2.0)
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -206,6 +206,7 @@ const PdfToBmpPage: React.FC = () => {
           setConvertedFileUrl(url);
           setConvertedFileName(name);
           setConversionProgress(100);
+          setProgress(100);
           
           // 성공 메시지 표시
           setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
@@ -365,7 +366,12 @@ const PdfToBmpPage: React.FC = () => {
                     max={2} 
                     step={0.1} 
                     value={scale} 
-                    onChange={(e) => setScale(Number(e.target.value))} 
+                    onChange={(e) => { 
+                      const v = Number(e.target.value || 0.5); 
+                      // 범위 고정 
+                      const clamped = Math.min(2, Math.max(0.2, v)); 
+                      setScale(clamped); 
+                    }} 
                     className="w-16 text-right border rounded px-2 py-1" 
                   />
                 </div>
@@ -379,25 +385,7 @@ const PdfToBmpPage: React.FC = () => {
                 )}
               </div>
 
-              {/* 변환 진행률 표시 */}
-              {isConverting && (
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${conversionProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex items-center justify-center mt-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 BMP로 변환 중...</span>
-                  </div>
-                </div>
-              )}
+
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
@@ -414,13 +402,19 @@ const PdfToBmpPage: React.FC = () => {
               {/* 진행률 바 */}
               {isConverting && (
                 <div className="mt-4">
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-                      style={{ width: `${progress}%` }}
-                    ></div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>변환 진행률</span>
+                    <span>{progress}%</span>
                   </div>
-                  <p className="text-sm text-gray-600 mt-2">{progressText}</p>
+                  <div className="h-2 bg-gray-200 rounded">
+                    <div 
+                      className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
+                      style={{ width: `${Math.max(2, progress)}%` }}
+                    />
+                  </div>
+                  {isConverting && (
+                    <div className="mt-2 text-sm text-gray-500">⏳ {progressText || "변환 중..."}</div>
+                  )}
                 </div>
               )}
 
