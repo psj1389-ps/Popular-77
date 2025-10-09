@@ -71,7 +71,7 @@ const PdfToBmpPage: React.FC = () => {
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // 다운로드 방지 및 타이머 관리용 refs
-  const timerRef = useRef<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
   const downloadedRef = useRef(false);
 
   // 진행률 상태
@@ -194,7 +194,7 @@ const PdfToBmpPage: React.FC = () => {
           
           // 파일명/타입 처리
           const contentType = (d.headers.get("content-type") || "").toLowerCase();
-          const base = safeGetFilename(selectedFile, "");
+          const base = selectedFile?.name?.replace(/\.[^/.]+$/, "") || "output";
           let name = safeGetFilename(d, base);
           const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
           if (!/\.(bmp|zip)$/i.test(name)) {
@@ -243,6 +243,13 @@ const PdfToBmpPage: React.FC = () => {
       setIsConverting(false);
     }
   };
+
+  // 컴포넌트 언마운트 시 폴링 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) clearInterval(timerRef.current);
+    };
+  }, []);
 
   return (
     <div className="w-full bg-white">
@@ -482,12 +489,5 @@ const PdfToBmpPage: React.FC = () => {
     </div>
   );
 };
-
-  // 컴포넌트 언마운트 시 폴링 정리
-  useEffect(() => {
-    return () => {
-      if (timerRef.current) clearInterval(timerRef.current);
-    };
-  }, []);
 
 export default PdfToBmpPage;
