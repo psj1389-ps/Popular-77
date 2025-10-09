@@ -1,4 +1,6 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+// Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
 // API Base URL - 프로덕션에서는 Render 직접 연결
 const DOC_API_BASE = import.meta.env.PROD ? "https://pdf-doc-306w.onrender.com" : "/api/pdf-doc";
@@ -52,18 +54,26 @@ const PdfToDocPage: React.FC = () => {
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 다운로드 방지 및 타이머 관리용 refs
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const downloadedRef = useRef(false);
+
+  // 진행률 상태
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      if (file.size > 100 * 1024 * 1024) {
-        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
-        setSelectedFile(null);
-      } else {
-        setSelectedFile(file);
-        setErrorMessage('');
-      }
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setErrorMessage('');
+      setShowSuccessMessage(false);
+      setConvertedFileUrl(null);
+      setConvertedFileName('');
     }
   };
 
@@ -71,79 +81,121 @@ const PdfToDocPage: React.FC = () => {
     setSelectedFile(null);
     setErrorMessage('');
     setShowSuccessMessage(false);
-    setSuccessMessage('');
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
     setConversionProgress(0);
+    setIsConverting(false);
+    
+    // 타이머 정리
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // 파일 입력 초기화
+      fileInputRef.current.value = '';
     }
   };
 
   const handleConvert = async () => {
-    if (!selectedFile) {
-      setErrorMessage('먼저 파일을 선택해주세요.');
-      return;
-    }
-    setIsConverting(true);
+    if (!selectedFile) return;
+    
     setErrorMessage('');
     setShowSuccessMessage(false);
-    setConversionProgress(0);
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
     
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
-    const payloadQuality = (quality === "low") ? "low" : "standard";
-    const formData = new FormData();
-    formData.append('file', selectedFile); // 'file' 필드명 사용
-    formData.append('quality', payloadQuality); // 2단계로 매핑
-    
+    const payloadQuality = quality === "low" ? "low" : "standard";
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("quality", payloadQuality);
+
+    setIsConverting(true);
+    setProgress(1);
+    setProgressText("PDF를 DOCX로 변환 중...");
+    downloadedRef.current = false;
+    if (timerRef.current) { 
+      clearInterval(timerRef.current); 
+      timerRef.current = null; 
+    }
+
     try {
-      const response = await fetch(`${DOC_API_BASE}/convert`, { 
-        method: 'POST', 
-        body: formData 
-      });
-      
-      if (!response.ok) {
-        const msg = await getErrorMessage(response);
-        throw new Error(msg);
+      const up = await fetch(`${DOC_API_BASE}/convert-async`, { method: "POST", body: form });
+      if (!up.ok) { 
+        setErrorMessage(await up.text()); 
+        setIsConverting(false); 
+        return; 
       }
-      
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
-      
-      const blob = await response.blob();
-      
-      // 파일명 파싱
-      const guessed = safeGetFilename(response, selectedFile.name.replace(/\.pdf$/i, "") + ".docx");
-      
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${guessed} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
-      
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, guessed);
-      }, 1000);
-      
+      const { job_id } = await up.json();
+
+      timerRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`${DOC_API_BASE}/job/${job_id}`);
+          const j = await r.json();
+          if (typeof j.progress === "number") setProgress(j.progress);
+          if (j.message) setProgressText(j.message);
+
+          if (j.status === "done") {
+            if (downloadedRef.current) return;
+            downloadedRef.current = true;
+            if (timerRef.current) { 
+              clearInterval(timerRef.current); 
+              timerRef.current = null; 
+            }
+
+            const d = await fetch(`${DOC_API_BASE}/download/${job_id}`);
+            if (!d.ok) { 
+              setErrorMessage(await d.text()); 
+              setIsConverting(false); 
+              return; 
+            }
+
+            const base = selectedFile.name.replace(/\.pdf$/i, "");
+            let name = safeGetFilename(d, `${base}.docx`);
+            if (!/\.docx$/i.test(name)) name = `${base}.docx`;
+
+            const blob = await d.blob();
+            const url = URL.createObjectURL(blob);
+            setConvertedFileUrl(url);
+            setConvertedFileName(name);
+            setProgress(100);
+            setIsConverting(false);
+            
+            // 성공 메시지 표시
+            setSuccessMessage(`변환 완료! 파일명: ${name}로 다운로드됩니다.`);
+            setShowSuccessMessage(true);
+            
+            // 잠시 후 다운로드 시작
+            setTimeout(() => {
+              downloadBlob(blob, name);
+            }, 1000);
+          }
+          if (j.status === "error") {
+            if (timerRef.current) { 
+              clearInterval(timerRef.current); 
+              timerRef.current = null; 
+            }
+            setErrorMessage(j.error || "변환 중 오류");
+            setIsConverting(false);
+          }
+        } catch (error) {
+          console.error("Polling error:", error);
+        }
+      }, 1500);
     } catch (error) {
-      clearInterval(progressInterval);
-      setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-        setConversionProgress(0);
-      }, 2000);
+      setIsConverting(false);
     }
   };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="w-full bg-white">
@@ -201,40 +253,47 @@ const PdfToDocPage: React.FC = () => {
               
               <div>
                 <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="flex gap-4">
+                <div className="space-y-2">
                   <label className="flex items-center">
-                    <input 
-                      type="radio" 
-                      name="quality" 
-                      value="low" 
-                      checked={quality === 'low'} 
-                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
-                      className="w-4 h-4 text-blue-600" 
-                    />
-                    <span className="ml-2 text-gray-700">빠른 변환</span>
+                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
                   </label>
                   <label className="flex items-center">
-                    <input 
-                      type="radio" 
-                      name="quality" 
-                      value="medium" 
-                      checked={quality === 'medium'} 
-                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
-                      className="w-4 h-4 text-blue-600" 
-                    />
-                    <span className="ml-2 text-gray-700">표준 변환 (권장)</span>
+                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
                   </label>
                   <label className="flex items-center">
-                    <input 
-                      type="radio" 
-                      name="quality" 
-                      value="high" 
-                      checked={quality === 'high'} 
-                      onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} 
-                      className="w-4 h-4 text-blue-600" 
-                    />
-                    <span className="ml-2 text-gray-700">고품질 변환</span>
+                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
                   </label>
+                </div>
+              </div>
+
+              {/* 고급 옵션 - 비활성화된 슬라이더 (통일감 유지) */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-500">크기 배율 (DOCX 변환에서는 사용되지 않음):</label>
+                    <span className="text-sm text-gray-400">1.0x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="2.0"
+                    step="0.1"
+                    value={1.0}
+                    disabled
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-not-allowed opacity-50"
+                  />
+                  <div className="flex justify-between text-xs text-gray-400 mt-1">
+                    <span>0.2x (작게)</span>
+                    <span>2.0x (크게)</span>
+                  </div>
+                  
+                  <div className="mt-2 text-sm text-gray-500">
+                    DOCX 변환은 원본 문서의 레이아웃을 유지합니다.
+                  </div>
                 </div>
               </div>
 
@@ -243,17 +302,17 @@ const PdfToDocPage: React.FC = () => {
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(progress)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">
                     <div 
                       className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${conversionProgress}%` }}
+                      style={{ width: `${progress}%` }}
                     ></div>
                   </div>
                   <div className="flex items-center justify-center mt-3">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 DOCX로 변환 중...</span>
+                    <span className="text-sm text-gray-600">{progressText}</span>
                   </div>
                 </div>
               )}

@@ -1,4 +1,17 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+
+// PDF.js (표준 빌드로 변경 - Vercel 호환성 개선)
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+
+// 워커 설정을 조건부로 처리 (SSR 환경 고려)
+if (typeof window !== "undefined") {
+  GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.js",
+    import.meta.url
+  ).toString();
+}
+
+// Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
 // API Base URL - 프로덕션에서는 Render 직접 연결
 const JPG_API_BASE = import.meta.env.PROD ? "https://pdf-jpg-jh3s.onrender.com" : "/api/pdf-jpg";
@@ -46,24 +59,57 @@ async function getErrorMessage(res: Response) {
 
 const PdfToJpgPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState('medium'); // 'low', 'medium', 'high'
+  const [quality, setQuality] = useState<"low" | "medium" | "high">("medium"); // JPG와 동일한 3단계 품질
+  const [scale, setScale] = useState(0.5); // 크기 배율 (0.2 ~ 2.0)
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // 다운로드 방지 및 타이머 관리용 refs
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const downloadedRef = useRef(false);
+
+  // 진행률 상태
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+
+  // 픽셀 기준(1.0 배율일 때의 가로/세로 픽셀)
+  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null);
+
+  // PDF 첫 페이지 크기 측정
+  async function measurePdfFirstPage(file: File): Promise<{ width: number; height: number } | null> {
+    try {
+      const buf = await file.arrayBuffer();
+      const pdf = await getDocument({ data: buf }).promise;
+      const page = await pdf.getPage(1);
+      const viewport = page.getViewport({ scale: 1 }); // 1.0 기준
+      const size = { width: Math.round(viewport.width), height: Math.round(viewport.height) };
+      console.log("[JPG] PDF 첫 페이지 크기:", size); // 확인용
+      return size;
+    } catch (e) {
+      console.warn("[JPG] PDF 크기 측정 실패:", e);
+      return null; // 실패 시 표시 생략
+    }
+  }
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      if (file.size > 100 * 1024 * 1024) {
-        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
-        setSelectedFile(null);
-      } else {
-        setSelectedFile(file);
-        setErrorMessage('');
-      }
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setErrorMessage('');
+      setShowSuccessMessage(false);
+      setConvertedFileUrl(null);
+      setConvertedFileName('');
+      
+      // PDF 크기 측정
+      measurePdfFirstPage(file).then(size => {
+        setBaseSize(size);
+      });
     }
   };
 
@@ -71,73 +117,124 @@ const PdfToJpgPage: React.FC = () => {
     setSelectedFile(null);
     setErrorMessage('');
     setShowSuccessMessage(false);
-    setSuccessMessage('');
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
     setConversionProgress(0);
+    setIsConverting(false);
+    setBaseSize(null);
+    
+    // 타이머 정리
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // 파일 입력 초기화
+      fileInputRef.current.value = '';
     }
   };
 
   const handleConvert = async () => {
-    if (!selectedFile) {
-      setErrorMessage('먼저 파일을 선택해주세요.');
-      return;
-    }
-    setIsConverting(true);
+    if (!selectedFile) return;
+    
     setErrorMessage('');
     setShowSuccessMessage(false);
-    setConversionProgress(0);
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
     
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("quality", quality);
+    form.append("scale", String(scale));
+
+    setIsConverting(true);
+    setProgress(1);
+    setProgressText("PDF를 JPG로 변환 중...");
+    downloadedRef.current = false;
+    if (timerRef.current) { 
+      clearInterval(timerRef.current); 
+      timerRef.current = null; 
+    }
+
     try {
-      const response = await fetch(`${JPG_API_BASE}/convert`, { method: 'POST', body: formData });
-      if (!response.ok) {
-        const msg = await getErrorMessage(response);
-        throw new Error(msg);
+      const up = await fetch(`${JPG_API_BASE}/convert-async`, { method: "POST", body: form });
+      if (!up.ok) { 
+        setErrorMessage(await up.text()); 
+        setIsConverting(false); 
+        return; 
       }
-      
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
-      
-      const blob = await response.blob();
-      
-      // 파일명 파싱
-      const downloadFilename = safeGetFilename(response, selectedFile.name.replace(/\.[^/.]+$/, "") + ".zip");
-      
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! 파일명: ${downloadFilename}로 다운로드됩니다.`);
-      setShowSuccessMessage(true);
-      
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
-      }, 1000);
-      
+      const { job_id } = await up.json();
+
+      timerRef.current = setInterval(async () => {
+        try {
+          const r = await fetch(`${JPG_API_BASE}/job/${job_id}`);
+          const j = await r.json();
+          if (typeof j.progress === "number") setProgress(j.progress);
+          if (j.message) setProgressText(j.message);
+
+          if (j.status === "done") {
+            if (downloadedRef.current) return;
+            downloadedRef.current = true;
+            if (timerRef.current) { 
+              clearInterval(timerRef.current); 
+              timerRef.current = null; 
+            }
+
+            const d = await fetch(`${JPG_API_BASE}/download/${job_id}`);
+            if (!d.ok) { 
+              setErrorMessage(await d.text()); 
+              setIsConverting(false); 
+              return; 
+            }
+
+            const contentType = (d.headers.get("content-type") || "").toLowerCase();
+            const base = selectedFile.name.replace(/\.pdf$/i, "");
+            let name = safeGetFilename(d, base);
+            const isZip = contentType.includes("zip") || /\.zip$/i.test(name);
+            if (!/\.(zip|jpg|jpeg)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.jpg`;
+
+            const blob = await d.blob();
+            const url = URL.createObjectURL(blob);
+            setConvertedFileUrl(url);
+            setConvertedFileName(name);
+            setProgress(100);
+            setIsConverting(false);
+            
+            // 성공 메시지 표시
+            setSuccessMessage(`변환 완료! 파일명: ${name}로 다운로드됩니다.`);
+            setShowSuccessMessage(true);
+            
+            // 잠시 후 다운로드 시작
+            setTimeout(() => {
+              downloadBlob(blob, name);
+            }, 1000);
+          }
+          if (j.status === "error") {
+            if (timerRef.current) { 
+              clearInterval(timerRef.current); 
+              timerRef.current = null; 
+            }
+            setErrorMessage(j.error || "변환 중 오류");
+            setIsConverting(false);
+          }
+        } catch (error) {
+          console.error("Polling error:", error);
+        }
+      }, 1500);
     } catch (error) {
-      clearInterval(progressInterval);
-      setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-        setConversionProgress(0);
-      }, 2000);
+      setIsConverting(false);
     }
   };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <div className="w-full bg-white">
@@ -197,17 +294,48 @@ const PdfToJpgPage: React.FC = () => {
                 <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
                 <div className="space-y-2">
                   <label className="flex items-center">
-                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
                     <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
                     <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
                   </label>
                   <label className="flex items-center">
-                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
                     <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
                   </label>
+                </div>
+              </div>
+
+              {/* 고급 옵션 - 크기 조정 */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">크기 배율:</label>
+                    <span className="text-sm text-gray-600">{scale}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="2.0"
+                    step="0.1"
+                    value={scale}
+                    onChange={(e) => setScale(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0.2x (작게)</span>
+                    <span>2.0x (크게)</span>
+                  </div>
+                  
+                  {/* 픽셀 크기 표시 */}
+                  {baseSize && (
+                    <div className="mt-2 text-sm text-gray-600">
+                      예상 크기: {Math.round(baseSize.width * scale)} × {Math.round(baseSize.height * scale)} 픽셀
+                    </div>
+                  )}
                 </div>
               </div>
 
@@ -216,17 +344,17 @@ const PdfToJpgPage: React.FC = () => {
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(progress)}%</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-2.5">
                     <div 
                       className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${conversionProgress}%` }}
+                      style={{ width: `${progress}%` }}
                     ></div>
                   </div>
                   <div className="flex items-center justify-center mt-3">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 JPG로 변환 중...</span>
+                    <span className="text-sm text-gray-600">{progressText}</span>
                   </div>
                 </div>
               )}
