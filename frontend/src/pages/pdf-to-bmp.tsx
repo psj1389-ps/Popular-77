@@ -1,10 +1,15 @@
 import React, { useState, useRef, useEffect } from 'react';
 
-// PDF.js(레거시 빌드가 Vite에서 가장 안정적)
-import * as pdfjsLib from "pdfjs-dist/legacy/build/pdf";
-// 워커 파일 URL을 workerSrc로 지정
-import workerSrc from "pdfjs-dist/legacy/build/pdf.worker.min.js?url";
-pdfjsLib.GlobalWorkerOptions.workerSrc = workerSrc;
+// PDF.js (표준 빌드로 변경 - Vercel 호환성 개선)
+import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
+
+// 워커 설정을 조건부로 처리 (SSR 환경 고려)
+if (typeof window !== "undefined") {
+  GlobalWorkerOptions.workerSrc = new URL(
+    "pdfjs-dist/build/pdf.worker.min.js",
+    import.meta.url
+  ).toString();
+}
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
@@ -72,7 +77,7 @@ const PdfToBmpPage: React.FC = () => {
   async function measurePdfFirstPage(file: File): Promise<{ width: number; height: number } | null> {
     try {
       const buf = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
+      const pdf = await getDocument({ data: buf }).promise;
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 1 }); // 1.0 기준
       const size = { width: Math.round(viewport.width), height: Math.round(viewport.height) };
