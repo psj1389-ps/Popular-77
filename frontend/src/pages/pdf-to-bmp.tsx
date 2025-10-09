@@ -79,24 +79,9 @@ const PdfToBmpPage: React.FC = () => {
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
 
-  // 픽셀 기준(1.0 배율일 때의 가로/세로 픽셀)
-  const [baseSize, setBaseSize] = useState<{ width: number; height: number } | null>(null);
 
-  // PDF 첫 페이지 크기 측정
-  async function measurePdfFirstPage(file: File): Promise<{ width: number; height: number } | null> {
-    try {
-      const buf = await file.arrayBuffer();
-      const pdf = await getDocument({ data: buf }).promise;
-      const page = await pdf.getPage(1);
-      const viewport = page.getViewport({ scale: 1 }); // 1.0 기준
-      const size = { width: Math.round(viewport.width), height: Math.round(viewport.height) };
-      console.log("[BMP] PDF 첫 페이지 크기:", size); // 확인용
-      return size;
-    } catch (e) {
-      console.warn("[BMP] PDF 크기 측정 실패:", e);
-      return null; // 실패 시 표시 생략
-    }
-  }
+
+
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -111,14 +96,7 @@ const PdfToBmpPage: React.FC = () => {
     }
   };
 
-  // 파일 선택 시 픽셀 기준 계산
-  useEffect(() => {
-    if (!selectedFile) {
-      setBaseSize(null);
-      return;
-    }
-    measurePdfFirstPage(selectedFile).then(setBaseSize);
-  }, [selectedFile]);
+
 
   const handleReset = () => {
     setSelectedFile(null);
@@ -128,7 +106,7 @@ const PdfToBmpPage: React.FC = () => {
     setConversionProgress(0);
     setConvertedFileUrl(null);
     setConvertedFileName('');
-    setBaseSize(null);
+
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -347,7 +325,6 @@ const PdfToBmpPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* 고급 옵션 - JPG와 동일한 UI */}
               <div className="border rounded-lg p-4 mb-4">
                 <p className="font-medium mb-3">고급 옵션:</p>
                 <div className="flex items-center gap-4">
@@ -361,29 +338,14 @@ const PdfToBmpPage: React.FC = () => {
                     onChange={(e) => setScale(Number(e.target.value))} 
                     className="flex-1" 
                   />
-                  <input 
-                    type="number" 
-                    min={0.2} 
-                    max={2} 
-                    step={0.1} 
-                    value={scale} 
-                    onChange={(e) => { 
-                      const v = Number(e.target.value || 0.5); 
-                      // 범위 고정 
-                      const clamped = Math.min(2, Math.max(0.2, v)); 
-                      setScale(clamped); 
-                    }} 
-                    className="w-16 text-right border rounded px-2 py-1" 
-                  />
-                </div>
-                {/* 슬라이더 아래 픽셀 표기 */}
-                {baseSize ? (
-                  <div className="mt-2 text-sm text-gray-500" role="status" aria-live="polite">
-                    {Math.round(baseSize.width * scale)}×{Math.round(baseSize.height * scale)} px
+                  <div className="w-16 text-right text-sm text-gray-600">
+                    {scale.toFixed(1)}x
                   </div>
-                ) : (
-                  <div className="mt-2 text-sm text-gray-400">PDF 크기 계산 중…</div>
-                )}
+                </div>
+                <div className="mt-2 flex justify-between text-xs text-gray-400">
+                  <span>0.2x (작게)</span>
+                  <span>2.0x (크게)</span>
+                </div>
               </div>
 
 

@@ -49,7 +49,7 @@ async function getErrorMessage(res: Response) {
 
 const PdfToDocPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState<"low" | "medium" | "high">("medium"); // JPG와 동일한 3단계 품질
+  const [speed, setSpeed] = useState<"fast" | "standard">("fast");
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -106,7 +106,7 @@ const PdfToDocPage: React.FC = () => {
     setConvertedFileUrl(null);
     setConvertedFileName('');
     
-    const payloadQuality = quality === "low" ? "low" : "standard";
+    const payloadQuality = speed === "fast" ? "low" : "standard";
     const form = new FormData();
     form.append("file", selectedFile);
     form.append("quality", payloadQuality);
@@ -252,22 +252,28 @@ const PdfToDocPage: React.FC = () => {
                 <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
               </div>
               
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
-                  </label>
-                </div>
+              <div className="space-y-2 mb-4">
+                <p className="font-medium">변환 품질 선택:</p>
+                <label className="flex items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="doc-quality" 
+                    value="fast" 
+                    checked={speed === "fast"} 
+                    onChange={() => setSpeed("fast")} 
+                  />
+                  <span>빠른 변환 (권장)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="doc-quality" 
+                    value="standard" 
+                    checked={speed === "standard"} 
+                    onChange={() => setSpeed("standard")} 
+                  />
+                  <span>표준 변환</span>
+                </label>
               </div>
 
               {/* 성공 메시지 */}
