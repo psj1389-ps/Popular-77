@@ -325,26 +325,27 @@ const PdfToBmpPage: React.FC = () => {
                 </div>
               </div>
 
-              <div className="border rounded-lg p-4 mb-4">
-                <p className="font-medium mb-3">고급 옵션:</p>
-                <div className="flex items-center gap-4">
-                  <label className="whitespace-nowrap">크기 x</label>
-                  <input 
-                    type="range" 
-                    min={0.2} 
-                    max={2} 
-                    step={0.1} 
-                    value={scale} 
-                    onChange={(e) => setScale(Number(e.target.value))} 
-                    className="flex-1" 
-                  />
-                  <div className="w-16 text-right text-sm text-gray-600">
-                    {scale.toFixed(1)}x
+              {/* 고급 옵션 - 크기 조정 */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
+                <div className="bg-gray-50 p-4 rounded-lg">
+                  <div className="flex items-center justify-between mb-2">
+                    <label className="text-sm font-medium text-gray-700">크기 x</label>
+                    <span className="text-sm text-gray-600">{scale.toFixed(1)}x</span>
                   </div>
-                </div>
-                <div className="mt-2 flex justify-between text-xs text-gray-400">
-                  <span>0.2x (작게)</span>
-                  <span>2.0x (크게)</span>
+                  <input
+                    type="range"
+                    min="0.2"
+                    max="2.0"
+                    step="0.1"
+                    value={scale}
+                    onChange={(e) => setScale(parseFloat(e.target.value))}
+                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                  />
+                  <div className="flex justify-between text-xs text-gray-500 mt-1">
+                    <span>0.2x (작게)</span>
+                    <span>2.0x (크게)</span>
+                  </div>
                 </div>
               </div>
 
