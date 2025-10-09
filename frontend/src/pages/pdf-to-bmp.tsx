@@ -75,8 +75,11 @@ const PdfToBmpPage: React.FC = () => {
       const pdf = await pdfjsLib.getDocument({ data: buf }).promise;
       const page = await pdf.getPage(1);
       const viewport = page.getViewport({ scale: 1 }); // 1.0 기준
-      return { width: Math.round(viewport.width), height: Math.round(viewport.height) };
-    } catch {
+      const size = { width: Math.round(viewport.width), height: Math.round(viewport.height) };
+      console.log("[BMP] PDF 첫 페이지 크기:", size); // 확인용
+      return size;
+    } catch (e) {
+      console.warn("[BMP] PDF 크기 측정 실패:", e);
       return null; // 실패 시 표시 생략
     }
   }
@@ -324,10 +327,12 @@ const PdfToBmpPage: React.FC = () => {
                   />
                 </div>
                 {/* 슬라이더 아래 픽셀 표기 */}
-                {baseSize && (
-                  <div className="mt-2 text-sm text-gray-500">
+                {baseSize ? (
+                  <div className="mt-2 text-sm text-gray-500" role="status" aria-live="polite">
                     {Math.round(baseSize.width * scale)}×{Math.round(baseSize.height * scale)} px
                   </div>
+                ) : (
+                  <div className="mt-2 text-sm text-gray-400">PDF 크기 계산 중…</div>
                 )}
               </div>
 

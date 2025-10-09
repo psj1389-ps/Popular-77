@@ -3,14 +3,22 @@ from flask_cors import CORS
 from concurrent.futures import ThreadPoolExecutor
 from uuid import uuid4
 import os
-import zipfile
+import shutil
 import tempfile
+import zipfile
 from pdf2image import convert_from_bytes
 from PIL import Image
 import io
 import logging
 
 logging.basicConfig(level=logging.INFO)
+
+# 영속 경로 정의
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "http://localhost:5173"]}})
@@ -33,72 +41,68 @@ def perform_bmp_conversion(file_path, quality, scale):
         - 다중 페이지면 zip 경로와 이름(.zip), content_type="application/zip"
         - 단일 페이지면 bmp 경로와 이름(.bmp), content_type="image/bmp"
     """
-    image_paths = []
+    base_filename = os.path.splitext(os.path.basename(file_path))[0]
     
-    try:
-        # 품질 설정
-        dpi_map = {'low': 150, 'medium': 200, 'high': 300}
-        dpi = dpi_map.get(quality, 200)
-        
-        # 크기 조절 적용
-        dpi = int(dpi * float(scale))
-        
-        # PDF를 이미지로 변환
-        base_filename = os.path.splitext(os.path.basename(file_path))[0]
-        print(f"[DEBUG] 변환 시작 - 파일: {file_path}, 기본 파일명: {base_filename}")
-        
-        # pdf2image를 사용하여 PDF를 이미지로 변환
-        with open(file_path, 'rb') as pdf_file:
-            pdf_bytes = pdf_file.read()
-        
-        # PDF를 PIL 이미지로 변환
-        images = convert_from_bytes(pdf_bytes, dpi=dpi)
-        page_count = len(images)
-        print(f"[DEBUG] PDF 변환 완료 - 총 {page_count}개 페이지 발견")
-        
-        if page_count == 0:
-            raise Exception('PDF 파일에 페이지가 없습니다.')
-        
-        # 각 페이지를 BMP로 변환
-        for page_num, pil_image in enumerate(images):
-            # BMP 파일로 저장
-            output_image_filename = f"{base_filename}_page_{page_num+1}.bmp"
-            image_path = os.path.join('outputs', output_image_filename)
-            pil_image.save(image_path, 'BMP')
-            image_paths.append(image_path)
-            print(f"[DEBUG] 페이지 {page_num+1} 저장 완료: {output_image_filename}")
-        
-        print(f"[DEBUG] 최종 페이지 수: {page_count}")
-        
-        if page_count == 1:
-            # 페이지가 1장이면, 첫 번째 이미지를 바로 반환
-            single_image_path = image_paths[0]
-            download_name = f"{base_filename}.bmp"
-            print(f"[DEBUG] 단일 페이지 처리 - BMP 파일({download_name})을 직접 반환")
-            return single_image_path, download_name, "image/bmp"
-        
-        else:
-            # 페이지가 2장 이상이면, ZIP 파일로 압축
-            zip_filename = f"{base_filename}_images.zip"
-            zip_path = os.path.join('outputs', zip_filename)
-            print(f"[DEBUG] 다중 페이지 처리 - {page_count}장을 ZIP 파일({zip_filename})로 압축")
+    # 임시 폴더에서 변환 작업 수행
+    with tempfile.TemporaryDirectory() as tmp_dir:
+        try:
+            # 품질 설정
+            dpi_map = {'low': 150, 'medium': 200, 'high': 300}
+            dpi = dpi_map.get(quality, 200)
             
-            with zipfile.ZipFile(zip_path, 'w') as zipf:
-                for file_path in image_paths:
-                    zipf.write(file_path, os.path.basename(file_path))
-                    print(f"[DEBUG] ZIP에 추가: {os.path.basename(file_path)}")
+            # 크기 조절 적용
+            dpi = int(dpi * float(scale))
             
-            print(f"[DEBUG] ZIP 파일 생성 완료: {zip_filename}")
-            return zip_path, zip_filename, "application/zip"
-    
-    finally:
-        # 생성된 이미지 파일들 정리 (ZIP으로 묶었거나 단일 파일 처리 후)
-        for path in image_paths:
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-            except Exception as e:
-                print(f"이미지 파일 삭제 실패 (무시됨): {e}")
+            print(f"[DEBUG] 변환 시작 - 파일: {file_path}, 기본 파일명: {base_filename}")
+            
+            # pdf2image를 사용하여 PDF를 이미지로 변환
+            with open(file_path, 'rb') as pdf_file:
+                pdf_bytes = pdf_file.read()
+            
+            # PDF를 PIL 이미지로 변환
+            images = convert_from_bytes(pdf_bytes, dpi=dpi)
+            page_count = len(images)
+            print(f"[DEBUG] PDF 변환 완료 - 총 {page_count}개 페이지 발견")
+            
+            if page_count == 0:
+                raise Exception('PDF 파일에 페이지가 없습니다.')
+            
+            # 임시 폴더에 BMP 파일들 생성
+            tmp_image_paths = []
+            for page_num, pil_image in enumerate(images):
+                output_image_filename = f"{base_filename}_page_{page_num+1}.bmp"
+                tmp_image_path = os.path.join(tmp_dir, output_image_filename)
+                pil_image.save(tmp_image_path, 'BMP')
+                tmp_image_paths.append(tmp_image_path)
+                print(f"[DEBUG] 페이지 {page_num+1} 저장 완료: {output_image_filename}")
+            
+            print(f"[DEBUG] 최종 페이지 수: {page_count}")
+            
+            if page_count == 1:
+                # 단일 페이지: BMP 파일을 OUTPUTS_DIR로 이동
+                final_name = f"{base_filename}.bmp"
+                final_path = os.path.join(OUTPUTS_DIR, final_name)
+                shutil.move(tmp_image_paths[0], final_path)
+                print(f"[DEBUG] 단일 페이지 처리 - BMP 파일({final_name})을 {final_path}로 이동")
+                return final_path, final_name, "image/bmp"
+            
+            else:
+                # 다중 페이지: ZIP 파일을 OUTPUTS_DIR에 생성
+                final_name = f"{base_filename}.zip"
+                final_path = os.path.join(OUTPUTS_DIR, final_name)
+                print(f"[DEBUG] 다중 페이지 처리 - {page_count}장을 ZIP 파일({final_name})로 압축")
+                
+                with zipfile.ZipFile(final_path, 'w', zipfile.ZIP_DEFLATED) as zf:
+                    for tmp_path in tmp_image_paths:
+                        zf.write(tmp_path, arcname=os.path.basename(tmp_path))
+                        print(f"[DEBUG] ZIP에 추가: {os.path.basename(tmp_path)}")
+                
+                print(f"[DEBUG] ZIP 파일 생성 완료: {final_name}")
+                return final_path, final_name, "application/zip"
+                
+        except Exception as e:
+            print(f"[ERROR] BMP 변환 중 오류 발생: {e}")
+            raise
 
 @app.route("/health")
 def health():
@@ -160,9 +164,8 @@ def convert_async():
     scale = request.form.get("scale", "1.0")
     
     # 업로드 저장
-    os.makedirs("uploads", exist_ok=True)
     job_id = uuid4().hex
-    in_path = os.path.join("uploads", f"{job_id}.pdf")
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
     
     JOBS[job_id] = {"status": "pending"}
@@ -171,6 +174,8 @@ def convert_async():
         try:
             out_path, name, ctype = perform_bmp_conversion(in_path, quality, scale)
             JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype}
+            # 잡 완료 시 경로 로그
+            app.logger.info(f"JOB {job_id} done: {out_path} exists={os.path.exists(out_path)}")
         except Exception as e:
             JOBS[job_id] = {"status": "error", "error": str(e)}
         finally:
