@@ -1,6 +1,9 @@
 from flask import Flask, request, render_template, send_file, flash, redirect, url_for, jsonify
 from flask_cors import CORS
+from concurrent.futures import ThreadPoolExecutor
+from uuid import uuid4
 import os
+import shutil
 import tempfile
 from werkzeug.utils import secure_filename
 from pdf2image import convert_from_path
@@ -21,6 +24,7 @@ import fitz  # PyMuPDF
 import re
 from typing import List, Tuple, Dict, Any
 from pdf2docx import Converter
+import logging
 # Adobe PDF Services SDK 임포트 및 설정
 try:
     # 올바른 Adobe PDF Services SDK import 구문
@@ -56,11 +60,63 @@ ENABLE_DEBUG_LOGS = os.getenv('ENABLE_DEBUG_LOGS', 'true').lower() == 'true'
 CONVERSION_TIMEOUT = int(os.environ.get('CONVERSION_TIMEOUT_SECONDS', '300'))
 TEMP_FILE_CLEANUP = os.environ.get('TEMP_FILE_CLEANUP', 'true').lower() == 'true'
 
+logging.basicConfig(level=logging.INFO)
+
+# 영속 경로 정의
+BASE_DIR = os.path.dirname(os.path.abspath(__file__))
+UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
+OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
+os.makedirs(UPLOADS_DIR, exist_ok=True)
+os.makedirs(OUTPUTS_DIR, exist_ok=True)
+
 app = Flask(__name__)
-CORS(app, origins=["https://tools-77.vercel.app", "http://localhost:3000"])  # CORS 설정 추가
+CORS(app, resources={r"/*": {"origins": ["https://popular-77.vercel.app", "https://*.vercel.app", "http://localhost:5173"]}})
 app.secret_key = os.environ.get("SECRET_KEY", "dev-secret-change-me")
 max_mb = int(os.environ.get("MAX_CONTENT_LENGTH_MB", "100"))
 app.config["MAX_CONTENT_LENGTH"] = max_mb * 1024 * 1024
+
+# 비동기 처리를 위한 전역 변수
+executor = ThreadPoolExecutor(max_workers=2)
+JOBS = {}  # job_id -> {"status": "pending|done|error", "path": "", "name": "", "ctype": "", "error": "", "progress": 0, "message": ""}
+
+def set_progress(job_id, p, msg=None):
+    """진행률 업데이트 도우미 함수"""
+    info = JOBS.get(job_id)
+    if not info: return
+    info["progress"] = int(p)
+    if msg:
+        info["message"] = msg
+
+def perform_doc_conversion(file_path, quality):
+    """
+    PDF를 DOCX로 변환하는 핵심 함수
+    
+    Args:
+        file_path: 저장된 PDF 경로
+        quality: "low"|"standard"
+    
+    Returns:
+        (output_path, download_name, content_type)
+        - 항상 docx 파일, content_type="application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    """
+    base_filename = os.path.splitext(os.path.basename(file_path))[0]
+    
+    try:
+        print(f"[DEBUG] 변환 시작 - 파일: {file_path}, 기본 파일명: {base_filename}")
+        
+        # 최종 출력 경로
+        final_name = f"{base_filename}.docx"
+        final_path = os.path.join(OUTPUTS_DIR, final_name)
+        
+        # 기존 pdf_to_docx 함수 호출
+        pdf_to_docx(file_path, final_path, quality)
+        
+        print(f"[DEBUG] DOCX 변환 완료: {final_name}")
+        return final_path, final_name, "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        
+    except Exception as e:
+        print(f"[ERROR] DOCX 변환 중 오류 발생: {e}")
+        raise
 
 # 헬스체크
 @app.route("/health")
@@ -1923,6 +1979,87 @@ def convert_file_api():
             'success': False, 
             'error': f'파일 처리 중 오류가 발생했습니다: {str(e)}'
         }), 500
+
+@app.route('/convert-async', methods=['POST'])
+def convert_async():
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+    
+    quality = request.form.get("quality", "medium")
+    # 품질 매핑: low -> "low", medium/high -> "standard"
+    payload_quality = "low" if quality == "low" else "standard"
+    
+    # 업로드 저장
+    job_id = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
+    f.save(in_path)
+    
+    JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"}
+    
+    def run_job():
+        try:
+            set_progress(job_id, 10, "변환 준비 중")
+            # 변환 시작 직전
+            set_progress(job_id, 50, "문서 분석 중")
+            out_path, name, ctype = perform_doc_conversion(in_path, payload_quality)
+            set_progress(job_id, 90, "파일 생성 중")
+            
+            JOBS[job_id] = {
+                "status": "done", "path": out_path, "name": name, "ctype": ctype,
+                "progress": 100, "message": "완료"
+            }
+            # 잡 완료 시 경로 로그
+            app.logger.info(f"JOB {job_id} done: {out_path} exists={os.path.exists(out_path)}")
+        except Exception as e:
+            JOBS[job_id] = {
+                "status": "error", "error": str(e),
+                "progress": 0, "message": "변환 실패"
+            }
+        finally:
+            # 입력파일 정리
+            try:
+                os.remove(in_path)
+            except:
+                pass
+    
+    executor.submit(run_job)
+    return jsonify({"job_id": job_id}), 202
+
+@app.route('/job/<job_id>', methods=['GET'])
+def job_status(job_id):
+    info = JOBS.get(job_id)
+    if not info:
+        return jsonify({"error": "작업을 찾을 수 없습니다"}), 404
+    
+    # progress/message가 없으면 기본값 제공
+    info.setdefault("progress", 0)
+    info.setdefault("message", "")
+    return jsonify(info), 200
+
+@app.route('/download/<job_id>', methods=['GET'])
+def job_download(job_id):
+    info = JOBS.get(job_id)
+    if not info:
+        return jsonify({"error": "job not found"}), 404
+    if info.get("status") != "done":
+        return jsonify({"error": "not ready"}), 409
+    
+    path = info.get("path")
+    name = info.get("name") or (os.path.basename(path) if path else "output.docx")
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file missing"}), 500
+    
+    ctype = info.get("ctype")
+    if not ctype:
+        ctype = "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    
+    return send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+
+@app.errorhandler(Exception)
+def handle_any_error(e):
+    app.logger.exception("Unhandled error")
+    return jsonify({"error": str(e)}), 500
 
 @app.route('/upload', methods=['POST'])
 def upload_file():
