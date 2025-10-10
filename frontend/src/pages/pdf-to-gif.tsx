@@ -162,12 +162,12 @@ const PdfToGifPage: React.FC = () => {
                 <p className="text-sm text-gray-500 mt-1">PDF 파일을 클릭하여 선택 (최대 100MB)</p>
               </label>
             ) : (
-            // 파일 선택 후 UI
-            <div className="space-y-6">
-              <div>
-                <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
-                <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
-              </div>
+              // 파일 선택 후 UI
+              <div className="space-y-6">
+                <div>
+                  <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
+                  <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
+                </div>
               
               <div>
                 <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
@@ -215,24 +215,24 @@ const PdfToGifPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
-                  {isConverting ? '변환 중...' : '변환하기'}
-                </button>
-                <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                  파일 초기화
-                </button>
+                <div className="flex gap-4">
+                  <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                    {isConverting ? '변환 중...' : '변환하기'}
+                  </button>
+                  <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    파일 초기화
+                  </button>
+                </div>
               </div>
-            </div>
-          )}
-          
-          {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
+            )}
+            
+            {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
+          </div>
         </div>
-      </div>
 
-      {/* PDF를 GIF로 변환하는 방법 가이드 섹션 */}
-      <div className="bg-gray-50 py-16">
-        <div className="max-w-4xl mx-auto px-4">
+        {/* PDF를 GIF로 변환하는 방법 가이드 섹션 */}
+        <div className="bg-gray-50 py-16">
+          <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 GIF로 변환하는 방법</h2>
             <p className="text-gray-600">간단한 4단계로 PDF를 애니메이션 이미지 파일로 변환하세요</p>
@@ -275,9 +275,10 @@ const PdfToGifPage: React.FC = () => {
               <p className="text-gray-600 text-sm text-center">변환이 완료되면, 애니메이션 이미지(.gif) 파일을 즉시 다운로드할 수 있습니다.</p>
             </div>
           </div>
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
