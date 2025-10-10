@@ -9,7 +9,6 @@ import fitz  # PyMuPDF
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# CORS
 CORS(app, resources={
     r"/*": {
         "origins": [
@@ -31,7 +30,7 @@ os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
-JOBS = {}  # job_id -> dict
+JOBS = {}
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -50,45 +49,37 @@ def set_progress(job_id, p, msg=None):
     if msg is not None:
         info["message"] = msg
 
-def perform_ai_analysis(in_path, base_name: str):
-    """AI 분석 기능 - PDF에서 텍스트 추출 및 분석"""
-    try:
-        doc = fitz.open(in_path)
-        page_count = doc.page_count
-        
-        # 전체 텍스트 추출
-        full_text = ""
-        for i in range(page_count):
-            set_progress(current_job_id, 10 + int(70*(i+1)/page_count), f"페이지 {i+1}/{page_count} 텍스트 추출 중")
-            page = doc.load_page(i)
-            text = page.get_text()
-            full_text += f"\n--- 페이지 {i+1} ---\n{text}\n"
-        
-        doc.close()
-        
-        # 분석 결과 생성
-        set_progress(current_job_id, 85, "AI 분석 중")
-        analysis_result = {
-            "total_pages": page_count,
-            "total_characters": len(full_text),
-            "total_words": len(full_text.split()),
-            "extracted_text": full_text.strip(),
-            "summary": f"PDF 문서 분석 완료: {page_count}페이지, {len(full_text.split())}단어"
-        }
-        
-        # JSON 파일로 저장
-        final_name = f"{base_name}_analysis.json"
+def perform_ai_conversion(in_path, base_name: str):
+    result_paths = []
+    with tempfile.TemporaryDirectory() as tmp:
+        src = fitz.open(in_path)
+        pages = src.page_count
+        for i in range(pages):
+            set_progress(current_job_id, 10 + int(80*(i+1)/pages), f"페이지 {i+1}/{pages} 저장 중")
+            out_pdf = fitz.open()            # 빈 문서
+            out_pdf.insert_pdf(src, from_page=i, to_page=i)
+            raw_path = os.path.join(tmp, f"{base_name}_{i+1:0{max(2,len(str(pages)))}d}.pdf")
+            out_pdf.save(raw_path)           # PDF로 저장
+            out_pdf.close()
+            # .ai로 이름 변경(실제 포맷은 PDF, 일러스트에서 열 수 있음)
+            ai_path = raw_path[:-4] + ".ai"
+            os.replace(raw_path, ai_path)
+            result_paths.append(ai_path)
+
+        if len(result_paths) == 1:
+            final_name = f"{base_name}.ai"
+            final_path = os.path.join(OUTPUTS_DIR, final_name)
+            if os.path.exists(final_path): os.remove(final_path)
+            os.replace(result_paths[0], final_path)
+            return final_path, final_name, "application/pdf"
+
+        final_name = f"{base_name}.zip"
         final_path = os.path.join(OUTPUTS_DIR, final_name)
-        
-        import json
-        with open(final_path, "w", encoding="utf-8") as f:
-            json.dump(analysis_result, f, ensure_ascii=False, indent=2)
-        
-        return final_path, final_name, "application/json"
-        
-    except Exception as e:
-        app.logger.exception(f"AI analysis error: {e}")
-        raise
+        if os.path.exists(final_path): os.remove(final_path)
+        with zipfile.ZipFile(final_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in result_paths:
+                zf.write(p, arcname=os.path.basename(p))
+        return final_path, final_name, "application/zip"
 
 @app.get("/")
 def home():
@@ -108,24 +99,21 @@ def convert_async():
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
-    
-    # AI 분석 옵션
-    analysis_type = request.form.get("analysis_type", "text_extraction")
-    
+
     JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"}
-    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, analysis_type={analysis_type}")
+    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}")
 
     def run_job():
         global current_job_id
         current_job_id = job_id
         try:
-            set_progress(job_id, 10, "AI 분석 준비 중")
-            out_path, name, ctype = perform_ai_analysis(in_path, base_name)
+            set_progress(job_id, 10, "변환 준비 중")
+            out_path, name, ctype = perform_ai_conversion(in_path, base_name)
             JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype,
                             "progress": 100, "message": "완료"}
             app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}")
         except Exception as e:
-            app.logger.exception("AI analysis error")
+            app.logger.exception("convert error")
             JOBS[job_id] = {"status": "error", "error": str(e), "progress": 0, "message": "오류"}
         finally:
             try: os.remove(in_path)
@@ -137,7 +125,7 @@ def convert_async():
 @app.get("/job/<job_id>")
 def job_status(job_id):
     info = JOBS.get(job_id)
-    if not info: return jsonify({"error": "job not found"}), 404
+    if not info: return jsonify({"error":"job not found"}), 404
     info.setdefault("progress", 0); info.setdefault("message", "")
     return jsonify(info), 200
 
@@ -154,7 +142,8 @@ def job_download(job_id):
 @app.errorhandler(Exception)
 def handle_any(e):
     app.logger.exception("Unhandled")
-    return jsonify({"error": "Internal server error"}), 500
+    return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    app.run(debug=True, host="0.0.0.0", port=5000)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
