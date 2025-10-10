@@ -11,13 +11,13 @@ const Navbar = () => {
           <Link to="/" className="flex items-center space-x-2">
             <div className="w-12 h-12 rounded-full overflow-hidden">
               <img 
-                src="/logo.svg" 
-                alt="77-tools.xyz Logo" 
+                src="https://trae-api-sg.mchost.guru/api/ide/v1/text_to_image?prompt=circular%20purple%20logo%20with%20white%20text%20%2277%20TOOLS%22%20modern%20design%20clean%20typography&image_size=square" 
+                alt="77 TOOLS Logo" 
                 className="w-full h-full object-cover"
               />
             </div>
             <span className="text-xl font-bold text-gray-900">
-              77-tools.xyz
+              77+ Popular Tools
             </span>
           </Link>
 
