@@ -89,8 +89,24 @@ const PdfToPptxPage: React.FC = () => {
       clearInterval(progressInterval);
       setConversionProgress(100);
       
+      const ct = (response.headers.get("content-type") || "").toLowerCase();
+      const base = selectedFile.name.replace(/\.[^.]+$/, "");
+      let name = selectedFile.name.replace(/\.[^/.]+$/, "") + ".pptx";
+
+      // 1) 응답 바이트로 매직넘버 확인
+      const buf = new Uint8Array(await response.clone().arrayBuffer());
+      const head = Array.from(buf.slice(0, 4));
+      const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK..
+      const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
+      const isSvg = head[0] === 0x3c || ( // '<'
+        head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf && head[3] === 0x3c // BOM + '<'
+      );
+
+      // 2) PPTX 페이지별로 올바른 확장자 강제
+      if (isZip && !/\.pptx|\.zip$/i.test(name)) name = `${base}.pptx`;
+
       const blob = await response.blob();
-      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".pptx";
+      const downloadFilename = name;
       
       // 성공 메시지 표시
       setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);

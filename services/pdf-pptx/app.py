@@ -1,9 +1,18 @@
 from flask import Flask, request, jsonify
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
-import os
+import os, mimetypes
 
 app = Flask(__name__)
+
+def guess_mime_by_name(name: str) -> str:
+    n = (name or "").lower()
+    if n.endswith(".svg"): return "image/svg+xml"
+    if n.endswith(".zip"): return "application/zip"
+    if n.endswith(".ai"): return "application/pdf"  # Illustrator 호환 PDF
+    if n.endswith(".pptx"): return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    if n.endswith(".xlsx"): return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return mimetypes.guess_type(n)[0] or "application/octet-stream"
 
 # CORS configuration
 CORS(app, resources={

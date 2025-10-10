@@ -119,8 +119,22 @@ const PdfToSvgPage: React.FC = () => {
           const ct = (d.headers.get("content-type") || "").toLowerCase();
           const base = selectedFile.name.replace(/\.[^.]+$/,"");
           let name = safeGetFilename(d, base);
-          const isZip = ct.includes("zip") || /\.zip$/i.test(name);
-          if (!/\.(zip|svg)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.svg`;
+
+          // 1) 응답 바이트로 매직넘버 확인
+          const buf = new Uint8Array(await d.clone().arrayBuffer());
+          const head = Array.from(buf.slice(0, 4));
+          const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK..
+          const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
+          const isSvg = head[0] === 0x3c || ( // '<'
+            head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf && head[3] === 0x3c // BOM + '<'
+          );
+
+          // 2) 페이지별로 올바른 확장자 강제
+          if (isZip) {
+            if (!/\.zip$/i.test(name)) name = `${name}.zip`;
+          } else if (isSvg) {
+            if (!/\.svg$/i.test(name)) name = `${name}.svg`;
+          }
 
           const blob = await d.blob();
           const url = URL.createObjectURL(blob);

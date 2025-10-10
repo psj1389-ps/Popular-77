@@ -1,4 +1,4 @@
-import os, re, io, zipfile, tempfile, logging, urllib.parse
+import os, re, io, zipfile, tempfile, logging, urllib.parse, mimetypes
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
@@ -49,6 +49,15 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
+
+def guess_mime_by_name(name: str) -> str:
+    n = (name or "").lower()
+    if n.endswith(".svg"): return "image/svg+xml"
+    if n.endswith(".zip"): return "application/zip"
+    if n.endswith(".ai"): return "application/pdf"  # Illustrator 호환 PDF
+    if n.endswith(".pptx"): return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    if n.endswith(".xlsx"): return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return mimetypes.guess_type(n)[0] or "application/octet-stream"
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -152,9 +161,13 @@ def job_download(job_id):
     info = JOBS.get(job_id)
     if not info: return jsonify({"error":"job not found"}), 404
     if info.get("status") != "done": return jsonify({"error":"not ready"}), 409
-    path, name, ctype = info.get("path"), info.get("name"), info.get("ctype")
+    
+    path, name = info.get("path"), info.get("name")
     if not path or not os.path.exists(path): return jsonify({"error":"output file missing"}), 500
+    
+    ctype = guess_mime_by_name(name)
     resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+    # 파일명 한글 안정화
     return attach_download_headers(resp, name)
 
 @app.post("/convert")
