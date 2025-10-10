@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import PageTitle from '../shared/PageTitle';
 
 // PDF.js (표준 빌드로 변경 - Vercel 호환성 개선)
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
@@ -232,7 +233,9 @@ const PdfToBmpPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full bg-white">
+    <>
+      <PageTitle suffix="PDF → BMP" />
+      <div className="w-full bg-white">
       {/* 상단 보라색 배경 섹션 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
         {/* 애니메이션 배경 패턴 */}
@@ -444,7 +447,8 @@ const PdfToBmpPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

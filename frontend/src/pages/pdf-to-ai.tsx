@@ -1,4 +1,5 @@
 import React, { useState, useRef } from 'react';
+import PageTitle from '../shared/PageTitle';
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -113,7 +114,9 @@ const PdfToAiPage: React.FC = () => {
   };
 
   return (
-    <div className="w-full bg-white">
+    <>
+      <PageTitle suffix="PDF → AI" />
+      <div className="w-full bg-white">
       {/* 상단 보라색 배경 섹션 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
         {/* 애니메이션 배경 패턴 */}
@@ -274,7 +277,8 @@ const PdfToAiPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

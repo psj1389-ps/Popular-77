@@ -1,4 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
+import PageTitle from '../shared/PageTitle';
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
@@ -199,7 +200,9 @@ const PdfToDocPage: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full bg-white">
+    <>
+      <PageTitle suffix="PDF → Word" />
+      <div className="w-full bg-white">
       {/* 상단 보라색 배경 섹션 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
         {/* 애니메이션 배경 패턴 */}
@@ -369,7 +372,8 @@ const PdfToDocPage: React.FC = () => {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </>
   );
 };
 

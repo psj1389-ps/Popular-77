@@ -3,6 +3,7 @@ import React, { useRef } from 'react';
 import Hero from '../components/Hero';               // Hero 섹션 컴포넌트
 import PopularTools from '../components/PopularTools'; // 인기 도구 섹션 컴포넌트
 import ToolsPreview from '../components/ToolsPreview'; // 전체 도구 미리보기 섹션 컴포넌트
+import PageTitle from '../shared/PageTitle';
 
 // 💡 constants.ts에서 TOOLS 배열 임포트
 import { TOOLS } from '../data/constants';
@@ -30,7 +31,9 @@ const Home: React.FC = () => {
     // 💡 Navbar와 Footer는 App.tsx에서 전역으로 관리하므로 여기서는 제거합니다.
     //    main 태그만 남기고, 필요한 레이아웃 스타일은 App.tsx의 main 태그나
     //    각 섹션 컴포넌트 내부에서 처리하는 것이 좋습니다.
-    <main>
+    <>
+      <PageTitle />
+      <main>
       {/* 1. 히어로 섹션 */}
       <Hero />
 
@@ -57,7 +60,8 @@ const Home: React.FC = () => {
 
       {/* TODO: 필요하다면 여기에 다른 섹션들을 추가할 수 있습니다. */}
       {/* 예: 사용 후기, 왜 우리 도구를 사용해야 하는지 등 */}
-    </main>
+      </main>
+    </>
   );
 };
 
