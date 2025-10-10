@@ -20,35 +20,60 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const AI_DIRECT = "https://popular-77.onrender.com"; // pdf-ai 서비스 도메인
+const AI_PROXY = "/api/pdf-ai";
+
+async function fetchWithFallback(direct: string, proxy: string, init: RequestInit) {
+  try { const r = await fetch(direct, init); if (r.ok) return r; return r; }
+  catch { return fetch(proxy, init); }
+}
+
+function safeGetFilename(res: Response, fallback: string) {
+  const cd = res.headers.get("content-disposition") || "";
+  const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) { try { return decodeURIComponent(star[1]); } catch {} }
+  const normal = /filename="?([^";]+)"?/i.exec(cd);
+  return normal?.[1] || fallback;
+}
+
 const PdfToAiPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
-  const [isConverting, setIsConverting] = useState(false);
-  const [conversionProgress, setConversionProgress] = useState(0);
-  const [showSuccessMessage, setShowSuccessMessage] = useState(false);
-  const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [quality, setQuality] = useState<"low" | "medium" | "high">("medium");
+  const [scale, setScale] = useState(0.5);
+  const [progress, setProgress] = useState(0);
+  const [progressText, setProgressText] = useState("");
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const downloadedRef = useRef(false);
+  const [isLoading, setIsLoading] = useState(false);
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileName, setConvertedFileName] = useState<string>("");
+  const [error, setError] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
       const file = event.target.files[0];
       if (file.size > 100 * 1024 * 1024) {
-        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
+        setError('파일 크기는 100MB를 초과할 수 없습니다.');
         setSelectedFile(null);
       } else {
         setSelectedFile(file);
-        setErrorMessage('');
+        setError('');
       }
     }
   };
 
   const handleReset = () => {
     setSelectedFile(null);
-    setErrorMessage('');
-    setShowSuccessMessage(false);
-    setSuccessMessage('');
-    setConversionProgress(0);
+    setError('');
+    setProgress(0);
+    setProgressText('');
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
+    if (timerRef.current) {
+      window.clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -56,61 +81,59 @@ const PdfToAiPage: React.FC = () => {
 
   const handleConvert = async () => {
     if (!selectedFile) {
-      setErrorMessage('먼저 파일을 선택해주세요.');
+      setError('먼저 파일을 선택해주세요.');
       return;
     }
-    setIsConverting(true);
-    setErrorMessage('');
-    setShowSuccessMessage(false);
-    setConversionProgress(0);
-    
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
-    try {
-      const response = await fetch('/api/pdf-ai/convert-async', { method: 'POST', body: formData });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+
+    downloadedRef.current = false;
+    if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI로 변환 중..."); setError("");
+
+    const form = new FormData();
+    form.append("file", selectedFile);
+    form.append("quality", quality);
+    form.append("scale", String(scale));
+
+    const up = await fetchWithFallback(
+      `${AI_DIRECT}/convert-async`, `${AI_PROXY}/convert-async`,
+      { method: "POST", body: form }
+    );
+    if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
+    const { job_id } = await up.json();
+
+    timerRef.current = window.setInterval(async () => {
+      const r = await fetchWithFallback(`${AI_DIRECT}/job/${job_id}`, `${AI_PROXY}/job/${job_id}`, {});
+      const j = await r.json();
+      if (typeof j.progress === "number") setProgress(j.progress);
+      if (j.message) setProgressText(j.message);
+
+      if (j.status === "done") {
+        if (downloadedRef.current) return;
+        downloadedRef.current = true;
+        if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+
+        const d = await fetchWithFallback(`${AI_DIRECT}/download/${job_id}`, `${AI_PROXY}/download/${job_id}`, {});
+        if (!d.ok) { setError(await d.text()); setIsLoading(false); return; }
+
+        const ct = (d.headers.get("content-type") || "").toLowerCase();
+        const base = selectedFile.name.replace(/\.[^.]+$/,"");
+        let name = safeGetFilename(d, base);
+        const isZip = ct.includes("zip") || /\.zip$/i.test(name);
+        if (!/\.(zip|ai)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.ai`;
+
+        const blob = await d.blob();
+        const url = URL.createObjectURL(blob);
+        setConvertedFileUrl(url);
+        setConvertedFileName(name);
+        setProgress(100);
+        setIsLoading(false);
       }
-      
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
-      
-      const blob = await response.blob();
-      const downloadFilename = selectedFile.name.replace(/\.[^/.]+$/, "") + ".txt";
-      
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
-      
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
-      }, 1000);
-      
-    } catch (error) {
-      clearInterval(progressInterval);
-      setConversionProgress(0);
-      setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-        setConversionProgress(0);
-      }, 2000);
-    }
+      if (j.status === "error") {
+        if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+        setError(j.error || "변환 중 오류");
+        setIsLoading(false);
+      }
+    }, 1500);
   };
 
   return (
@@ -169,60 +192,102 @@ const PdfToAiPage: React.FC = () => {
                 <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
               </div>
               
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="fast" checked={quality === 'fast'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">빠른 변환 (권장)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">표준 변환</span>
-                  </label>
+              {/* 변환 품질 선택 */}
+              <div className="space-y-2 mb-4">
+                <p className="font-medium">변환 품질 선택:</p>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="q" value="low"
+                    checked={quality === "low"} onChange={() => setQuality("low")} />
+                  <span>저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="q" value="medium"
+                    checked={quality === "medium"} onChange={() => setQuality("medium")} />
+                  <span>중간 품질 (중간 품질 및 파일 크기)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input type="radio" name="q" value="high"
+                    checked={quality === "high"} onChange={() => setQuality("high")} />
+                  <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                </label>
+              </div>
+
+              {/* 고급 옵션: JPG/BMP와 동일 스타일 */}
+              <div className="bg-gray-50 border rounded-lg p-4 mb-4">
+                <p className="font-medium mb-3">고급 옵션:</p>
+                <div className="flex items-center gap-4">
+                  <label className="whitespace-nowrap">크기 x</label>
+                  <input
+                    type="range" min={0.2} max={2} step={0.1}
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="flex-1"
+                  />
+                  <div className="w-16 text-right text-sm text-gray-600">
+                    {scale.toFixed(1)}x
+                  </div>
+                </div>
+                <div className="mt-2 flex justify-between text-xs text-gray-400">
+                  <span>0.2x (작게)</span>
+                  <span>2.0x (크게)</span>
                 </div>
               </div>
 
-              {/* 변환 진행률 표시 */}
-              {isConverting && (
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${conversionProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex items-center justify-center mt-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 AI로 분석 중...</span>
-                  </div>
-                </div>
-              )}
-
-              {/* 성공 메시지 */}
-              {showSuccessMessage && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-green-700 font-medium">{successMessage}</span>
-                  </div>
-                </div>
-              )}
-
               <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
-                  {isConverting ? '분석 중...' : '분석하기'}
+                <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                  {isLoading ? '분석 중...' : '분석하기'}
                 </button>
-                <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                <button onClick={handleReset} disabled={isLoading} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
                   파일 초기화
                 </button>
               </div>
+
+              <div className="mt-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>변환 진행률</span>
+                  <span>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
+                </div>
+                <div className="h-2 bg-gray-200 rounded">
+                  <div
+                    className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
+                    style={{ width: `${Math.max(2, progress)}%` }}
+                  />
+                </div>
+                {isLoading && <div className="mt-2 text-sm text-gray-500">⏳ {progressText || "변환 중..."}</div>}
+              </div>
+
+              {/* 오류 메시지 */}
+              {error && (
+                <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 text-red-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <span className="text-red-700 font-medium">{error}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 변환 완료 메시지 */}
+              {convertedFileUrl && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-green-700 font-medium">변환 완료!</span>
+                    </div>
+                    <a
+                      href={convertedFileUrl}
+                      download={convertedFileName}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
+                    >
+                      다운로드
+                    </a>
+                  </div>
+                </div>
+              )}
             </div>
           )}
           
