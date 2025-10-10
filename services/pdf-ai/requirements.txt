@@ -1,21 +1,15 @@
-# Essential build tools - Python 3.12 compatible
 pip>=25.2
 setuptools>=75.1.0
 wheel>=0.43
 packaging>=24.1
-
-# Core web framework
 Flask>=3.0.0
-Werkzeug==2.3.7
 gunicorn>=21.2.0
-python-dotenv==1.0.0
-flask-cors>=4.0.0
-
-# Essential utilities only
+Flask-Cors>=4.0.0
 requests>=2.31.0
-PyMuPDF==1.23.26
-reportlab==4.0.4
+python-dotenv==1.0.0
+PyMuPDF>=1.24.9
 Pillow>=10.2.0
+
 
 
 
