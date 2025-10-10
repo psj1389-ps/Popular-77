@@ -16,6 +16,46 @@ export const TOOL_CATEGORIES = [
 export const TOOLS: Tool[] = [
   // PDF 도구들
   {
+    id: 'pdf-svg',
+    name: 'PDF to SVG 변환기',
+    description: 'PDF 파일을 고품질 SVG 벡터 이미지로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'svg', 'vector', 'converter'],
+    icon: 'Vector',
+    featured: true,
+    path: '/tools/pdf-svg'
+  },
+  {
+    id: 'pdf-ai',
+    name: 'PDF to AI 변환기',
+    description: 'PDF 파일을 Adobe Illustrator AI 파일로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'ai', 'illustrator', 'converter'],
+    icon: 'FileText',
+    featured: true,
+    path: '/tools/pdf-ai'
+  },
+  {
+    id: 'pdf-xls',
+    name: 'PDF to XLS 변환기',
+    description: 'PDF 파일을 Excel 스프레드시트로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'xls', 'excel', 'converter'],
+    icon: 'FileSpreadsheet',
+    featured: true,
+    path: '/tools/pdf-xls'
+  },
+  {
+    id: 'pdf-pptx',
+    name: 'PDF to PPTX 변환기',
+    description: 'PDF 파일을 PowerPoint 프레젠테이션으로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'pptx', 'powerpoint', 'converter'],
+    icon: 'Presentation',
+    featured: true,
+    path: '/tools/pdf-pptx'
+  },
+  {
     id: 'pdf-converter',
     name: 'PDF 변환기',
     description: '다양한 파일 형식을 PDF로 변환하거나 PDF를 다른 형식으로 변환',

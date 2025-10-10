@@ -4,6 +4,7 @@ from concurrent.futures import ThreadPoolExecutor
 
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
+from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
 import fitz  # PyMuPDF
 
 app = Flask(__name__)
@@ -15,13 +16,30 @@ CORS(app, resources={
             "http://localhost:5173",
             "https://77-tools.xyz",
             "https://www.77-tools.xyz",
-            "https://popular-77.vercel.app"
+            "https://popular-77.vercel.app",
+            "https://*.vercel.app"
         ],
         "expose_headers": ["Content-Disposition"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
+
+@app.before_request
+def reject_front_routes():
+    if request.path.startswith("/tools/"):
+        # 백엔드가 처리하지 않는 프론트 전용 경로
+        raise NotFound()
+
+@app.errorhandler(HTTPException)
+def handle_http_exc(e):
+    # Flask 기본 404/405 등을 그대로 코드 유지 + JSON 바디
+    return jsonify({"error": e.description or "error"}), e.code
+
+@app.errorhandler(Exception)
+def handle_any_exc(e):
+    app.logger.exception("Unhandled")
+    return jsonify({"error": str(e)}), 500
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
