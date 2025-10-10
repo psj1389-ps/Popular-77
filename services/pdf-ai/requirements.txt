@@ -1,14 +1,13 @@
-# Essential build tools - Python 3.13 compatible
-setuptools>=69.5.1,<71.0.0
-wheel>=0.42.0
-packaging>=24.0
+# Essential build tools - Python 3.12 compatible
+pip>=25.2
+setuptools>=75.1.0
+wheel>=0.43
+packaging>=24.1
 
 # Core web framework
-Flask==2.3.3
-Werkzeug==2.3.7
-gunicorn==21.2.0
-python-dotenv==1.0.0
-Flask-Cors==4.0.0
+Flask>=3.0.0
+gunicorn>=21.2.0
+flask-cors>=4.0.0
 
 # Utilities
 requests>=2.31.0
@@ -18,9 +17,11 @@ reportlab==4.0.4
 Pillow>=10.2.0
 pdfservices-sdk==4.2.0
 pdf2image==1.17.0
+
+# Vector/Image conversion
 svglib==1.5.1
 cairosvg==2.7.1
 wand==0.6.13
-opencv-python==4.8.1.78
-numpy==1.24.4
-scipy==1.11.4
+opencv-python-headless==4.8.1.78
+numpy==1.26.4
+scipy==1.13.1
