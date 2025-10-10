@@ -163,6 +163,18 @@ def job_download(job_id):
     resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
     return attach_download_headers(resp, name)
 
+@app.post("/convert")
+def convert_compat():
+    """
+    구(舊) 클라이언트가 /convert로 올 때를 위한 하위호환 엔드포인트.
+    내부적으로 /convert-async 로직을 그대로 실행해 job_id를 반환합니다.
+    """
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+    # 그대로 convert-async 실행
+    return convert_async()
+
 @app.errorhandler(Exception)
 def handle_any(e):
     app.logger.exception("Unhandled")

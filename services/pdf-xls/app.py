@@ -45,6 +45,33 @@ def index():
 def health():
     return "ok", 200
 
+@app.post("/convert-async")
+def convert_async():
+    """
+    PDF to XLS 비동기 변환 엔드포인트 (향후 구현 예정)
+    현재는 기본 응답만 반환합니다.
+    """
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+    
+    # 임시로 job_id 반환 (실제 변환 로직은 향후 구현)
+    from uuid import uuid4
+    job_id = uuid4().hex
+    return jsonify({"job_id": job_id, "status": "pending"}), 202
+
+@app.post("/convert")
+def convert_compat():
+    """
+    구(舊) 클라이언트가 /convert로 올 때를 위한 하위호환 엔드포인트.
+    내부적으로 /convert-async 로직을 그대로 실행해 job_id를 반환합니다.
+    """
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+    # 그대로 convert-async 실행
+    return convert_async()
+
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
