@@ -1,24 +1,18 @@
-# Essential build tools - Python 3.12 compatible
 pip>=25.2
 setuptools>=75.1.0
 wheel>=0.43
 packaging>=24.1
 
-# Core web framework
 Flask>=3.0.0
 gunicorn>=21.2.0
 flask-cors>=4.0.0
 
-# Utilities
 requests>=2.31.0
-PyMuPDF==1.22.5
-python-docx==0.8.11
 reportlab==4.0.4
 Pillow>=10.2.0
 pdfservices-sdk==4.2.0
 pdf2image==1.17.0
 
-# Vector/Image conversion
 svglib==1.5.1
 cairosvg==2.7.1
 wand==0.6.13
