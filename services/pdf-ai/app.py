@@ -1,14 +1,18 @@
 import os, re, io, zipfile, tempfile, logging, urllib.parse, mimetypes
+import shutil, errno
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, redirect
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
 import fitz  # PyMuPDF
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+
+# Redirect URL
+HOME_URL = "https://77-tools.xyz/tools/pdf-ai"
 
 CORS(app, resources={
     r"/*": {
@@ -26,10 +30,9 @@ CORS(app, resources={
 })
 
 @app.before_request
-def reject_front_routes():
+def route_front_routes():
     if request.path.startswith("/tools/"):
-        # 백엔드가 처리하지 않는 프론트 전용 경로
-        raise NotFound()
+        return redirect(HOME_URL, code=302)
 
 @app.errorhandler(HTTPException)
 def handle_http_exc(e):
@@ -49,6 +52,24 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
+
+def safe_move(src: str, dst: str):
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    try:
+        # 같은 파일시스템이면 원자적 교체
+        if os.path.exists(dst):
+            os.remove(dst)
+        os.replace(src, dst)
+    except OSError as e:
+        # 다른 파일시스템이면 복사 → 원본 삭제
+        if getattr(e, "errno", None) == errno.EXDEV:
+            shutil.copy2(src, dst)
+            try: 
+                os.unlink(src)
+            except FileNotFoundError: 
+                pass
+        else:
+            raise
 
 def guess_mime_by_name(name: str) -> str:
     n = (name or "").lower()
@@ -78,7 +99,7 @@ def set_progress(job_id, p, msg=None):
 
 def perform_ai_conversion(in_path, base_name: str):
     result_paths = []
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
         src = fitz.open(in_path)
         pages = src.page_count
         for i in range(pages):
@@ -97,7 +118,7 @@ def perform_ai_conversion(in_path, base_name: str):
             final_name = f"{base_name}.ai"
             final_path = os.path.join(OUTPUTS_DIR, final_name)
             if os.path.exists(final_path): os.remove(final_path)
-            os.replace(result_paths[0], final_path)
+            safe_move(result_paths[0], final_path)
             return final_path, final_name, "application/pdf"
 
         final_name = f"{base_name}.zip"
@@ -110,7 +131,12 @@ def perform_ai_conversion(in_path, base_name: str):
 
 @app.get("/")
 def home():
-    return "OK (pdf-ai)"
+    return redirect(HOME_URL, code=302)
+
+@app.route("/tools", defaults={"path": ""})
+@app.route("/tools/<path:path>")
+def tools_redirect(path):
+    return redirect(HOME_URL, code=302)
 
 @app.get("/health")
 def health():
