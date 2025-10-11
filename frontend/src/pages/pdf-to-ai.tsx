@@ -34,6 +34,8 @@ const PdfToAiPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<"low" | "medium" | "high">("medium");
   const [scale, setScale] = useState(1.0);
+  const [pageMode, setPageMode] = useState<"all" | "selected">("all");
+  const [pageRange, setPageRange] = useState(""); // 예: 1,3,5-7
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
   // 타이머 ref 타입(브라우저 환경)
@@ -53,6 +55,11 @@ const PdfToAiPage: React.FC = () => {
   const successMessage = convertedFileName 
     ? `변환 완료! ${convertedFileName} 파일이 다운로드됩니다.`
     : "변환 완료!";
+
+  // 유효성 검사 함수
+  const normalizePageRange = (s: string) => s.replace(/\s+/g, "");
+  const isValidPageRange = (s: string) => 
+    /^\d+(-\d+)?(,\d+(-\d+)?)*$/.test(normalizePageRange(s)); // 1,3,5-7 형태
 
   // 언마운트 시 자동 정리
   useEffect(() => {
@@ -105,6 +112,10 @@ const PdfToAiPage: React.FC = () => {
     form.append("file", selectedFile);
     form.append("quality", quality);
     form.append("scale", String(scale));
+    form.append("page_mode", pageMode); // "all" | "selected"
+    if (pageMode === "selected" && pageRange.trim()) {
+      form.append("page_range", normalizePageRange(pageRange)); // 예: 1,3,5-7
+    }
 
     const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
     if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
@@ -241,6 +252,7 @@ const PdfToAiPage: React.FC = () => {
               </div>
               
               {/* 변환 품질 선택 */}
+              {false && (
               <div className="space-y-2 mb-4">
                 <p className="font-medium">변환 품질 선택:</p>
                 <label className="flex items-center gap-2">
@@ -259,8 +271,10 @@ const PdfToAiPage: React.FC = () => {
                   <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
                 </label>
               </div>
+              )}
 
               {/* 고급 옵션 - 크기 조정 */}
+              {false && (
               <div>
                 <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -283,6 +297,58 @@ const PdfToAiPage: React.FC = () => {
                   </div>
                 </div>
               </div>
+              )}
+
+              {/* AI 변환 옵션 */}
+              <fieldset className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                <legend className="px-1 text-sm font-semibold text-gray-700">AI 변환 옵션</legend>
+
+                <div className="mt-3">
+                  <p className="text-sm font-medium mb-2">페이지 범위:</p>
+
+                  <div className="flex items-center gap-6 mb-3">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="ai-pages"
+                        value="all"
+                        checked={pageMode === "all"}
+                        onChange={() => setPageMode("all")}
+                      />
+                      <span>모든 페이지</span>
+                    </label>
+
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="ai-pages"
+                        value="selected"
+                        checked={pageMode === "selected"}
+                        onChange={() => setPageMode("selected")}
+                      />
+                      <span>특정 페이지만</span>
+                    </label>
+                  </div>
+
+                  <input
+                    type="text"
+                    className="w-full rounded border px-3 py-2 text-sm disabled:bg-gray-100"
+                    placeholder="예: 1,3,5-7"
+                    disabled={pageMode === "all"}
+                    value={pageRange}
+                    onChange={(e) => setPageRange(e.target.value)}
+                  />
+
+                  <p className="mt-2 text-xs text-gray-500">
+                    특정 페이지를 선택할 때는 쉼표로 구분하거나 하이픈으로 범위를 지정하세요.
+                  </p>
+
+                  {/* 선택: 잘못된 형식 경고 */}
+                  {pageMode === "selected" && pageRange && !isValidPageRange(pageRange) && (
+                    <p className="mt-1 text-xs text-red-600">형식 예: 1,3,5-7</p>
+                  )}
+                </div>
+              </fieldset>
 
               <div className="flex gap-4">
                 <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
