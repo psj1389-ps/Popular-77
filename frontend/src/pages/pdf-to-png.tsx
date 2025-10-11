@@ -20,11 +20,11 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const PdfToGifPage: React.FC = () => {
+const PdfToPngPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState<"low" | "medium" | "high">("low"); // 품질 선택 상태 추가
   const [scale, setScale] = useState(0.5); // 크기 배율 (기본값 0.5)
   const [transparent, setTransparent] = useState<"off" | "on">("off"); // 기본: 사용 안함
+  const [whiteThreshold, setWhiteThreshold] = useState(250); // 흰색 임계값 (기본값 250)
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -56,6 +56,80 @@ const PdfToGifPage: React.FC = () => {
     }
   };
 
+  const pollJobStatus = async (jobId: string): Promise<void> => {
+    const maxAttempts = 60; // 최대 5분 대기 (5초 간격)
+    let attempts = 0;
+
+    const poll = async (): Promise<void> => {
+      try {
+        const response = await fetch(`/api/pdf-png/job/${jobId}`);
+        if (!response.ok) {
+          throw new Error(`작업 상태 확인 실패: ${response.status}`);
+        }
+
+        const jobData = await response.json();
+        
+        if (jobData.status === 'completed') {
+          // 작업 완료 - 결과 다운로드
+          setConversionProgress(100);
+          
+          const downloadResponse = await fetch(`/api/pdf-png/job/${jobId}/download`);
+          if (!downloadResponse.ok) {
+            throw new Error(`다운로드 실패: ${downloadResponse.status}`);
+          }
+          
+          const blob = await downloadResponse.blob();
+          const ct = (downloadResponse.headers?.get("content-type") || "").toLowerCase?.() || "";
+          const base = selectedFile!.name.replace(/\.[^.]+$/, "");
+          let name = base;
+          const isZip = ct.includes("zip") || /\.zip$/i.test(name);
+          if (!/\.(png|zip)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.png`;
+          const downloadFilename = name;
+          
+          // 성공 메시지 표시
+          setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+          setShowSuccessMessage(true);
+          
+          // 잠시 후 다운로드 시작
+          setTimeout(() => {
+            downloadBlob(blob, downloadFilename);
+          }, 1000);
+          
+        } else if (jobData.status === 'failed') {
+          throw new Error(jobData.error || '변환 작업이 실패했습니다.');
+        } else if (jobData.status === 'processing') {
+          // 진행률 업데이트
+          if (jobData.progress) {
+            setConversionProgress(jobData.progress);
+          }
+          
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw new Error('변환 시간이 초과되었습니다. 다시 시도해주세요.');
+          }
+          
+          // 5초 후 다시 확인
+          setTimeout(poll, 5000);
+        } else {
+          // pending 상태 - 계속 대기
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw new Error('변환 시간이 초과되었습니다. 다시 시도해주세요.');
+          }
+          
+          // 5초 후 다시 확인
+          setTimeout(poll, 5000);
+        }
+      } catch (error) {
+        setErrorMessage(error instanceof Error ? error.message : '작업 상태 확인 중 오류가 발생했습니다.');
+        setIsConverting(false);
+        setConversionProgress(0);
+      }
+    };
+
+    poll();
+  };
+
   const handleConvert = async () => {
     if (!selectedFile) {
       setErrorMessage('먼저 파일을 선택해주세요.');
@@ -66,52 +140,30 @@ const PdfToGifPage: React.FC = () => {
     setShowSuccessMessage(false);
     setConversionProgress(0);
     
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('quality', quality); // quality 상태 사용
     formData.append('scale', String(scale)); // 크기 배율
     formData.append("transparent", transparent === "on" ? "1" : "0");
+    if (transparent === "on") {
+      formData.append('white_threshold', String(whiteThreshold));
+    }
+    
     try {
-      const response = await fetch('/api/pdf-png/convert', { method: 'POST', body: formData });
+      const response = await fetch('/api/pdf-png/convert-async', { method: 'POST', body: formData });
       if (!response.ok) {
         const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
         throw new Error(errorData.error || `서버 오류: ${response.status}`);
       }
       
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
+      const jobData = await response.json();
+      if (!jobData.job_id) {
+        throw new Error('작업 ID를 받지 못했습니다.');
+      }
       
-      const blob = await response.blob();
-      const ct = (response.headers?.get("content-type") || "").toLowerCase?.() || "";
-      const base = selectedFile.name.replace(/\.[^.]+$/, "");
-      let name = base;
-      const isZip = ct.includes("zip") || /\.zip$/i.test(name);
-      if (!/\.(png|zip)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.png`;
-      const downloadFilename = name;
-      
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
-      
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
-      }, 1000);
+      // 작업 상태 폴링 시작
+      await pollJobStatus(jobData.job_id);
       
     } catch (error) {
-      clearInterval(progressInterval);
       setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
     } finally {
@@ -141,9 +193,9 @@ const PdfToGifPage: React.FC = () => {
           <div className="container mx-auto relative z-10">
               <div className="flex justify-center items-center gap-4 mb-4">
                 <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                <h1 className="text-4xl font-bold">PDF → GIF 변환기</h1>
+                <h1 className="text-4xl font-bold">PDF → PNG 변환기</h1>
               </div>
-              <p className="text-lg opacity-90 max-w-2xl mx-auto">AI 기반 PDF to GIF 변환 서비스로 문서를 애니메이션 이미지 파일로 쉽게 변환하세요.</p>
+              <p className="text-lg opacity-90 max-w-2xl mx-auto">AI 기반 PDF to PNG 변환 서비스로 문서를 고품질 이미지 파일로 쉽게 변환하세요.</p>
           </div>
         </div>
         
@@ -159,8 +211,8 @@ const PdfToGifPage: React.FC = () => {
         <div className="container mx-auto px-4 py-16">
           <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-semibold text-gray-800">PDF → GIF 변환기</h2>
-              <p className="text-gray-500">애니메이션 이미지 파일 변환</p>
+              <h2 className="text-2xl font-semibold text-gray-800">PDF → PNG 변환기</h2>
+              <p className="text-gray-500">고품질 이미지 파일 변환</p>
             </div>
             
             {!selectedFile ? (
@@ -177,25 +229,6 @@ const PdfToGifPage: React.FC = () => {
                   <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
                   <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
                 </div>
-              
-              {/* 변환 품질 선택 섹션 */}
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
-                  </label>
-                </div>
-              </div>
 
               {/* 고급 옵션 */}
               <div>
@@ -226,7 +259,7 @@ const PdfToGifPage: React.FC = () => {
                       <label className="flex items-center gap-2">
                         <input
                           type="radio"
-                          name="gif-transparent"
+                          name="png-transparent"
                           value="off"
                           checked={transparent === "off"}
                           onChange={() => setTransparent("off")}
@@ -236,7 +269,7 @@ const PdfToGifPage: React.FC = () => {
                       <label className="flex items-center gap-2">
                         <input
                           type="radio"
-                          name="gif-transparent"
+                          name="png-transparent"
                           value="on"
                           checked={transparent === "on"}
                           onChange={() => setTransparent("on")}
@@ -244,6 +277,29 @@ const PdfToGifPage: React.FC = () => {
                         <span>사용</span>
                       </label>
                     </div>
+                    
+                    {/* 흰색 임계값 설정 (투명 배경 사용 시에만 표시) */}
+                    {transparent === "on" && (
+                      <div className="mt-3">
+                        <div className="flex items-center justify-between mb-2">
+                          <label className="text-sm font-medium text-gray-700">흰색 임계값</label>
+                          <span className="text-sm text-gray-600">{whiteThreshold}</span>
+                        </div>
+                        <input
+                          type="range"
+                          min="200"
+                          max="255"
+                          step="5"
+                          value={whiteThreshold}
+                          onChange={(e) => setWhiteThreshold(parseInt(e.target.value))}
+                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                        />
+                        <div className="flex justify-between text-xs text-gray-500 mt-1">
+                          <span>200 (더 많이 투명)</span>
+                          <span>255 (덜 투명)</span>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 </div>
               </div>
@@ -263,7 +319,7 @@ const PdfToGifPage: React.FC = () => {
                   </div>
                   <div className="flex items-center justify-center mt-3">
                     <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 GIF로 변환 중...</span>
+                    <span className="text-sm text-gray-600">PDF를 PNG로 변환 중...</span>
                   </div>
                 </div>
               )}
@@ -295,12 +351,12 @@ const PdfToGifPage: React.FC = () => {
           </div>
         </div>
 
-        {/* PDF를 GIF로 변환하는 방법 가이드 섹션 */}
+        {/* PDF를 PNG로 변환하는 방법 가이드 섹션 */}
         <div className="bg-gray-50 py-16">
           <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 GIF로 변환하는 방법</h2>
-            <p className="text-gray-600">간단한 4단계로 PDF를 애니메이션 이미지 파일로 변환하세요</p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 PNG로 변환하는 방법</h2>
+            <p className="text-gray-600">간단한 4단계로 PDF를 고품질 이미지 파일로 변환하세요</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -319,7 +375,7 @@ const PdfToGifPage: React.FC = () => {
                 <span className="text-xl font-bold text-green-600">2️⃣</span>
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">변환 옵션 선택 (선택 사항)</h3>
-              <p className="text-gray-600 text-sm text-center">빠른 변환 또는 고품질 변환 등 원하는 품질 옵션을 선택해주세요.</p>
+              <p className="text-gray-600 text-sm text-center">크기 조정, 투명 배경 등 원하는 옵션을 선택해주세요.</p>
             </div>
 
             {/* 3단계: 자동 변환 시작 */}
@@ -328,16 +384,16 @@ const PdfToGifPage: React.FC = () => {
                 <span className="text-xl font-bold text-yellow-600">3️⃣</span>
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환 시작</h3>
-              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 문서를 GIF 파일로 변환합니다.</p>
+              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 문서를 PNG 파일로 변환합니다.</p>
             </div>
 
-            {/* 4단계: GIF 파일 다운로드 */}
+            {/* 4단계: PNG 파일 다운로드 */}
             <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto">
                 <span className="text-xl font-bold text-purple-600">4️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">GIF 파일 다운로드</h3>
-              <p className="text-gray-600 text-sm text-center">변환이 완료되면, PNG 이미지(.png) 파일을 즉시 다운로드할 수 있습니다.</p>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">PNG 파일 다운로드</h3>
+              <p className="text-gray-600 text-sm text-center">변환이 완료되면, PNG 이미지(.png) 또는 ZIP(.zip) 파일을 즉시 다운로드할 수 있습니다.</p>
             </div>
           </div>
           </div>
@@ -347,4 +403,4 @@ const PdfToGifPage: React.FC = () => {
   );
 };
 
-export default PdfToGifPage;
+export default PdfToPngPage;

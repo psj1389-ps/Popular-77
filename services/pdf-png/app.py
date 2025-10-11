@@ -3,29 +3,35 @@ import io
 import urllib.parse
 import tempfile
 import shutil
+import errno
 import zipfile
 import logging
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
+
 from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-import fitz
+from werkzeug.exceptions import HTTPException
+import fitz  # PyMuPDF
 from PIL import Image
 
 app = Flask(__name__)
-CORS(app, resources={r"/*": {
-    "origins": [
-        "http://localhost:5173",
-        "https://77-tools.xyz",
-        "https://www.77-tools.xyz", 
-        "https://popular-77.vercel.app"
-    ],
-    "expose_headers": ["Content-Disposition"]
-}})
-
-# Setup logging
 logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+
+# CORS (프리뷰/프로덕션 허용)
+CORS(app, resources={
+    r"/*": {
+        "origins": [
+            "http://localhost:5173",
+            "https://77-tools.xyz",
+            "https://www.77-tools.xyz",
+            "https://popular-77.vercel.app"
+        ],
+        "methods": ["GET", "POST", "OPTIONS"],
+        "allow_headers": ["Content-Type"],
+        "expose_headers": ["Content-Disposition"]
+    }
+})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -35,153 +41,198 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
+current_job_id = None
 
-def send_download_memory(path, download_name, ctype):
-    """Send file from memory with proper headers"""
+def safe_base_name(filename: str) -> str:
+    base = os.path.splitext(os.path.basename(filename or "output"))[0]
+    return base.replace("/", "_").replace("\\", "_").strip() or "output"
+
+def set_progress(job_id, p, msg=None):
+    info = JOBS.setdefault(job_id, {})
+    info["progress"] = int(p)
+    if msg is not None:
+        info["message"] = msg
+
+def send_download_memory(path: str, download_name: str, ctype: str):
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file missing"}), 500
     with open(path, "rb") as f:
         data = f.read()
     resp = send_file(
-        io.BytesIO(data), 
-        mimetype=ctype, 
-        as_attachment=True, 
-        download_name=download_name, 
+        io.BytesIO(data),
+        mimetype=ctype,
+        as_attachment=True,
+        download_name=download_name,
         conditional=False
     )
     resp.direct_passthrough = False
     resp.headers["Content-Length"] = str(len(data))
     resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
+    quoted = urllib.parse.quote(download_name)
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
     return resp
 
 def pix_to_rgba(pix: fitz.Pixmap) -> Image.Image:
-    """Convert fitz.Pixmap to PIL RGBA Image"""
     mode = "RGBA" if pix.alpha else "RGB"
     img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
     return img if mode == "RGBA" else img.convert("RGBA")
 
 def remove_white_to_alpha(rgba: Image.Image, white_threshold: int = 250) -> Image.Image:
-    """Convert white/light areas to transparent"""
+    # 밝은 영역(종이 배경)을 투명으로
     gray = rgba.convert("L")
-    # Bright areas (paper) become transparent (0), others stay opaque (255)
     alpha_mask = gray.point(lambda p: 0 if p >= white_threshold else 255)
     out = rgba.copy()
     out.putalpha(alpha_mask)
     return out
 
-def perform_png_conversion(in_path: str, base_name: str, scale: float = 1.0, transparent: int = 0, white_threshold: int = 250):
-    """Convert PDF to PNG with optional transparency"""
-    try:
-        with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
-            doc = fitz.open(in_path)
-            mat = fitz.Matrix(scale, scale)
-            paths = []
-            
-            for i in range(doc.page_count):
-                page = doc.load_page(i)
-                # Render with alpha channel for transparency support
-                pix = page.get_pixmap(matrix=mat, alpha=True)
-                rgba = pix_to_rgba(pix)
-                
-                if transparent:
-                    rgba = remove_white_to_alpha(rgba, white_threshold=white_threshold)
-                
-                out_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-                rgba.save(out_path, format="PNG", optimize=True)
-                paths.append(out_path)
-            
-            doc.close()
-            
-            if len(paths) == 1:
-                # Single page - return PNG file
-                final_name = f"{base_name}.png"
-                final_path = os.path.join(OUTPUTS_DIR, final_name)
-                if os.path.exists(final_path):
-                    os.remove(final_path)
-                shutil.move(paths[0], final_path)
-                return final_path, final_name, "image/png"
-            else:
-                # Multiple pages - return ZIP file
-                final_name = f"{base_name}.zip"
-                final_path = os.path.join(OUTPUTS_DIR, final_name)
-                if os.path.exists(final_path):
-                    os.remove(final_path)
-                with zipfile.ZipFile(final_path, "w", zipfile.ZIP_DEFLATED) as zf:
-                    for p in paths:
-                        zf.write(p, arcname=os.path.basename(p))
-                return final_path, final_name, "application/zip"
-                
-    except Exception as e:
-        logger.error(f"PNG conversion error: {str(e)}")
-        raise
+def perform_png_conversion(in_path: str, base_name: str,
+                          scale: float = 1.0,
+                          transparent: int = 0,
+                          white_threshold: int = 250):
+    with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:  # 같은 디스크에 임시폴더
+        doc = fitz.open(in_path)
+        mat = fitz.Matrix(scale, scale)
+        page_count = doc.page_count
+        out_paths = []
 
-def clamp_num(v, lo, hi, default, T=float):
-    """Clamp numeric value within range"""
-    try:
-        x = T(v)
-    except:
-        return default
-    return max(lo, min(hi, x))
+        for i in range(page_count):
+            set_progress(current_job_id, 10 + int(80 * (i + 1) / page_count), f"페이지 {i+1}/{page_count} 처리 중")
+            page = doc.load_page(i)
+            # 알파 포함 렌더(투명 처리 대비)
+            pix = page.get_pixmap(matrix=mat, alpha=True)
+            rgba = pix_to_rgba(pix)
+            if transparent:
+                rgba = remove_white_to_alpha(rgba, white_threshold=white_threshold)
+            out_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
+            rgba.save(out_path, format="PNG", optimize=True)
+            out_paths.append(out_path)
+
+        doc.close()
+
+        if len(out_paths) == 1:
+            final_name = f"{base_name}.png"
+            final_path = os.path.join(OUTPUTS_DIR, final_name)
+            if os.path.exists(final_path): 
+                os.remove(final_path)
+            shutil.move(out_paths[0], final_path)  # EXDEV 안전
+            return final_path, final_name, "image/png"
+
+        final_name = f"{base_name}.zip"
+        final_path = os.path.join(OUTPUTS_DIR, final_name)
+        if os.path.exists(final_path): 
+            os.remove(final_path)
+        with zipfile.ZipFile(final_path, "w", zipfile.ZIP_DEFLATED) as zf:
+            for p in out_paths:
+                zf.write(p, arcname=os.path.basename(p))
+        return final_path, final_name, "application/zip"
+
+@app.route("/", methods=["GET"])
+def index():
+    return '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+        <title>PDF to PNG Conversion Service</title>
+        <style>
+            body { font-family: Arial, sans-serif; margin: 40px; }
+            h1 { color: #333; }
+            ul { margin: 20px 0; }
+            li { margin: 5px 0; }
+            code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
+        </style>
+    </head>
+    <body>
+        <h1>PDF to PNG Conversion Service</h1>
+        <p>This is a backend service for converting PDF files to PNG images with transparent background support.</p>
+        <p><strong>Available endpoints:</strong></p>
+        <ul>
+            <li><code>GET /health</code> - Health check</li>
+            <li><code>POST /convert-async</code> - Start conversion job (recommended)</li>
+            <li><code>GET /job/&lt;id&gt;</code> - Check job status</li>
+            <li><code>GET /download/&lt;id&gt;</code> - Download result</li>
+            <li><code>POST /convert</code> - Synchronous conversion (legacy)</li>
+        </ul>
+        <p><strong>Parameters for conversion:</strong></p>
+        <ul>
+            <li><code>file</code> - PDF file to convert</li>
+            <li><code>scale</code> - Scale factor (0.2-2.0, default: 1.0)</li>
+            <li><code>transparent</code> - Enable transparent background (0 or 1, default: 0)</li>
+            <li><code>white_threshold</code> - White color threshold for transparency (0-255, default: 250)</li>
+        </ul>
+    </body>
+    </html>
+    '''
 
 @app.route("/health", methods=["GET"])
 def health():
-    return jsonify({"status": "ok", "service": "pdf-png"})
+    return "ok", 200
 
 @app.route("/convert-async", methods=["POST"])
 def convert_async():
-    """Start async PNG conversion"""
     f = request.files.get("file") or request.files.get("pdfFile")
     if not f:
         return jsonify({"error": "file field is required"}), 400
-    
+
+    base_name = safe_base_name(f.filename)
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
-    
-    # Parse parameters
+
+    def clamp_num(v, lo, hi, default, T=float):
+        try: 
+            x = T(v)
+        except: 
+            return default
+        return max(lo, min(hi, x))
+
     scale = clamp_num(request.form.get("scale", "1.0"), 0.2, 2.0, 1.0, float)
     transparent = clamp_num(request.form.get("transparent", "0"), 0, 1, 0, int)
-    white_threshold = clamp_num(request.form.get("white_threshold", "250"), 200, 255, 250, int)
-    
-    base_name = f.filename.rsplit('.', 1)[0] if '.' in f.filename else f.filename
-    
-    # Start conversion job
-    JOBS[job_id] = {"status": "processing", "progress": 0}
-    
-    def conversion_task():
+    white_threshold = clamp_num(request.form.get("white_threshold", "250"), 0, 255, 250, int)
+
+    JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"}
+    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}, transparent={transparent}, th={white_threshold}")
+
+    def run_job():
+        global current_job_id
+        current_job_id = job_id
         try:
-            JOBS[job_id]["progress"] = 50
+            set_progress(job_id, 5, "변환 시작")
             final_path, final_name, content_type = perform_png_conversion(
                 in_path, base_name, scale, transparent, white_threshold
             )
+            set_progress(job_id, 100, "완료")
             JOBS[job_id].update({
                 "status": "completed",
-                "progress": 100,
                 "output_path": final_path,
                 "filename": final_name,
                 "content_type": content_type
             })
         except Exception as e:
-            logger.error(f"Conversion failed for job {job_id}: {str(e)}")
+            app.logger.error(f"[{job_id}] conversion failed: {str(e)}")
             JOBS[job_id].update({
                 "status": "failed",
-                "error": str(e)
+                "error": str(e),
+                "message": f"오류: {str(e)}"
             })
         finally:
-            # Cleanup input file
+            # 입력 파일 정리
             if os.path.exists(in_path):
-                os.remove(in_path)
-    
-    executor.submit(conversion_task)
+                try:
+                    os.remove(in_path)
+                except:
+                    pass
+            current_job_id = None
+
+    executor.submit(run_job)
     return jsonify({"job_id": job_id})
 
 @app.route("/job/<job_id>", methods=["GET"])
 def get_job_status(job_id):
-    """Get job status"""
     if job_id not in JOBS:
         return jsonify({"error": "Job not found"}), 404
     
     job = JOBS[job_id].copy()
-    # Don't expose internal paths
+    # 내부 경로는 노출하지 않음
     if "output_path" in job:
         del job["output_path"]
     
@@ -189,7 +240,6 @@ def get_job_status(job_id):
 
 @app.route("/download/<job_id>", methods=["GET"])
 def download_result(job_id):
-    """Download conversion result"""
     if job_id not in JOBS:
         return jsonify({"error": "Job not found"}), 404
     
@@ -208,31 +258,43 @@ def download_result(job_id):
             job["content_type"]
         )
     finally:
-        # Cleanup after download
+        # 다운로드 후 정리
         if os.path.exists(output_path):
-            os.remove(output_path)
-        del JOBS[job_id]
+            try:
+                os.remove(output_path)
+            except:
+                pass
+        if job_id in JOBS:
+            del JOBS[job_id]
 
 @app.route("/convert", methods=["POST"])
 def convert_sync():
-    """Synchronous PNG conversion for compatibility"""
+    """동기 변환 (호환성용)"""
     f = request.files.get("file") or request.files.get("pdfFile")
     if not f:
         return jsonify({"error": "file field is required"}), 400
     
-    # Parse parameters
+    def clamp_num(v, lo, hi, default, T=float):
+        try: 
+            x = T(v)
+        except: 
+            return default
+        return max(lo, min(hi, x))
+
     scale = clamp_num(request.form.get("scale", "1.0"), 0.2, 2.0, 1.0, float)
     transparent = clamp_num(request.form.get("transparent", "0"), 0, 1, 0, int)
-    white_threshold = clamp_num(request.form.get("white_threshold", "250"), 200, 255, 250, int)
+    white_threshold = clamp_num(request.form.get("white_threshold", "250"), 0, 255, 250, int)
     
-    base_name = f.filename.rsplit('.', 1)[0] if '.' in f.filename else f.filename
+    base_name = safe_base_name(f.filename)
     
-    # Save input file
+    # 입력 파일 저장
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
     
     try:
+        global current_job_id
+        current_job_id = job_id
         final_path, final_name, content_type = perform_png_conversion(
             in_path, base_name, scale, transparent, white_threshold
         )
@@ -240,14 +302,21 @@ def convert_sync():
         return send_download_memory(final_path, final_name, content_type)
         
     except Exception as e:
-        logger.error(f"Sync conversion failed: {str(e)}")
+        app.logger.error(f"Sync conversion failed: {str(e)}")
         return jsonify({"error": str(e)}), 500
     finally:
-        # Cleanup
+        # 정리
         if os.path.exists(in_path):
-            os.remove(in_path)
+            try:
+                os.remove(in_path)
+            except:
+                pass
         if 'final_path' in locals() and os.path.exists(final_path):
-            os.remove(final_path)
+            try:
+                os.remove(final_path)
+            except:
+                pass
+        current_job_id = None
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
