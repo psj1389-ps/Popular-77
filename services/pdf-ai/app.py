@@ -11,9 +11,6 @@ import fitz  # PyMuPDF
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
 
-# Redirect URL
-HOME_URL = "https://77-tools.xyz/tools/pdf-ai"
-
 CORS(app, resources={
     r"/*": {
         "origins": [
@@ -21,18 +18,14 @@ CORS(app, resources={
             "https://77-tools.xyz",
             "https://www.77-tools.xyz",
             "https://popular-77.vercel.app",
-            "https://*.vercel.app"
+            "https://*.vercel.app",
+            "https://popular-77.onrender.com"
         ],
         "expose_headers": ["Content-Disposition"],
         "methods": ["GET", "POST", "OPTIONS"],
         "allow_headers": ["Content-Type"]
     }
 })
-
-@app.before_request
-def route_front_routes():
-    if request.path.startswith("/tools/"):
-        return redirect(HOME_URL, code=302)
 
 @app.errorhandler(HTTPException)
 def handle_http_exc(e):
@@ -131,12 +124,8 @@ def perform_ai_conversion(in_path, base_name: str):
 
 @app.get("/")
 def home():
-    return redirect(HOME_URL, code=302)
-
-@app.route("/tools", defaults={"path": ""})
-@app.route("/tools/<path:path>")
-def tools_redirect(path):
-    return redirect(HOME_URL, code=302)
+    from flask import render_template
+    return render_template('index.html')
 
 @app.get("/health")
 def health():

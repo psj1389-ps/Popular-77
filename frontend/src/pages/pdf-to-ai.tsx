@@ -99,7 +99,7 @@ const PdfToAiPage: React.FC = () => {
 
     downloadedRef.current = false;
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI로 변환 중..."); setError(null);
+    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI(일러스트레이터)로 변환 중..."); setError(null);
 
     const form = new FormData();
     form.append("file", selectedFile);
@@ -164,7 +164,7 @@ const PdfToAiPage: React.FC = () => {
           if (!/\.(txt|ai)$/i.test(name)) name = `${name}.txt`;
         } else {
           // 알 수 없는 바이너리 → 저장하지 말고 에러 표시
-          setError("유효하지 않은 AI 분석 데이터입니다.");
+          setError("유효하지 않은 AI 변환 데이터입니다.");
           setIsLoading(false);
           return;
         }
@@ -186,7 +186,7 @@ const PdfToAiPage: React.FC = () => {
 
   return (
     <>
-      <PageTitle suffix="PDF → AI" />
+      <PageTitle suffix="PDF → AI(일러스트레이터)" />
       <div className="w-full bg-white">
       {/* 상단 보라색 배경 섹션 */}
       <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
@@ -203,9 +203,9 @@ const PdfToAiPage: React.FC = () => {
         <div className="container mx-auto relative z-10">
             <div className="flex justify-center items-center gap-4 mb-4">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              <h1 className="text-4xl font-bold">PDF → AI 분석</h1>
+              <h1 className="text-4xl font-bold">PDF → AI(일러스트레이터) 변환기</h1>
             </div>
-            <p className="text-lg opacity-90 max-w-2xl mx-auto">AI 기반 PDF 분석 서비스로 문서를 텍스트로 추출하고 분석하세요.</p>
+            <p className="text-lg opacity-90 max-w-2xl mx-auto">AI 기반 지능형 PDF to AI 벡터 변환 서비스</p>
         </div>
       </div>
       
@@ -221,8 +221,8 @@ const PdfToAiPage: React.FC = () => {
       <div className="container mx-auto px-4 py-16">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">PDF → AI 분석</h2>
-            <p className="text-gray-500">AI 기반 텍스트 추출 및 분석</p>
+            <h2 className="text-2xl font-semibold text-gray-800">PDF → AI(일러스트레이터) 변환기</h2>
+            <p className="text-gray-500">고품질 AI 벡터 변환</p>
           </div>
           
           {!selectedFile ? (
@@ -286,7 +286,7 @@ const PdfToAiPage: React.FC = () => {
 
               <div className="flex gap-4">
                 <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
-                  {isLoading ? '분석 중...' : '분석하기'}
+                  {isLoading ? '변환 중...' : '변환하기'}
                 </button>
                 <button onClick={handleReset} disabled={isLoading} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
                   파일 초기화
@@ -349,12 +349,12 @@ const PdfToAiPage: React.FC = () => {
         </div>
       </div>
 
-      {/* PDF를 AI로 분석하는 방법 가이드 섹션 */}
+      {/* PDF를 AI(일러스트레이터)로 변환하는 방법 가이드 섹션 */}
       <div className="bg-gray-50 py-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 AI로 분석하는 방법</h2>
-            <p className="text-gray-600">간단한 4단계로 PDF를 AI로 분석하고 텍스트를 추출하세요</p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 AI(일러스트레이터)로 변환하는 방법</h2>
+            <p className="text-gray-600">간단한 4단계로 PDF를 AI 벡터 파일로 변환하세요</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -372,26 +372,26 @@ const PdfToAiPage: React.FC = () => {
               <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4 mx-auto">
                 <span className="text-xl font-bold text-green-600">2️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">분석 옵션 선택 (선택 사항)</h3>
-              <p className="text-gray-600 text-sm text-center">빠른 분석 또는 OCR을 포함한 표준 분석 등 원하는 품질 옵션을 선택해주세요.</p>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">변환 옵션 선택 (선택 사항)</h3>
+              <p className="text-gray-600 text-sm text-center">빠른 변환 또는 고품질 벡터 변환 등 원하는 품질 옵션을 선택해주세요.</p>
             </div>
 
-            {/* 3단계: 자동 분석 시작 */}
+            {/* 3단계: 자동 변환 시작 */}
             <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-4 mx-auto">
                 <span className="text-xl font-bold text-yellow-600">3️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 분석 시작</h3>
-              <p className="text-gray-600 text-sm text-center">"분석하기" 버튼을 클릭하세요. AI 기반 엔진이 문서의 내용을 분석하여 텍스트를 추출합니다.</p>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환 시작</h3>
+              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 PDF를 벡터 형식으로 변환합니다.</p>
             </div>
 
-            {/* 4단계: 분석 결과 다운로드 */}
+            {/* 4단계: AI 파일 다운로드 */}
             <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto">
                 <span className="text-xl font-bold text-purple-600">4️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">분석 결과 다운로드</h3>
-              <p className="text-gray-600 text-sm text-center">분석이 완료되면, 추출된 텍스트 파일(.txt)을 즉시 다운로드할 수 있습니다.</p>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">AI 파일 다운로드</h3>
+              <p className="text-gray-600 text-sm text-center">변환이 완료되면, AI(일러스트레이터) 파일(.ai)을 즉시 다운로드할 수 있습니다.</p>
             </div>
           </div>
         </div>

@@ -178,8 +178,8 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               onClick={() => window.location.href = '/tools/pdf-ai'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to AI 분석</h4>
-              <p className="text-gray-600">PDF 파일을 AI로 분석하여 텍스트를 추출합니다.</p>
+              <h4 className="font-semibold text-lg mb-2">PDF to AI(일러스트레이터) 변환기</h4>
+              <p className="text-gray-600">PDF 파일을 AI(일러스트레이터) 형식으로 변환합니다.</p>
             </div>
           </div>
         </div>
