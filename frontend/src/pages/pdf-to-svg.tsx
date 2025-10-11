@@ -52,6 +52,9 @@ const formatFileSize = (bytes: number) => {
 
 const API_BASE = "/api/pdf-svg";
 
+// 기본 품질 설정
+const QUALITY_DEFAULT = "medium";
+
 function safeGetFilename(res: Response, fallback: string) {
   const cd = res.headers.get("content-disposition") || "";
   const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
@@ -138,11 +141,13 @@ setError(null);
 
     downloadedRef.current = false;
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-    setIsLoading(true); setProgress(1); setProgressText("PDF를 SVG로 변환 중..."); setError(null);
+    setIsLoading(true); 
+    setProgress(1); 
+    setError("");
 
     const form = new FormData();
     form.append("file", selectedFile);
-    form.append("quality", quality);
+    form.append("quality", QUALITY_DEFAULT);
     form.append("vector_colors", String(vectorColors));
     form.append("vector_detail", String(vectorDetail));
     form.append("vector_denoise", String(vectorDenoise));
@@ -252,25 +257,27 @@ setError(null);
                   <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
                 </div>
                 
-                {/* 변환 품질 선택 */}
-                <div className="space-y-2 mb-4">
-                  <p className="font-medium">변환 품질 선택:</p>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" name="q" value="low"
-                      checked={quality === "low"} onChange={() => setQuality("low")} />
-                    <span>저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" name="q" value="medium"
-                      checked={quality === "medium"} onChange={() => setQuality("medium")} />
-                    <span>중간 품질 (중간 품질 및 파일 크기)</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input type="radio" name="q" value="high"
-                      checked={quality === "high"} onChange={() => setQuality("high")} />
-                    <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
-                  </label>
-                </div>
+                {/* 변환 품질 선택 - 숨김 처리 */}
+                {false && (
+                  <div className="space-y-2 mb-4">
+                    <p className="font-medium">변환 품질 선택:</p>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="q" value="low"
+                        checked={quality === "low"} onChange={() => setQuality("low")} />
+                      <span>저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="q" value="medium"
+                        checked={quality === "medium"} onChange={() => setQuality("medium")} />
+                      <span>중간 품질 (중간 품질 및 파일 크기)</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input type="radio" name="q" value="high"
+                        checked={quality === "high"} onChange={() => setQuality("high")} />
+                      <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                    </label>
+                  </div>
+                )}
 
                 {/* SVG 벡터화 옵션 */}
                 <fieldset className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
@@ -336,6 +343,28 @@ setError(null);
                     </p>
                   </div>
                 </fieldset>
+
+                {/* 진행률 표시 */}
+                {isLoading && (
+                  <div className="mt-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>변환 진행률</span>
+                      <span>{progress}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded">
+                      <div className="h-2 bg-indigo-500 rounded transition-[width] duration-300" 
+                           style={{ width: `${Math.max(1, progress)}%` }} />
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">⏳ PDF를 SVG로 변환 중...</div>
+                  </div>
+                )}
+
+                {/* 완료 메시지 */}
+                {!isLoading && convertedFileName && (
+                  <div className="mt-3 rounded bg-green-50 text-green-700 p-3 text-sm">
+                    변환완료! 파일명: {convertedFileName} 로 다운로드 됩니다.
+                  </div>
+                )}
 
                 <div className="flex gap-4">
                   <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
