@@ -149,101 +149,69 @@ def convert_async():
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
 
-    # 옵션 파라미터
-    def clamp(v, lo, hi, default):
-        try:
-            return max(lo, min(hi, float(v)))
-        except (ValueError, TypeError):
-            return default
+    # 옵션 파라미터 
+    def clamp(v, lo, hi, default): 
+        try: 
+            x = type(default)(v) 
+        except: 
+            return default 
+        return max(lo, min(hi, x)) 
 
-    scale = clamp(request.form.get("scale", 1.0), 0.2, 2.0, 1.0)
-    delay_ms = clamp(request.form.get("delay_ms", 400), 50, 5000, 400)
-    colors = int(clamp(request.form.get("colors", 128), 2, 256, 128))
-    dither = int(clamp(request.form.get("dither", 1), 0, 1, 1))
-    max_pages = int(clamp(request.form.get("max_pages", 100), 1, 500, 100))
+    scale = clamp(request.form.get("scale", "1.0"), 0.2, 2.0, 1.0) 
+    delay_ms = clamp(request.form.get("delay_ms", "400"), 20, 2000, 400) 
+    colors = clamp(request.form.get("colors", "128"), 2, 256, 128) 
+    dither = clamp(request.form.get("dither", "1"), 0, 1, 1) 
+    max_pages = clamp(request.form.get("max_pages", "100"), 1, 1000, 100) 
 
-    JOBS[job_id] = {"progress": 0, "message": "작업 시작"}
+    JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"} 
+    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}, delay={delay_ms}, colors={colors}, dither={dither}, max_pages={max_pages}") 
 
-    def worker():
-        try:
-            set_progress(job_id, 5, "PDF 파일 분석 중")
-            final_path, final_name, content_type = perform_gif_conversion(
-                in_path, base_name, job_id, scale, delay_ms, colors, dither, max_pages
-            )
-            set_progress(job_id, 100, "변환 완료")
-            JOBS[job_id]["status"] = "completed"
-            JOBS[job_id]["output_path"] = final_path
-            JOBS[job_id]["output_name"] = final_name
-            JOBS[job_id]["content_type"] = content_type
-        except Exception as e:
-            logging.error(f"Job {job_id} failed: {e}")
-            JOBS[job_id]["status"] = "failed"
-            JOBS[job_id]["error"] = str(e)
-        finally:
-            try:
-                if os.path.exists(in_path):
-                    os.remove(in_path)
-            except:
-                pass
+    def run_job(): 
+        global current_job_id 
+        current_job_id = job_id 
+        try: 
+            set_progress(job_id, 10, "변환 준비 중") 
+            out_path, name, ctype = perform_gif_conversion( 
+                in_path, base_name, 
+                scale=scale, delay_ms=delay_ms, colors=colors, dither=dither, max_pages=max_pages 
+            ) 
+            JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype, 
+                            "progress": 100, "message": "완료"} 
+            app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}") 
+        except Exception as e: 
+            app.logger.exception("convert error") 
+            JOBS[job_id] = {"status": "error", "error": str(e), "progress": 0, "message": "오류"} 
+        finally: 
+            try: os.remove(in_path) 
+            except: pass 
 
-    executor.submit(worker)
+    executor.submit(run_job) 
     return jsonify({"job_id": job_id}), 202
 
-@app.route("/job/<job_id>", methods=["GET"])
-def get_job_status(job_id):
-    if job_id not in JOBS:
-        return jsonify({"error": "Job not found"}), 404
-    
-    job = JOBS[job_id]
-    response = {
-        "progress": job.get("progress", 0),
-        "message": job.get("message", ""),
-        "status": job.get("status", "running")
-    }
-    
-    if job.get("status") == "failed":
-        response["error"] = job.get("error", "Unknown error")
-    
-    return jsonify(response)
+@app.get("/job/<job_id>") 
+def job_status(job_id): 
+    info = JOBS.get(job_id) 
+    if not info: return jsonify({"error": "job not found"}), 404 
+    info.setdefault("progress", 0); info.setdefault("message", "") 
+    return jsonify(info), 200 
 
-@app.route("/download/<job_id>", methods=["GET"])
-def download_result(job_id):
-    if job_id not in JOBS:
-        return jsonify({"error": "Job not found"}), 404
-    
-    job = JOBS[job_id]
-    if job.get("status") != "completed":
-        return jsonify({"error": "Job not completed"}), 400
-    
-    output_path = job.get("output_path")
-    output_name = job.get("output_name")
-    content_type = job.get("content_type", "image/gif")
-    
-    if not output_path or not os.path.exists(output_path):
-        return jsonify({"error": "Output file not found"}), 404
-    
-    try:
-        response = send_download_memory(output_path, output_name, content_type)
-        # 다운로드 후 정리
-        try:
-            os.remove(output_path)
-            del JOBS[job_id]
-        except:
-            pass
-        return response
-    except Exception as e:
-        logging.error(f"Download failed for job {job_id}: {e}")
-        return jsonify({"error": "Download failed"}), 500
+@app.get("/download/<job_id>") 
+def job_download(job_id): 
+    info = JOBS.get(job_id) 
+    if not info: return jsonify({"error":"job not found"}), 404 
+    if info.get("status") != "done": return jsonify({"error":"not ready"}), 409 
+    path, name, ctype = info.get("path"), info.get("name"), info.get("ctype") 
+    return send_download_memory(path, name, ctype) 
 
-@app.errorhandler(HTTPException)
-def handle_http_exception(e):
-    return jsonify({"error": e.description}), e.code
+@app.errorhandler(HTTPException) 
+def handle_http_exc(e): 
+    return jsonify({"error": e.description}), e.code 
 
-@app.errorhandler(Exception)
-def handle_exception(e):
-    logging.error(f"Unhandled exception: {e}")
-    return jsonify({"error": "Internal server error"}), 500
+@app.errorhandler(Exception) 
+def handle_any(e): 
+    app.logger.exception("Unhandled") 
+    return jsonify({"error": str(e)}), 500
 
-if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port, debug=False)
+if __name__ == "__main__": 
+    port = int(os.environ.get("PORT", 5000)) 
+    app.run(host="0.0.0.0", port=port)
