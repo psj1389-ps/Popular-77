@@ -106,6 +106,16 @@ export const TOOLS: Tool[] = [
     path: '/tools/pdf-tiff'
   },
   {
+    id: 'pdf-to-png',
+    name: 'PDF to PNG 변환기',
+    description: 'PDF 파일을 고품질 PNG 이미지로 변환 (투명 배경 지원)',
+    category: 'pdf',
+    tags: ['pdf', 'png', 'image', 'converter', 'transparent'],
+    icon: 'Image',
+    featured: true,
+    path: '/tools/pdf-png'
+  },
+  {
     id: 'pdf-to-excel',
     name: 'PDF to Excel 변환기',
     description: 'PDF 파일을 Excel 스프레드시트로 변환',

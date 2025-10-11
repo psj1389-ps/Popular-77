@@ -19,4 +19,18 @@ export default defineConfig({
  
     tsconfigPaths()
   ],
+  server: {
+    proxy: {
+      "/api/pdf-tiff": {
+        target: "http://localhost:5008",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-tiff/, "")
+      },
+      "/api/pdf-png": {
+        target: "http://localhost:5009",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-png/, "")
+      }
+    }
+  }
 })

@@ -7,6 +7,7 @@ import PdfToJpgPage from "@/pages/pdf-to-jpg"; // pdf-to-jpg.tsx 파일 경로
 import PdfToAiPage from "@/pages/pdf-to-ai";
 import PdfToBmpPage from "@/pages/pdf-to-bmp";
 import PdfToGifPage from "@/pages/pdf-to-gif";
+import PdfToPngPage from "@/pages/pdf-to-png";
 import PdfToPptxPage from "@/pages/pdf-to-pptx";
 import PdfToSvgPage from "@/pages/pdf-to-svg";
 import PdfToTiffPage from "@/pages/pdf-to-tiff";
@@ -62,6 +63,14 @@ function App() {
           element={
             <MainLayout>
               <PdfToGifPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/pdf-png"
+          element={
+            <MainLayout>
+              <PdfToPngPage />
             </MainLayout>
           }
         />
