@@ -157,14 +157,10 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
                 zf.write(p, arcname=os.path.basename(p))
         return final_path, final_name, "application/zip"
 
-# 루트: web/index.html 있으면 서빙, 없으면 도구 페이지로 폴백(임시 안전장치)
+# 루트: web/index.html 서빙
 @app.get("/")
 def index():
-    idx = os.path.join(app.static_folder, "index.html")
-    if os.path.exists(idx):
-        return send_from_directory(app.static_folder, "index.html")
-    # web이 아직 없을 때 임시로 프론트 페이지로 이동(원치 않으면 return "index.html missing", 500)
-    return redirect("https://77-tools.xyz/tools/pdf-svg", code=302)
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.get("/health")
 def health():

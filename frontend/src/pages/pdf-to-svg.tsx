@@ -361,8 +361,13 @@ setError(null);
 
                 {/* 완료 메시지 */}
                 {!isLoading && convertedFileName && (
-                  <div className="mt-3 rounded bg-green-50 text-green-700 p-3 text-sm">
-                    변환완료! 파일명: {convertedFileName} 로 다운로드 됩니다.
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-green-700 font-medium">변환완료! 파일명: {convertedFileName} 로 다운로드 됩니다.</span>
+                    </div>
                   </div>
                 )}
 
@@ -379,33 +384,6 @@ setError(null);
             )}
             
             {error && <p className="mt-4 text-center text-red-500">{error}</p>}
-            
-            {convertedFileName && (
-              <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <span className="text-green-700 font-medium">변환 완료! {convertedFileName}</span>
-                  <div className="flex gap-2">
-                    {!isOnRender && convertedFileUrl && convertedFileName && (
-                      <button 
-                        className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
-                        onClick={() => triggerDownload(convertedFileUrl!, convertedFileName!)}
-                      >
-                        파일 다시 받기
-                      </button>
-                    )}
-                    {convertedFileUrl && (
-                      <a
-                        href={convertedFileUrl}
-                        download={convertedFileName}
-                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                      >
-                        다운로드
-                      </a>
-                    )}
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
 
