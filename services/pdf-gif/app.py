@@ -134,9 +134,75 @@ def perform_gif_conversion(in_path: str, base_name: str, job_id: str,
             )
         return final_path, final_name, "image/gif"
 
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({
+        "service": "PDF-GIF Converter",
+        "version": "1.0",
+        "endpoints": {
+            "health": "GET /health",
+            "convert": "POST /convert",
+            "convert_async": "POST /convert-async",
+            "job_status": "GET /job/<job_id>",
+            "download": "GET /download/<job_id>"
+        }
+    }), 200
+
 @app.route("/health", methods=["GET"])
 def health():
     return "ok", 200
+
+@app.route("/convert", methods=["POST"])
+def convert():
+    """Synchronous PDF to GIF conversion"""
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+
+    base_name = safe_base_name(f.filename)
+    job_id = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
+    f.save(in_path)
+
+    # 옵션 파라미터 
+    def clamp(v, lo, hi, default): 
+        try: 
+            x = type(default)(v) 
+        except: 
+            return default 
+        return max(lo, min(hi, x)) 
+
+    scale = clamp(request.form.get("scale", "1.0"), 0.2, 2.0, 1.0) 
+    delay_ms = clamp(request.form.get("delay_ms", "400"), 20, 2000, 400) 
+    colors = clamp(request.form.get("colors", "128"), 2, 256, 128) 
+    dither = clamp(request.form.get("dither", "1"), 0, 1, 1) 
+    max_pages = clamp(request.form.get("max_pages", "100"), 1, 1000, 100) 
+
+    try:
+        out_path, name, ctype = perform_gif_conversion( 
+            in_path, base_name, job_id,
+            scale=scale, delay_ms=delay_ms, colors=colors, dither=dither, max_pages=max_pages 
+        ) 
+        
+        # 동기 변환이므로 바로 파일 반환
+        response = send_download_memory(out_path, name, ctype)
+        
+        # 정리
+        try:
+            os.remove(in_path)
+            os.remove(out_path)
+        except:
+            pass
+            
+        return response
+        
+    except Exception as e:
+        app.logger.exception("Synchronous convert error")
+        try:
+            os.remove(in_path)
+        except:
+            pass
+        return jsonify({"error": str(e)}), 500
 
 @app.route("/convert-async", methods=["POST"])
 def convert_async():
@@ -172,7 +238,7 @@ def convert_async():
         try: 
             set_progress(job_id, 10, "변환 준비 중") 
             out_path, name, ctype = perform_gif_conversion( 
-                in_path, base_name, 
+                in_path, base_name, job_id,
                 scale=scale, delay_ms=delay_ms, colors=colors, dither=dither, max_pages=max_pages 
             ) 
             JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype, 
@@ -201,7 +267,22 @@ def job_download(job_id):
     if not info: return jsonify({"error":"job not found"}), 404 
     if info.get("status") != "done": return jsonify({"error":"not ready"}), 409 
     path, name, ctype = info.get("path"), info.get("name"), info.get("ctype") 
-    return send_download_memory(path, name, ctype) 
+    
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file not found"}), 404
+    
+    try:
+        response = send_download_memory(path, name, ctype)
+        # 다운로드 후 정리
+        try:
+            os.remove(path)
+            del JOBS[job_id]
+        except:
+            pass
+        return response
+    except Exception as e:
+        app.logger.exception(f"Download failed for job {job_id}")
+        return jsonify({"error": "download failed"}), 500 
 
 @app.errorhandler(HTTPException) 
 def handle_http_exc(e): 
