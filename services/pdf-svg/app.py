@@ -244,6 +244,50 @@ def convert_compat():
     # 그대로 convert-async 실행
     return convert_async()
 
+@app.post("/convert_to_svg")
+def convert_to_svg():
+    """
+    템플릿 프론트엔드가 /convert_to_svg로 요청할 때를 위한 엔드포인트.
+    내부적으로 /convert-async 로직을 실행하되, 직접 파일을 반환합니다.
+    """
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+
+    base_name = safe_base_name(f.filename)
+    job_id = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
+    f.save(in_path)
+    quality = request.form.get("quality", "medium")
+    try:
+        scale = float(request.form.get("scale", "1.0"))
+    except Exception:
+        scale = 1.0
+    scale = max(0.2, min(2.0, scale))
+
+    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}, quality={quality}")
+
+    try:
+        out_path, name, ctype = perform_svg_conversion(in_path, scale, base_name)
+        app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}")
+        
+        # 파일을 직접 반환
+        response = send_file(out_path, as_attachment=True, download_name=name, mimetype=ctype)
+        attach_download_headers(response, name)
+        
+        # 임시 파일들 정리
+        try: os.remove(in_path)
+        except: pass
+        try: os.remove(out_path)
+        except: pass
+        
+        return response
+    except Exception as e:
+        app.logger.exception("convert error")
+        try: os.remove(in_path)
+        except: pass
+        return jsonify({"error": str(e)}), 500
+
 @app.errorhandler(Exception)
 def handle_any(e):
     app.logger.exception("Unhandled")
