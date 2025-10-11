@@ -23,6 +23,7 @@ const formatFileSize = (bytes: number) => {
 const PdfToGifPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
+  const [transparent, setTransparent] = useState<"off" | "on">("off"); // 기본: 사용 안함
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -78,6 +79,7 @@ const PdfToGifPage: React.FC = () => {
     const formData = new FormData();
     formData.append('file', selectedFile);
     formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    formData.append("transparent", transparent === "on" ? "1" : "0");
     try {
       const response = await fetch('/api/pdf-gif/convert', { method: 'POST', body: formData });
       if (!response.ok) {
@@ -179,6 +181,33 @@ const PdfToGifPage: React.FC = () => {
                   <label className="flex items-center">
                     <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
                     <span className="ml-2 text-gray-700">표준 변환</span>
+                  </label>
+                </div>
+              </div>
+
+              {/* 투명 배경 */}
+              <div className="mt-4">
+                <p className="text-sm font-medium mb-2">투명 배경:</p>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="gif-transparent"
+                      value="off"
+                      checked={transparent === "off"}
+                      onChange={() => setTransparent("off")}
+                    />
+                    <span>사용 안함</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="gif-transparent"
+                      value="on"
+                      checked={transparent === "on"}
+                      onChange={() => setTransparent("on")}
+                    />
+                    <span>사용</span>
                   </label>
                 </div>
               </div>
