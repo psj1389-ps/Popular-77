@@ -96,6 +96,16 @@ export const TOOLS: Tool[] = [
     path: '/tools/pdf-bmp'
   },
   {
+    id: 'pdf-tiff',
+    name: 'PDF → TIFF',
+    description: 'PDF 파일을 고품질 TIFF 이미지로 변환',
+    category: 'pdf',
+    tags: ['pdf', 'tiff', 'image', 'converter'],
+    icon: 'Image',
+    featured: true,
+    path: '/tools/pdf-tiff'
+  },
+  {
     id: 'pdf-to-excel',
     name: 'PDF to Excel 변환기',
     description: 'PDF 파일을 Excel 스프레드시트로 변환',
