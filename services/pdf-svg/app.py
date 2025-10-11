@@ -217,20 +217,39 @@ def job_download(job_id):
     size = os.path.getsize(path)
     app.logger.info(f"[{job_id}] download: {name} size={size} ctype={ctype}")
 
-    # send_file을 사용하여 파일 전송 (Flask가 자동으로 파일을 닫음)
-    resp = send_file(
-        path,  # 파일 경로를 직접 전달
-        mimetype=ctype,
-        as_attachment=True,
-        download_name=name,
-        conditional=False  # If-Range/ETag 등 조건부 비활성(직접 전송)
-    )
-    
-    # 추가 헤더 설정
-    resp.headers["Content-Length"] = str(size)
-    resp.headers["Cache-Control"] = "no-store"
-    
-    return resp
+    try:
+        # send_file을 사용하여 파일 전송
+        resp = send_file(
+            path,
+            mimetype=ctype,
+            as_attachment=True,
+            download_name=name
+        )
+        
+        # Content-Disposition 헤더를 올바르게 설정
+        attach_download_headers(resp, name)
+        
+        # 파일 전송 후 정리 (성공적으로 전송된 후에만)
+        def cleanup_after_response():
+            try:
+                if os.path.exists(path):
+                    os.remove(path)
+                    app.logger.info(f"[{job_id}] cleaned up: {path}")
+                # 작업 정보도 정리
+                if job_id in JOBS:
+                    del JOBS[job_id]
+            except Exception as e:
+                app.logger.warning(f"[{job_id}] cleanup failed: {e}")
+        
+        # Flask의 after_this_request를 사용하여 응답 후 정리
+        from flask import after_this_request
+        after_this_request(lambda response: (cleanup_after_response(), response)[1])
+        
+        return resp
+        
+    except Exception as e:
+        app.logger.exception(f"[{job_id}] download error: {e}")
+        return jsonify({"error": "download failed"}), 500
 
 @app.post("/convert")
 def convert_compat():
