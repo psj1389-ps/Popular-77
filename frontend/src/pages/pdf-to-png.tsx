@@ -1,6 +1,8 @@
 import React, { useState, useRef } from 'react';
 import PageTitle from '../shared/PageTitle';
 
+const API_BASE = "/api/pdf-png";
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -12,6 +14,25 @@ const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+function triggerDirectDownload(url: string, filename?: string) {
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    if (filename) a.download = filename;
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {}
+  setTimeout(() => {
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(() => iframe.remove(), 60_000);
+  }, 300);
+}
+
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -22,9 +43,9 @@ const formatFileSize = (bytes: number) => {
 
 const PdfToPngPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [scale, setScale] = useState(0.5); // 크기 배율 (기본값 0.5)
-  const [transparent, setTransparent] = useState<"off" | "on">("off"); // 기본: 사용 안함
-  const [whiteThreshold, setWhiteThreshold] = useState(250); // 흰색 임계값 (기본값 250)
+  const [scale, setScale] = useState(0.5);
+  const [transparent, setTransparent] = useState<"off" | "on">("off");
+  const [whiteThreshold, setWhiteThreshold] = useState(250);
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -73,26 +94,22 @@ const PdfToPngPage: React.FC = () => {
           // 작업 완료 - 결과 다운로드
           setConversionProgress(100);
           
-          const downloadResponse = await fetch(`/api/pdf-png/job/${jobId}/download`);
-          if (!downloadResponse.ok) {
-            throw new Error(`다운로드 실패: ${downloadResponse.status}`);
-          }
-          
-          const blob = await downloadResponse.blob();
-          const ct = (downloadResponse.headers?.get("content-type") || "").toLowerCase?.() || "";
+          const ct = (jobData.headers?.get?.("content-type") || "").toLowerCase?.() || "";
           const base = selectedFile!.name.replace(/\.[^.]+$/, "");
           let name = base;
-          const isZip = ct.includes("zip") || /\.zip$/i.test(name);
+          const isZip = ct.includes("zip") || /\.zip/i.test(name);
           if (!/\.(png|zip)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.png`;
-          const downloadFilename = name;
+          
+          const downloadUrl = `${API_BASE}/download/${jobId}`;
           
           // 성공 메시지 표시
-          setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+          setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
           setShowSuccessMessage(true);
+          setIsConverting(false);
           
-          // 잠시 후 다운로드 시작
+          // 자동 다운로드 시작
           setTimeout(() => {
-            downloadBlob(blob, downloadFilename);
+            triggerDirectDownload(downloadUrl, name);
           }, 1000);
           
         } else if (jobData.status === 'failed') {
@@ -231,76 +248,78 @@ const PdfToPngPage: React.FC = () => {
                 </div>
 
               {/* 고급 옵션 */}
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center justify-between mb-2">
-                    <label className="text-sm font-medium text-gray-700">크기 x</label>
-                    <span className="text-sm text-gray-600">{scale}x</span>
-                  </div>
-                  <input
-                    type="range"
-                    min="0.2"
-                    max="2.0"
-                    step="0.1"
-                    value={scale}
-                    onChange={(e) => setScale(parseFloat(e.target.value))}
-                    className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              <div className="bg-gray-50 border rounded-lg p-4 mb-4">
+                <p className="font-medium mb-3">고급 옵션:</p>
+                
+                {/* 크기 x */}
+                <div className="flex items-center gap-4">
+                  <label className="whitespace-nowrap">크기 x</label>
+                  <input 
+                    type="range" 
+                    min={0.2} 
+                    max={2} 
+                    step={0.1} 
+                    value={scale} 
+                    onChange={(e) => setScale(Number(e.target.value))} 
+                    className="flex-1" 
                   />
-                  <div className="flex justify-between text-xs text-gray-500 mt-1">
-                    <span>0.2x (작게)</span>
-                    <span>2.0x (크게)</span>
+                  <div className="w-16 text-right text-sm text-gray-600">
+                    {scale.toFixed(1)}x
                   </div>
-
-                  {/* 투명 배경 옵션 */}
-                  <div className="mt-4">
-                    <p className="text-sm font-medium mb-2">투명 배경:</p>
-                    <div className="space-y-2">
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="png-transparent"
-                          value="off"
-                          checked={transparent === "off"}
-                          onChange={() => setTransparent("off")}
-                        />
-                        <span>사용 안함</span>
-                      </label>
-                      <label className="flex items-center gap-2">
-                        <input
-                          type="radio"
-                          name="png-transparent"
-                          value="on"
-                          checked={transparent === "on"}
-                          onChange={() => setTransparent("on")}
-                        />
-                        <span>사용</span>
-                      </label>
-                    </div>
-                    
-                    {/* 흰색 임계값 설정 (투명 배경 사용 시에만 표시) */}
-                    {transparent === "on" && (
-                      <div className="mt-3">
-                        <div className="flex items-center justify-between mb-2">
-                          <label className="text-sm font-medium text-gray-700">흰색 임계값</label>
-                          <span className="text-sm text-gray-600">{whiteThreshold}</span>
-                        </div>
-                        <input
-                          type="range"
-                          min="200"
-                          max="255"
-                          step="5"
-                          value={whiteThreshold}
-                          onChange={(e) => setWhiteThreshold(parseInt(e.target.value))}
-                          className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                        />
-                        <div className="flex justify-between text-xs text-gray-500 mt-1">
-                          <span>200 (더 많이 투명)</span>
-                          <span>255 (덜 투명)</span>
-                        </div>
+                </div>
+                <div className="mt-2 flex justify-between text-xs text-gray-400">
+                  <span>0.2x (작게)</span>
+                  <span>2.0x (크게)</span>
+                </div>
+                
+                {/* 투명 배경 */}
+                <div className="mt-4">
+                  <p className="text-sm font-medium mb-2">투명 배경:</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="radio" 
+                        name="png-transparent" 
+                        value="off" 
+                        checked={transparent === "off"} 
+                        onChange={() => setTransparent("off")} 
+                      />
+                      <span>사용 안함</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input 
+                        type="radio" 
+                        name="png-transparent" 
+                        value="on" 
+                        checked={transparent === "on"} 
+                        onChange={() => setTransparent("on")} 
+                      />
+                      <span>사용</span>
+                    </label>
+                  </div>
+                  
+                  {/* 흰색 임계값 설정 (투명 배경 사용 시에만 표시) */}
+                  {transparent === "on" && (
+                    <div className="mt-3">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-700">흰색 임계값</label>
+                        <span className="text-sm text-gray-600">{whiteThreshold}</span>
                       </div>
-                    )}
-                  </div>
+                      <input
+                        type="range"
+                        min="200"
+                        max="255"
+                        step="5"
+                        value={whiteThreshold}
+                        onChange={(e) => setWhiteThreshold(parseInt(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>200 (더 많이 투명)</span>
+                        <span>255 (덜 투명)</span>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </div>
 

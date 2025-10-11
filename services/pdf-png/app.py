@@ -317,5 +317,14 @@ def _alias_job(job_id):
 def _alias_download(job_id):
     return download_result(job_id)
 
+# 별칭 라우트: 잘못된 URL 패턴 처리
+@app.route("/job/<job_id>/download")
+def _job_download_alias(job_id):
+    return download_result(job_id)
+
+@app.route("/api/pdf-png/job/<job_id>/download")
+def _api_job_download_alias(job_id):
+    return download_result(job_id)
+
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
