@@ -84,6 +84,29 @@ def attach_download_headers(resp, download_name: str):
     resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
     return resp
 
+def send_download_memory(path: str, download_name: str, ctype: str):
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file missing"}), 500
+
+    with open(path, "rb") as f:
+        data = f.read()
+    size = len(data)
+
+    resp = send_file(
+        io.BytesIO(data),
+        mimetype=ctype,
+        as_attachment=True,
+        download_name=download_name,
+        conditional=False
+    )
+    resp.direct_passthrough = False
+    resp.headers["Content-Length"] = str(size)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Content-Disposition"] = (
+        f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
+    )
+    return resp
+
 def set_progress(job_id, p, msg=None):
     info = JOBS.setdefault(job_id, {})
     info["progress"] = int(p)
@@ -96,7 +119,11 @@ def perform_ai_conversion(in_path, base_name: str):
         src = fitz.open(in_path)
         pages = src.page_count
         for i in range(pages):
-            set_progress(current_job_id, 10 + int(80*(i+1)/pages), f"페이지 {i+1}/{pages} 저장 중")
+            # current_job_id가 정의되지 않은 경우를 위한 안전장치
+            try:
+                set_progress(current_job_id, 10 + int(80*(i+1)/pages), f"페이지 {i+1}/{pages} 저장 중")
+            except NameError:
+                pass  # current_job_id가 없는 경우 진행률 업데이트 생략
             out_pdf = fitz.open()            # 빈 문서
             out_pdf.insert_pdf(src, from_page=i, to_page=i)
             raw_path = os.path.join(tmp, f"{base_name}_{i+1:0{max(2,len(str(pages)))}d}.pdf")
@@ -184,6 +211,32 @@ def job_download(job_id):
     resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
     # 파일명 한글 안정화
     return attach_download_headers(resp, name)
+
+@app.post("/convert_to_ai")
+def convert_to_ai():
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+
+    base_name = safe_base_name(f.filename)
+    in_path = os.path.join(UPLOADS_DIR, f"{uuid4().hex}.pdf")
+    f.save(in_path)
+
+    # 품질 파라미터(옵션): fast/standard → low/standard 매핑
+    q = request.form.get("quality", "standard")
+    _ = "low" if q in ("low", "fast") else "standard"
+
+    try:
+        # 기존 변환 로직 재사용
+        out_path, name, ctype = perform_ai_conversion(in_path, base_name)
+        # 대부분 ctype="application/pdf" (.ai 확장자)
+        return send_download_memory(out_path, name, ctype)
+    except Exception as e:
+        app.logger.exception("convert_to_ai error")
+        return jsonify({"error": str(e)}), 500
+    finally:
+        try: os.remove(in_path)
+        except: pass
 
 @app.post("/convert")
 def convert_compat():
