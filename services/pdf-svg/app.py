@@ -193,7 +193,7 @@ def job_status(job_id):
     info.setdefault("progress", 0); info.setdefault("message", "")
     return jsonify(info), 200
 
-@app.route("/download/<job_id>")
+@app.get("/download/<job_id>")
 def job_download(job_id):
     info = JOBS.get(job_id)
     if not info:
@@ -205,15 +205,31 @@ def job_download(job_id):
     if not path or not os.path.exists(path):
         return jsonify({"error": "output file missing"}), 500
 
-    name = os.path.basename(path)  # 파일명 확정 (예: 타이페이와 에펠탑.svg)
-    # 확장자에 맞는 MIME (svg/zip)
-    ctype = "image/svg+xml" if name.lower().endswith(".svg") else "application/zip"
+    name = os.path.basename(path).strip() or "output.svg"
+    # MIME 고정(확장자 기준)
+    if name.lower().endswith(".svg"):
+        ctype = "image/svg+xml"
+    elif name.lower().endswith(".zip"):
+        ctype = "application/zip"
+    else:
+        ctype = "application/octet-stream"
 
-    # 정적 디렉터리에서 직접 서빙 → Content-Length가 정확히 들어갑니다.
-    resp = send_from_directory(OUTPUTS_DIR, name, as_attachment=True, mimetype=ctype)
-    # 캐시/파일명 헤더 추가
+    size = os.path.getsize(path)
+    app.logger.info(f"[{job_id}] download: {name} size={size} ctype={ctype}")
+
+    # 파일 객체로 전송 + 길이/파일명 헤더 확정
+    f = open(path, "rb")
+    resp = send_file(
+        f,
+        mimetype=ctype,
+        as_attachment=True,
+        download_name=name,
+        conditional=False  # If-Range/ETag 등 조건부 비활성(직접 전송)
+    )
+    # 길이/캐시/파일명 헤더 명시
+    resp.direct_passthrough = False        # 길이 계산/로깅 보장
+    resp.headers["Content-Length"] = str(size)
     resp.headers["Cache-Control"] = "no-store"
-    # UTF-8 파일명(Content-Disposition)
     quoted = urllib.parse.quote(name)
     resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
     return resp
