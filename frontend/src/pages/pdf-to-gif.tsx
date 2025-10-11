@@ -23,6 +23,7 @@ const formatFileSize = (bytes: number) => {
 const PdfToGifPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
+  const [scale, setScale] = useState(0.5); // 크기 배율 (기본값 0.5)
   const [transparent, setTransparent] = useState<"off" | "on">("off"); // 기본: 사용 안함
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
@@ -78,7 +79,8 @@ const PdfToGifPage: React.FC = () => {
     
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    formData.append('quality', 'low'); // 기본값 "low" 사용
+    formData.append('scale', String(scale)); // 크기 배율
     formData.append("transparent", transparent === "on" ? "1" : "0");
     try {
       const response = await fetch('/api/pdf-gif/convert', { method: 'POST', body: formData });
@@ -171,44 +173,77 @@ const PdfToGifPage: React.FC = () => {
                   <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
                 </div>
               
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="fast" checked={quality === 'fast'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">빠른 변환 (권장)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">표준 변환</span>
-                  </label>
+              {/* 품질 라디오 섹션 숨김(화면에는 안 보임) */}
+              {false && (
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
+                  <div className="flex gap-4">
+                    <label className="flex items-center">
+                      <input type="radio" name="quality" value="fast" checked={quality === 'fast'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">빠른 변환 (권장)</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">표준 변환</span>
+                    </label>
+                  </div>
                 </div>
-              </div>
+              )}
 
-              {/* 투명 배경 */}
-              <div className="mt-4">
-                <p className="text-sm font-medium mb-2">투명 배경:</p>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="gif-transparent"
-                      value="off"
-                      checked={transparent === "off"}
-                      onChange={() => setTransparent("off")}
-                    />
-                    <span>사용 안함</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="gif-transparent"
-                      value="on"
-                      checked={transparent === "on"}
-                      onChange={() => setTransparent("on")}
-                    />
-                    <span>사용</span>
-                  </label>
+              {/* 고급 옵션 */}
+              <div className="bg-gray-50 border rounded-lg p-4 mb-4">
+                <p className="font-medium mb-3">고급 옵션:</p>
+
+                <div className="flex items-center gap-4">
+                  <label className="whitespace-nowrap">크기 x</label>
+
+                  <input
+                    type="range"
+                    min={0.2}
+                    max={2}
+                    step={0.1}
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="flex-1"
+                  />
+
+                  {/* 오른쪽 현재값 */}
+                  <div className="w-16 text-right text-sm text-gray-600">
+                    {scale.toFixed(1)}x
+                  </div>
+                </div>
+
+                {/* 하단 좌/우 라벨 */}
+                <div className="mt-2 flex justify-between text-xs text-gray-400">
+                  <span>0.2x (작게)</span>
+                  <span>2.0x (크게)</span>
+                </div>
+
+                {/* 아래는 기존에 추가했던 투명 배경 라디오(유지) */}
+                <div className="mt-4">
+                  <p className="text-sm font-medium mb-2">투명 배경:</p>
+                  <div className="space-y-2">
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="gif-transparent"
+                        value="off"
+                        checked={transparent === "off"}
+                        onChange={() => setTransparent("off")}
+                      />
+                      <span>사용 안함</span>
+                    </label>
+                    <label className="flex items-center gap-2">
+                      <input
+                        type="radio"
+                        name="gif-transparent"
+                        value="on"
+                        checked={transparent === "on"}
+                        onChange={() => setTransparent("on")}
+                      />
+                      <span>사용</span>
+                    </label>
+                  </div>
                 </div>
               </div>
 
