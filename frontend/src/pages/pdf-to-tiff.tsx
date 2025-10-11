@@ -402,8 +402,8 @@ const PdfToBmpPage: React.FC = () => {
       <div className="bg-gray-50 py-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 BMP로 변환하는 방법</h2>
-            <p className="text-gray-600">간단한 4단계로 PDF를 고품질 비트맵 이미지 파일로 변환하세요</p>
+            <h2 className="text-3xl font-bold text-gray-800 mb-4">PDF를 TIFF로 변환하는 방법</h2>
+            <p className="text-gray-600">간단한 4단계로 PDF를 고품질 TIFF 이미지 파일로 변환하세요</p>
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -431,7 +431,7 @@ const PdfToBmpPage: React.FC = () => {
                 <span className="text-xl font-bold text-yellow-600">3️⃣</span>
               </div>
               <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환 시작</h3>
-              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 문서를 BMP 파일로 변환합니다.</p>
+              <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하세요. AI 기반 엔진이 문서를 TIFF 이미지 파일로 변환합니다.</p>
             </div>
 
             {/* 4단계: BMP 파일 다운로드 */}
@@ -439,8 +439,8 @@ const PdfToBmpPage: React.FC = () => {
               <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto">
                 <span className="text-xl font-bold text-purple-600">4️⃣</span>
               </div>
-              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">BMP 파일 다운로드</h3>
-              <p className="text-gray-600 text-sm text-center">변환이 완료되면, 고품질 비트맵 이미지(.bmp) 파일을 즉시 다운로드할 수 있습니다.</p>
+              <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">TIFF 이미지 파일 다운로드</h3>
+              <p className="text-gray-600 text-sm text-center">변환이 완료되면, 고품질 TIFF 이미지(.tiff) 파일을 즉시 다운로드할 수 있습니다.</p>
             </div>
           </div>
         </div>
