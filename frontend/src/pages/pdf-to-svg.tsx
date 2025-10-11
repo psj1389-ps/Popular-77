@@ -12,6 +12,16 @@ const downloadBlob = (blob: Blob, filename: string) => {
   URL.revokeObjectURL(url);
 };
 
+const triggerDownload = (url: string, name: string) => {
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url); // 메모리 해제
+};
+
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
   const k = 1024;
@@ -145,41 +155,26 @@ setError(null);
             return;
           }
 
-          // 응답 스니핑(무엇인지 판단)
+          // 파일명 세팅 - safeGetFilename + 확장자 보정
           const ct = (d.headers.get("content-type") || "").toLowerCase();
-          const buf = new Uint8Array(await d.clone().arrayBuffer());
-          const head = Array.from(buf.slice(0, 4));
-
-          // PK.. = ZIP, %PDF = PDF, '<' 로 시작 = SVG
-          const isZip = head[0] === 0x50 && head[1] === 0x4b;
-          const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
-          const sniff = new TextDecoder().decode(buf.slice(0, 128)).trimStart();
-          const isSvg = ct.includes("image/svg+xml") || /^<\?xml|^<svg/i.test(sniff);
-
-          // 파일명 결정
           const base = selectedFile.name.replace(/\.[^.]+$/, "");
           let name = safeGetFilename(d, base);
-
-          // 확장자 강제 보정
-          if (isZip || ct.includes("zip")) {
-            if (!/\.zip$/i.test(name)) name = `${name}.zip`;
-          } else if (isSvg) {
-            if (!/\.svg$/i.test(name)) name = `${name}.svg`;
-          } else if (isPdf) {
-            setError("SVG 대신 PDF가 반환되었습니다. 다시 시도해 주세요.");
-            setIsLoading(false);
-            return;
-          } else {
-            setError("유효하지 않은 SVG 데이터입니다.");
-            setIsLoading(false);
-            return;
-          }
+          const isZip = ct.includes("zip") || /\.zip$/i.test(name);
+          if (!/\.(zip|svg)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.svg`;
 
           // 최종 저장
           const blob = await d.blob();
           const url = URL.createObjectURL(blob);
+          
           setConvertedFileUrl(url);
           setConvertedFileName(name);
+          
+          // 자동 다운로드 실행
+          if (!downloadedRef.current) {
+            downloadedRef.current = true;
+            triggerDownload(url, name); // 자동 다운로드
+          }
+          
           setProgress(100);
           setIsLoading(false);
         }
@@ -345,22 +340,6 @@ setError(null);
                   </button>
                 </div>
 
-                {/* 진행률 바 */}
-                {isLoading && (
-                  <div className="mt-4">
-                    <div className="flex justify-between text-sm mb-1">
-                      <span>변환 진행률</span>
-                      <span>{progress}%</span>
-                    </div>
-                    <div className="h-2 bg-gray-200 rounded">
-                      <div 
-                        className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
-                        style={{ width: `${Math.max(2, progress)}%` }}
-                      />
-                    </div>
-                    <div className="mt-2 text-sm text-gray-500">⏳ {progressText || "변환 중..."}</div>
-                  </div>
-                )}
               </div>
             )}
             
@@ -369,7 +348,7 @@ setError(null);
             {convertedFileUrl && (
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center justify-between">
-                  <span className="text-green-700 font-medium">변환 완료!</span>
+                  <span className="text-green-700 font-medium">변환 완료! {convertedFileName}</span>
                   <a
                     href={convertedFileUrl}
                     download={convertedFileName}
