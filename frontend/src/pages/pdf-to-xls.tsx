@@ -22,14 +22,24 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
+const triggerDirectDownload = (url: string, filename?: string) => {
+  const a = document.createElement('a');
+  a.href = url;
+  if (filename) a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+};
+
 const PdfToXlsPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState('fast'); // 'fast' 또는 'standard'
+  const [speed, setSpeed] = useState<"fast" | "standard">("fast");
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [convertedFileName, setConvertedFileName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -51,6 +61,7 @@ const PdfToXlsPage: React.FC = () => {
     setShowSuccessMessage(false);
     setSuccessMessage('');
     setConversionProgress(0);
+    setConvertedFileName(null);
     if (fileInputRef.current) {
       fileInputRef.current.value = ""; // 파일 입력 초기화
     }
@@ -66,20 +77,11 @@ const PdfToXlsPage: React.FC = () => {
     setShowSuccessMessage(false);
     setConversionProgress(0);
     
-    // 진행률 애니메이션 시뮬레이션
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => {
-        if (prev >= 90) {
-          clearInterval(progressInterval);
-          return 90;
-        }
-        return prev + Math.random() * 15;
-      });
-    }, 200);
-    
     const formData = new FormData();
     formData.append('file', selectedFile);
-    formData.append('quality', quality); // 선택된 품질 값을 백엔드로 보냅니다.
+    formData.append("quality", speed === "fast" ? "low" : "standard");
+    formData.append("scale", "1.0");
+    
     try {
       const response = await fetch(`${API_BASE}/convert-async`, { method: 'POST', body: formData });
       if (!response.ok) {
@@ -87,46 +89,47 @@ const PdfToXlsPage: React.FC = () => {
         throw new Error(errorData.error || `서버 오류: ${response.status}`);
       }
       
-      // 변환 완료 시 진행률을 100%로 설정
-      clearInterval(progressInterval);
-      setConversionProgress(100);
+      const { job_id } = await response.json();
       
-      const ct = (response.headers.get("content-type") || "").toLowerCase();
-      const base = selectedFile.name.replace(/\.[^.]+$/,"");
-      let downloadFilename = base + ".xls";
-
-      // 1) 응답 바이트로 매직넘버 확인
-      const buf = new Uint8Array(await response.clone().arrayBuffer());
-      const head = Array.from(buf.slice(0, 4));
-      const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK..
-      const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
-      const isSvg = head[0] === 0x3c || ( // '<'
-        head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf && head[3] === 0x3c // BOM + '<'
-      );
-
-      // 2) 페이지별로 올바른 확장자 강제
-      if (isZip && !/\.xlsx|\.zip$/i.test(downloadFilename)) downloadFilename = `${base}.xlsx`;
-
-      const blob = await response.blob();
+      // 진행률 폴링
+      const pollProgress = async () => {
+        try {
+          const statusResponse = await fetch(`${API_BASE}/job/${job_id}`);
+          if (!statusResponse.ok) throw new Error('상태 확인 실패');
+          
+          const status = await statusResponse.json();
+          setConversionProgress(status.progress || 0);
+          
+          if (status.status === 'done') {
+            setConversionProgress(100);
+            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+            const fileName = `${baseName}.xlsx`;
+            setConvertedFileName(fileName);
+            
+            // 자동 다운로드
+            const downloadUrl = `${API_BASE}/download/${job_id}`;
+            triggerDirectDownload(downloadUrl, fileName);
+            
+            setSuccessMessage(`변환 완료! ${fileName} 파일이 다운로드됩니다.`);
+            setShowSuccessMessage(true);
+            setIsConverting(false);
+          } else if (status.status === 'error') {
+            throw new Error(status.error || '변환 중 오류 발생');
+          } else {
+            setTimeout(pollProgress, 1000);
+          }
+        } catch (error) {
+          setErrorMessage(error instanceof Error ? error.message : '상태 확인 중 오류 발생');
+          setIsConverting(false);
+        }
+      };
       
-      // 성공 메시지 표시
-      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
-      
-      // 잠시 후 다운로드 시작
-      setTimeout(() => {
-        downloadBlob(blob, downloadFilename);
-      }, 1000);
+      pollProgress();
       
     } catch (error) {
-      clearInterval(progressInterval);
       setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-        setConversionProgress(0);
-      }, 2000);
+      setIsConverting(false);
     }
   };
 
@@ -186,19 +189,31 @@ const PdfToXlsPage: React.FC = () => {
                 <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
               </div>
               
-              <div>
-                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
-                <div className="flex gap-4">
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="fast" checked={quality === 'fast'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">빠른 변환 (권장)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input type="radio" name="quality" value="standard" checked={quality === 'standard'} onChange={(e) => setQuality(e.target.value)} className="w-4 h-4 text-blue-600" />
-                    <span className="ml-2 text-gray-700">표준 변환</span>
-                  </label>
-                </div>
+              <div className="space-y-2 mb-4">
+                <p className="font-medium">변환 품질 선택:</p>
+                <label className="flex items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="xls-speed" 
+                    value="fast" 
+                    checked={speed === "fast"} 
+                    onChange={() => setSpeed("fast")} 
+                  />
+                  <span>빠른 변환 (권장)</span>
+                </label>
+                <label className="flex items-center gap-2">
+                  <input 
+                    type="radio" 
+                    name="xls-speed" 
+                    value="standard" 
+                    checked={speed === "standard"} 
+                    onChange={() => setSpeed("standard")} 
+                  />
+                  <span>표준 변환</span>
+                </label>
               </div>
+
+              {false && (/* 기존 크기 x 블록 */)}
 
               {/* 변환 진행률 표시 */}
               {isConverting && (
@@ -222,22 +237,25 @@ const PdfToXlsPage: React.FC = () => {
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                    </svg>
-                    <span className="text-green-700 font-medium">{successMessage}</span>
-                  </div>
+                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
+                  <p>{successMessage}</p>
                 </div>
               )}
 
+              {/* 버튼들 */}
               <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                <button 
+                  onClick={handleConvert} 
+                  disabled={isConverting}
+                  className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                >
                   {isConverting ? '변환 중...' : '변환하기'}
                 </button>
-                <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                  파일 초기화
+                <button 
+                  onClick={handleReset} 
+                  className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors"
+                >
+                  다시 선택
                 </button>
               </div>
             </div>
