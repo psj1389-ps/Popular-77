@@ -189,8 +189,10 @@ const PdfToXlsPage: React.FC = () => {
                 <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
               </div>
               
+              {/* 변환 품질 선택: doc과 동일 */}
               <div className="space-y-2 mb-4">
                 <p className="font-medium">변환 품질 선택:</p>
+
                 <label className="flex items-center gap-2">
                   <input 
                     type="radio" 
@@ -201,6 +203,7 @@ const PdfToXlsPage: React.FC = () => {
                   />
                   <span>빠른 변환 (권장)</span>
                 </label>
+
                 <label className="flex items-center gap-2">
                   <input 
                     type="radio" 
@@ -213,7 +216,17 @@ const PdfToXlsPage: React.FC = () => {
                 </label>
               </div>
 
-              {false && (/* 기존 크기 x 블록 */)}
+              {/* 크기 x UI는 화면에서 숨김(문법 안전하게 "통째 주석") */}
+              {/*
+              <div className="bg-gray-50 border rounded-lg p-4 mb-4">
+                <p className="font-medium mb-3">고급 옵션:</p>
+                <div className="flex items-center gap-4">
+                  <label className="whitespace-nowrap">크기 x</label>
+                  <input type="range" min={0.2} max={2} step={0.1} value={1.0} onChange={() => {}} className="flex-1" />
+                  <div className="w-16 text-right text-sm text-gray-600">1.0x</div>
+                </div>
+              </div>
+              */}
 
               {/* 변환 진행률 표시 */}
               {isConverting && (
