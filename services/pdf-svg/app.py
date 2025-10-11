@@ -57,7 +57,7 @@ def safe_move(src: str, dst: str):
         # 같은 파일시스템이면 원자적 교체
         if os.path.exists(dst):
             os.remove(dst)
-        os.replace(src, dst)
+        shutil.move(src, dst)
     except OSError as e:
         # 다른 파일시스템이면 복사 → 원본 삭제
         if getattr(e, "errno", None) == errno.EXDEV:
@@ -126,20 +126,13 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
         return final_path, final_name, "application/zip"
 
 @app.get("/")
-def index():
-    return send_from_directory(app.static_folder, "index.html")
+def home():
+    return redirect(HOME_URL, code=302)
 
-@app.route("/<path:path>")
-def spa(path):
-    # API 경로는 정적 서빙 대상이 아님
-    if path.startswith(("convert", "convert-async", "job", "download", "health", "api")):
-        abort(404)
-    # 실제 파일이 있으면 파일 서빙
-    full_path = os.path.join(app.static_folder, path)
-    if os.path.isfile(full_path):
-        return send_from_directory(app.static_folder, path)
-    # 그 외 경로는 SPA용 index.html 반환
-    return send_from_directory(app.static_folder, "index.html")
+@app.route("/tools", defaults={"path": ""})
+@app.route("/tools/<path:path>")
+def tools_redirect(path):
+    return redirect(HOME_URL, code=302)
 
 @app.get("/health")
 def health():
