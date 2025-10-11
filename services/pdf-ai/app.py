@@ -113,39 +113,76 @@ def set_progress(job_id, p, msg=None):
     if msg is not None:
         info["message"] = msg
 
-def perform_ai_conversion(in_path, base_name: str):
-    result_paths = []
+def parse_page_range(expr: str, page_count: int) -> list[int]:
+    """
+    1,3,5-7 → [0,2,4,5,6] (0-based 반환)
+    page_count를 벗어나는 값은 제거
+    """
+    if not expr:
+        return []
+    expr = expr.replace(" ", "")
+    pages = set()
+    for part in expr.split(","):
+        if not part:
+            continue
+        if "-" in part:
+            a, b = part.split("-", 1)
+            if a.isdigit() and b.isdigit():
+                start = int(a)
+                end = int(b)
+                if start > end:
+                    start, end = end, start
+                for p in range(start, end + 1):
+                    pages.add(p)
+        else:
+            if part.isdigit():
+                pages.add(int(part))
+    # 1-based → 0-based, 유효 범위만
+    result = sorted({p - 1 for p in pages if 1 <= p <= page_count})
+    return result
+
+def perform_ai_conversion(in_path: str, base_name: str, pages: list[int] | None = None):
+    """
+    pages: 0-based 페이지 번호 리스트. None이면 전체.
+    반환: (final_path, final_name, content_type)
+    """
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
         src = fitz.open(in_path)
-        pages = src.page_count
-        for i in range(pages):
+        all_pages = list(range(src.page_count))
+        target_pages = all_pages if not pages else [p for p in pages if 0 <= p < src.page_count]
+        if not target_pages:
+            raise ValueError("no valid pages selected")
+
+        out_paths = []
+        pad = max(2, len(str(max(target_pages) + 1)))  # 원본 페이지 번호 기준 패딩
+
+        for p in target_pages:
             # current_job_id가 정의되지 않은 경우를 위한 안전장치
             try:
-                set_progress(current_job_id, 10 + int(80*(i+1)/pages), f"페이지 {i+1}/{pages} 저장 중")
+                set_progress(current_job_id, 10 + int(80*(len(out_paths)+1)/len(target_pages)), f"페이지 {p+1} 저장 중")
             except NameError:
                 pass  # current_job_id가 없는 경우 진행률 업데이트 생략
-            out_pdf = fitz.open()            # 빈 문서
-            out_pdf.insert_pdf(src, from_page=i, to_page=i)
-            raw_path = os.path.join(tmp, f"{base_name}_{i+1:0{max(2,len(str(pages)))}d}.pdf")
-            out_pdf.save(raw_path)           # PDF로 저장
+            out_pdf = fitz.open()
+            out_pdf.insert_pdf(src, from_page=p, to_page=p)
+            raw_path = os.path.join(tmp, f"{base_name}_{p+1:0{pad}d}.pdf")
+            out_pdf.save(raw_path)
             out_pdf.close()
-            # .ai로 이름 변경(실제 포맷은 PDF, 일러스트에서 열 수 있음)
-            ai_path = raw_path[:-4] + ".ai"
+            ai_path = raw_path[:-4] + ".ai"  # PDF를 .ai로 rename (Illustrator에서 열림)
             os.replace(raw_path, ai_path)
-            result_paths.append(ai_path)
+            out_paths.append(ai_path)
 
-        if len(result_paths) == 1:
+        if len(out_paths) == 1:
             final_name = f"{base_name}.ai"
             final_path = os.path.join(OUTPUTS_DIR, final_name)
             if os.path.exists(final_path): os.remove(final_path)
-            safe_move(result_paths[0], final_path)
+            shutil.move(out_paths[0], final_path)
             return final_path, final_name, "application/pdf"
 
         final_name = f"{base_name}.zip"
         final_path = os.path.join(OUTPUTS_DIR, final_name)
         if os.path.exists(final_path): os.remove(final_path)
         with zipfile.ZipFile(final_path, "w", zipfile.ZIP_DEFLATED) as zf:
-            for p in result_paths:
+            for p in out_paths:
                 zf.write(p, arcname=os.path.basename(p))
         return final_path, final_name, "application/zip"
 
@@ -169,15 +206,27 @@ def convert_async():
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     f.save(in_path)
 
+    page_mode = request.form.get("page_mode", "all")
+    page_range_expr = request.form.get("page_range", "").strip()
+
     JOBS[job_id] = {"status": "pending", "progress": 1, "message": "대기 중"}
-    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}")
+    app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, page_mode={page_mode}, page_range='{page_range_expr}'")
 
     def run_job():
         global current_job_id
         current_job_id = job_id
         try:
             set_progress(job_id, 10, "변환 준비 중")
-            out_path, name, ctype = perform_ai_conversion(in_path, base_name)
+            # 선택 페이지는 perform_ai_conversion에서 문서 열고 파싱(유효성 재검증)
+            pages = None
+            if page_mode == "selected" and page_range_expr:
+                # 문서 열어 유효 범위로 변환
+                doc = fitz.open(in_path)
+                pages = parse_page_range(page_range_expr, doc.page_count)
+                doc.close()
+                if not pages:
+                    raise ValueError("선택된 페이지가 유효하지 않습니다.")
+            out_path, name, ctype = perform_ai_conversion(in_path, base_name, pages)
             JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype,
                             "progress": 100, "message": "완료"}
             app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}")
@@ -222,14 +271,19 @@ def convert_to_ai():
     in_path = os.path.join(UPLOADS_DIR, f"{uuid4().hex}.pdf")
     f.save(in_path)
 
-    # 품질 파라미터(옵션): fast/standard → low/standard 매핑
-    q = request.form.get("quality", "standard")
-    _ = "low" if q in ("low", "fast") else "standard"
+    page_mode = request.form.get("page_mode", "all")
+    page_range_expr = request.form.get("page_range", "").strip()
 
     try:
-        # 기존 변환 로직 재사용
-        out_path, name, ctype = perform_ai_conversion(in_path, base_name)
-        # 대부분 ctype="application/pdf" (.ai 확장자)
+        pages = None
+        if page_mode == "selected" and page_range_expr:
+            doc = fitz.open(in_path)
+            pages = parse_page_range(page_range_expr, doc.page_count)
+            doc.close()
+            if not pages:
+                return jsonify({"error": "선택된 페이지 범위가 유효하지 않습니다."}), 400
+
+        out_path, name, ctype = perform_ai_conversion(in_path, base_name, pages)
         return send_download_memory(out_path, name, ctype)
     except Exception as e:
         app.logger.exception("convert_to_ai error")
