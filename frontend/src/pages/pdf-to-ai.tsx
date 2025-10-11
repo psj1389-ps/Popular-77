@@ -20,13 +20,7 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const AI_DIRECT = "https://popular-77.onrender.com"; // pdf-ai 서비스 도메인
-const AI_PROXY = "/api/pdf-ai";
-
-async function fetchWithFallback(direct: string, proxy: string, init: RequestInit) {
-  try { const r = await fetch(direct, init); if (r.ok) return r; return r; }
-  catch { return fetch(proxy, init); }
-}
+const API_BASE = "/api/pdf-ai";
 
 function safeGetFilename(res: Response, fallback: string) {
   const cd = res.headers.get("content-disposition") || "";
@@ -112,16 +106,13 @@ const PdfToAiPage: React.FC = () => {
     form.append("quality", quality);
     form.append("scale", String(scale));
 
-    const up = await fetchWithFallback(
-      `${AI_DIRECT}/convert-async`, `${AI_PROXY}/convert-async`,
-      { method: "POST", body: form }
-    );
+    const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
     if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
     const { job_id } = await up.json();
 
     // 타이머 시작할 때
     timerRef.current = window.setInterval(async () => {
-      const r = await fetchWithFallback(`${AI_DIRECT}/job/${job_id}`, `${AI_PROXY}/job/${job_id}`, {});
+      const r = await fetch(`${API_BASE}/job/${job_id}`);
       const j = await r.json();
       if (typeof j.progress === "number") setProgress(j.progress);
       if (j.message) setProgressText(j.message);
@@ -131,7 +122,7 @@ const PdfToAiPage: React.FC = () => {
         downloadedRef.current = true;
         if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
-        const d = await fetchWithFallback(`${AI_DIRECT}/download/${job_id}`, `${AI_PROXY}/download/${job_id}`, {});
+        const d = await fetch(`${API_BASE}/download/${job_id}`);
         
         // d: /download/<job_id> 응답
         if (!d.ok) {

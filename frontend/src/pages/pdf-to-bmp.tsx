@@ -14,9 +14,7 @@ if (typeof window !== "undefined") {
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
-// 프록시 스위치 - 디버깅용
-const USE_PROXY = false; // true로 바꾸면 /api 프록시 사용
-const BMP_API_BASE = USE_PROXY ? "/api/pdf-bmp" : "https://pdf-bmp.onrender.com";
+const API_BASE = "/api/pdf-bmp";
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -137,7 +135,7 @@ const PdfToBmpPage: React.FC = () => {
     
     try {
       // 업로드 - 비동기 엔드포인트 사용
-      const up = await fetch(`${BMP_API_BASE}/convert-async`, { method: "POST", body: formData });
+      const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: formData });
       if (!up.ok) {
         const msg = await up.text().catch(() => `요청 실패(${up.status})`);
         setErrorMessage(msg);
@@ -147,7 +145,7 @@ const PdfToBmpPage: React.FC = () => {
       
       // 폴링 함수 (2초 간격)
       const poll = async () => {
-        const r = await fetch(`${BMP_API_BASE}/job/${job_id}`);
+        const r = await fetch(`${API_BASE}/job/${job_id}`);
         const j = await r.json();
         
         // 서버 진행률 반영
@@ -164,7 +162,7 @@ const PdfToBmpPage: React.FC = () => {
           }
           
           // 다운로드
-          const d = await fetch(`${BMP_API_BASE}/download/${job_id}`);
+          const d = await fetch(`${API_BASE}/download/${job_id}`);
           if (!d.ok) {
             const errorMsg = await getErrorMessage(d);
             setErrorMessage(errorMsg);

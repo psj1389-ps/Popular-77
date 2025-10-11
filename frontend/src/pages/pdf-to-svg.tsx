@@ -20,13 +20,7 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const SVG_DIRECT = "https://pdf-svg.onrender.com";
-const SVG_PROXY = "/api/pdf-svg";
-
-async function fetchWithFallback(direct: string, proxy: string, init: RequestInit) {
-  try { const r = await fetch(direct, init); if (r.ok) return r; return r; }
-  catch { return fetch(proxy, init); }
-}
+const API_BASE = "/api/pdf-svg";
 
 function safeGetFilename(res: Response, fallback: string) {
   const cd = res.headers.get("content-disposition") || "";
@@ -114,16 +108,13 @@ setError(null);
     form.append("scale", String(scale));
 
     try {
-      const up = await fetchWithFallback(
-        `${SVG_DIRECT}/convert-async`, `${SVG_PROXY}/convert-async`,
-        { method: "POST", body: form }
-      );
+      const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
       if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
       const { job_id } = await up.json();
 
       // 타이머 시작할 때
       timerRef.current = window.setInterval(async () => {
-        const r = await fetchWithFallback(`${SVG_DIRECT}/job/${job_id}`, `${SVG_PROXY}/job/${job_id}`, {});
+        const r = await fetch(`${API_BASE}/job/${job_id}`);
         const j = await r.json();
         if (typeof j.progress === "number") setProgress(j.progress);
         if (j.message) setProgressText(j.message);
@@ -133,7 +124,7 @@ setError(null);
           downloadedRef.current = true;
           if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
-          const d = await fetchWithFallback(`${SVG_DIRECT}/download/${job_id}`, `${SVG_PROXY}/download/${job_id}`, {});
+          const d = await fetch(`${API_BASE}/download/${job_id}`);
           
           // d: fetch(`${API_BASE}/download/${job_id}`)
           if (!d.ok) {

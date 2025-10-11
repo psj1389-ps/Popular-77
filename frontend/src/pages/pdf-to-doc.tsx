@@ -3,9 +3,7 @@ import PageTitle from '../shared/PageTitle';
 
 // Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
 
-// 프록시 스위치 - 디버깅용
-const USE_PROXY = false; // true로 바꾸면 /api 프록시 사용
-const DOC_API_BASE = USE_PROXY ? "/api/pdf-doc" : "https://pdf-doc-306w.onrender.com";
+const API_BASE = "/api/pdf-doc";
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -122,7 +120,7 @@ const PdfToDocPage: React.FC = () => {
     }
 
     try {
-      const up = await fetch(`${DOC_API_BASE}/convert-async`, { method: "POST", body: form });
+      const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
       if (!up.ok) { 
         setErrorMessage(await up.text()); 
         setIsConverting(false); 
@@ -132,7 +130,7 @@ const PdfToDocPage: React.FC = () => {
 
       timerRef.current = setInterval(async () => {
         try {
-          const r = await fetch(`${DOC_API_BASE}/job/${job_id}`);
+          const r = await fetch(`${API_BASE}/job/${job_id}`);
           const j = await r.json();
           if (typeof j.progress === "number") setProgress(j.progress);
           if (j.message) setProgressText(j.message);
@@ -145,7 +143,7 @@ const PdfToDocPage: React.FC = () => {
               timerRef.current = null; 
             }
 
-            const d = await fetch(`${DOC_API_BASE}/download/${job_id}`);
+            const d = await fetch(`${API_BASE}/download/${job_id}`);
             if (!d.ok) { 
               setErrorMessage(await d.text()); 
               setIsConverting(false); 
