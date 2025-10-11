@@ -8,7 +8,7 @@ from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
 import fitz  # PyMuPDF
 
-app = Flask(__name__, static_folder="web", static_url_path="")
+app = Flask(__name__, static_folder="templates", static_url_path="")
 logging.basicConfig(level=logging.INFO)
 
 # HOME_URL 변수 제거 - 자체 인터페이스 서빙
