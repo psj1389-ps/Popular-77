@@ -1,6 +1,26 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 
+// 직접 다운로드를 위한 보조 함수 (컴포넌트 밖에 정의)
+function triggerDirectDownload(downloadUrl: string) {
+  // a.click() → 실패 대비 iframe 폴백
+  const a = document.createElement("a");
+  a.href = downloadUrl;
+  a.style.display = "none";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  
+  // 일부 브라우저/확장기능에서 a.click을 막을 경우 폴백
+  setTimeout(() => {
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = downloadUrl;
+    document.body.appendChild(iframe);
+    setTimeout(() => iframe.remove(), 60_000);
+  }, 400);
+}
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -41,6 +61,9 @@ function safeGetFilename(res: Response, fallback: string) {
 }
 
 const PdfToSvgPage: React.FC = () => {
+  // 호스트 판별 로직
+  const isOnRender = typeof window !== "undefined" && window.location.hostname.endsWith(".onrender.com");
+  
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<"low" | "medium" | "high">("medium");
   const [scale, setScale] = useState(1.0);
@@ -138,45 +161,28 @@ setError(null);
         if (j.message) setProgressText(j.message);
 
         if (j.status === "done") {
-          if (downloadedRef.current) return;
-          downloadedRef.current = true;
           if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
-          const d = await fetch(`${API_BASE}/download/${job_id}`);
+          // 다운로드 URL(직접 요청)
+          const downloadUrl = `${API_BASE}/download/${job_id}`;
           
-          // d: fetch(`${API_BASE}/download/${job_id}`)
-          if (!d.ok) {
-            const ct = d.headers.get("content-type") || "";
-            const body = ct.includes("application/json")
-              ? await d.json().catch(() => null)
-              : await d.text().catch(() => "");
-            setError((body && (body.error || body.message)) || `요청 실패(${d.status})`);
-            setIsLoading(false);
-            return;
-          }
-
-          // 파일명 세팅 - safeGetFilename + 확장자 보정
-          const ct = (d.headers.get("content-type") || "").toLowerCase();
+          // 이름 계산(있으면 유지)
+          const d = await fetch(`${API_BASE}/download/${job_id}`, { method: 'HEAD' }).catch(() => null);
+          const ct = (d?.headers?.get("content-type") || "").toLowerCase?.() || "";
           const base = selectedFile.name.replace(/\.[^.]+$/, "");
-          let name = safeGetFilename(d, base);
-          const isZip = ct.includes("zip") || /\.zip$/i.test(name);
+          let name = safeGetFilename?.(d, base) || base; // d가 없으면 fallback
+          const isZip = /zip/i.test(name) || ct.includes("zip");
           if (!/\.(zip|svg)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.svg`;
-
-          // 최종 저장
-          const blob = await d.blob();
-          const url = URL.createObjectURL(blob);
           
-          setConvertedFileUrl(url);
           setConvertedFileName(name);
-          
-          // 자동 다운로드 실행
-          if (!downloadedRef.current) {
-            downloadedRef.current = true;
-            triggerDownload(url, name); // 자동 다운로드
-          }
-          
           setProgress(100);
           setIsLoading(false);
+          
+          // 자동 다운로드(1회)
+          if (!downloadedRef.current) {
+            downloadedRef.current = true;
+            triggerDirectDownload(downloadUrl);
+          }
         }
         if (j.status === "error") {
           if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
@@ -345,17 +351,29 @@ setError(null);
             
             {error && <p className="mt-4 text-center text-red-500">{error}</p>}
             
-            {convertedFileUrl && (
+            {convertedFileName && (
               <div className="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
                 <div className="flex items-center justify-between">
                   <span className="text-green-700 font-medium">변환 완료! {convertedFileName}</span>
-                  <a
-                    href={convertedFileUrl}
-                    download={convertedFileName}
-                    className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
-                  >
-                    다운로드
-                  </a>
+                  <div className="flex gap-2">
+                    {!isOnRender && convertedFileUrl && convertedFileName && (
+                      <button 
+                        className="px-4 py-2 rounded bg-indigo-600 text-white hover:bg-indigo-700"
+                        onClick={() => triggerDownload(convertedFileUrl!, convertedFileName!)}
+                      >
+                        파일 다시 받기
+                      </button>
+                    )}
+                    {convertedFileUrl && (
+                      <a
+                        href={convertedFileUrl}
+                        download={convertedFileName}
+                        className="bg-green-600 text-white px-4 py-2 rounded hover:bg-green-700"
+                      >
+                        다운로드
+                      </a>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
