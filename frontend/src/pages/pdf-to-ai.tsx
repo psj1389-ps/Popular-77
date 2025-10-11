@@ -23,6 +23,10 @@ function triggerDirectDownload(url: string, filename?: string) {
   }, 300);
 }
 
+function nameWithAi(baseName: string) {
+  return /\.ai$/i.test(baseName) ? baseName : `${baseName}.ai`;
+}
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -156,23 +160,23 @@ const PdfToAiPage: React.FC = () => {
       if (j.status === "done") {
         if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
-        // 1) 다운로드 URL 확정(동일 출처: /api → Vercel rewrites)
         const downloadUrl = `${API_BASE}/download/${job_id}`;
 
-        // 2) 파일명(UI 표시에만 사용; 최종 파일명은 서버 Content-Disposition이 결정)
+        // UI 표시용 파일명(.ai 보장)
+        // 서버가 Content-Disposition으로 최종 파일명(.ai 또는 .zip)을 내려주지만,
+        // 화면에는 .ai 형태를 보여달라는 요구에 맞춥니다.
         const base = selectedFile.name.replace(/\.[^.]+$/, "");
-        let name = base; // safeGetFilename(d, base) 사용 중이면 그대로 두셔도 됩니다.
+        const uiName = nameWithAi(base);
 
-        // 3) 상태 업데이트(기존 UI 유지)
-        setConvertedFileUrl(downloadUrl);     // 수동 버튼이 이 URL을 사용
-        setConvertedFileName(name);
+        setConvertedFileUrl(downloadUrl);     // (수동 버튼은 제거했지만 상태는 유지)
+        setConvertedFileName(uiName);
         setProgress(100);
         setIsLoading(false);
 
-        // 4) 자동 다운로드(1회)
+        // 자동 다운로드(직접 스트림)
         if (!downloadedRef.current) {
           downloadedRef.current = true;
-          triggerDirectDownload(downloadUrl, name);
+          triggerDirectDownload(downloadUrl, uiName);
         }
       }
       if (j.status === "error") {
@@ -356,22 +360,9 @@ const PdfToAiPage: React.FC = () => {
               )}
 
               {/* 변환 완료 메시지 */}
-              {convertedFileUrl && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-green-700 font-medium">AI 변환 완료! {convertedFileName} 파일이 다운로드됩니다.</span>
-                    </div>
-                    <button
-                      onClick={() => convertedFileUrl && triggerDirectDownload(convertedFileUrl, convertedFileName || undefined)}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
-                    >
-                      다운로드
-                    </button>
-                  </div>
+              {!isLoading && convertedFileName && (
+                <div className="mt-3 rounded bg-green-50 text-green-700 p-3 text-sm">
+                  AI 변환 완료! {convertedFileName} 파일이 다운로드됩니다.
                 </div>
               )}
 
