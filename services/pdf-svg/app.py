@@ -217,21 +217,19 @@ def job_download(job_id):
     size = os.path.getsize(path)
     app.logger.info(f"[{job_id}] download: {name} size={size} ctype={ctype}")
 
-    # 파일 객체로 전송 + 길이/파일명 헤더 확정
-    f = open(path, "rb")
+    # send_file을 사용하여 파일 전송 (Flask가 자동으로 파일을 닫음)
     resp = send_file(
-        f,
+        path,  # 파일 경로를 직접 전달
         mimetype=ctype,
         as_attachment=True,
         download_name=name,
         conditional=False  # If-Range/ETag 등 조건부 비활성(직접 전송)
     )
-    # 길이/캐시/파일명 헤더 명시
-    resp.direct_passthrough = False        # 길이 계산/로깅 보장
+    
+    # 추가 헤더 설정
     resp.headers["Content-Length"] = str(size)
     resp.headers["Cache-Control"] = "no-store"
-    quoted = urllib.parse.quote(name)
-    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
+    
     return resp
 
 @app.post("/convert")
