@@ -196,18 +196,27 @@ def job_status(job_id):
 @app.route("/download/<job_id>")
 def job_download(job_id):
     info = JOBS.get(job_id)
-    if not info: return jsonify({"error":"job not found"}), 404
-    if info.get("status") != "done": return jsonify({"error":"not ready"}), 409
+    if not info:
+        return jsonify({"error": "job not found"}), 404
+    if info.get("status") != "done":
+        return jsonify({"error": "not ready"}), 409
 
     path = info.get("path")
     if not path or not os.path.exists(path):
-        return jsonify({"error":"output file missing"}), 500
+        return jsonify({"error": "output file missing"}), 500
 
-    name = os.path.basename(path)                 # 경로에서 이름 확정
-    ctype = guess_mime_by_name(name)              # 확장자로 MIME 결정
-    resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
+    name = os.path.basename(path)  # 파일명 확정 (예: 타이페이와 에펠탑.svg)
+    # 확장자에 맞는 MIME (svg/zip)
+    ctype = "image/svg+xml" if name.lower().endswith(".svg") else "application/zip"
+
+    # 정적 디렉터리에서 직접 서빙 → Content-Length가 정확히 들어갑니다.
+    resp = send_from_directory(OUTPUTS_DIR, name, as_attachment=True, mimetype=ctype)
+    # 캐시/파일명 헤더 추가
     resp.headers["Cache-Control"] = "no-store"
-    return attach_download_headers(resp, name)
+    # UTF-8 파일명(Content-Disposition)
+    quoted = urllib.parse.quote(name)
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{quoted}"
+    return resp
 
 @app.post("/convert")
 def convert_compat():
