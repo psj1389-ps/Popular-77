@@ -361,7 +361,7 @@ const PdfToAiPage: React.FC = () => {
 
               {/* 변환 완료 메시지 */}
               {!isLoading && convertedFileName && (
-                <div className="mt-3 rounded bg-green-50 text-green-700 p-3 text-sm">
+                <div className="mt-3 rounded bg-green-50 text-green-700 font-medium p-3 text-sm">
                   AI 변환 완료! {convertedFileName} 파일이 다운로드됩니다.
                 </div>
               )}
