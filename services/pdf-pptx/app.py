@@ -8,7 +8,7 @@ import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
 
 # CORS
@@ -100,6 +100,20 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0):
             os.remove(final_path)
         prs.save(final_path)
         return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+
+@app.get("/")
+def index():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>")
+def spa(path):
+    # API는 제외
+    if path in ("health", "convert", "convert-async") or path.startswith(("job/", "download/", "api/")):
+        abort(404)
+    full = os.path.join(app.static_folder, path)
+    if os.path.isfile(full):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
