@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -42,13 +42,30 @@ const PdfToSvgPage: React.FC = () => {
   const [scale, setScale] = useState(0.5);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 타이머 ref 타입(브라우저 환경)
+  const timerRef = useRef<number | null>(null);
   const downloadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
   const [convertedFileName, setConvertedFileName] = useState<string>("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 기존 코드에서 쓰던 이름들을 표준 상태로 연결(별칭)
+  const errorMessage = error ?? "";
+  const isConverting = isLoading;
+  const conversionProgress = progress;
+  const showSuccessMessage = !!convertedFileUrl;
+  const successMessage = convertedFileName 
+    ? `변환 완료! ${convertedFileName} 파일이 다운로드됩니다.`
+    : "변환 완료!";
+
+  // 언마운트 시 자동 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -56,20 +73,22 @@ const PdfToSvgPage: React.FC = () => {
       if (file.size > 100 * 1024 * 1024) {
         setError('파일 크기는 100MB를 초과할 수 없습니다.');
         setSelectedFile(null);
+setError(null);
       } else {
         setSelectedFile(file);
-        setError('');
+        setError(null);
       }
     }
   };
 
   const handleReset = () => {
     setSelectedFile(null);
-    setError('');
+    setError(null);
     setProgress(0);
     setProgressText('');
     setConvertedFileUrl(null);
     setConvertedFileName('');
+    // 타이머 정리할 때
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
@@ -87,7 +106,7 @@ const PdfToSvgPage: React.FC = () => {
 
     downloadedRef.current = false;
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-    setIsLoading(true); setProgress(1); setProgressText("PDF를 SVG로 변환 중..."); setError("");
+    setIsLoading(true); setProgress(1); setProgressText("PDF를 SVG로 변환 중..."); setError(null);
 
     const form = new FormData();
     form.append("file", selectedFile);
@@ -102,6 +121,7 @@ const PdfToSvgPage: React.FC = () => {
       if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
       const { job_id } = await up.json();
 
+      // 타이머 시작할 때
       timerRef.current = window.setInterval(async () => {
         const r = await fetchWithFallback(`${SVG_DIRECT}/job/${job_id}`, `${SVG_PROXY}/job/${job_id}`, {});
         const j = await r.json();
@@ -114,28 +134,49 @@ const PdfToSvgPage: React.FC = () => {
           if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
           const d = await fetchWithFallback(`${SVG_DIRECT}/download/${job_id}`, `${SVG_PROXY}/download/${job_id}`, {});
-          if (!d.ok) { setError(await d.text()); setIsLoading(false); return; }
+          
+          // d: fetch(`${API_BASE}/download/${job_id}`)
+          if (!d.ok) {
+            const ct = d.headers.get("content-type") || "";
+            const body = ct.includes("application/json")
+              ? await d.json().catch(() => null)
+              : await d.text().catch(() => "");
+            setError((body && (body.error || body.message)) || `요청 실패(${d.status})`);
+            setIsLoading(false);
+            return;
+          }
 
+          // 응답 스니핑(무엇인지 판단)
           const ct = (d.headers.get("content-type") || "").toLowerCase();
-          const base = selectedFile.name.replace(/\.[^.]+$/,"");
-          let name = safeGetFilename(d, base);
-
-          // 1) 응답 바이트로 매직넘버 확인
           const buf = new Uint8Array(await d.clone().arrayBuffer());
           const head = Array.from(buf.slice(0, 4));
-          const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK..
-          const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
-          const isSvg = head[0] === 0x3c || ( // '<'
-            head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf && head[3] === 0x3c // BOM + '<'
-          );
 
-          // 2) 페이지별로 올바른 확장자 강제
-          if (isZip) {
+          // PK.. = ZIP, %PDF = PDF, '<' 로 시작 = SVG
+          const isZip = head[0] === 0x50 && head[1] === 0x4b;
+          const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46;
+          const sniff = new TextDecoder().decode(buf.slice(0, 128)).trimStart();
+          const isSvg = ct.includes("image/svg+xml") || /^<\?xml|^<svg/i.test(sniff);
+
+          // 파일명 결정
+          const base = selectedFile.name.replace(/\.[^.]+$/, "");
+          let name = safeGetFilename(d, base);
+
+          // 확장자 강제 보정
+          if (isZip || ct.includes("zip")) {
             if (!/\.zip$/i.test(name)) name = `${name}.zip`;
           } else if (isSvg) {
             if (!/\.svg$/i.test(name)) name = `${name}.svg`;
+          } else if (isPdf) {
+            setError("SVG 대신 PDF가 반환되었습니다. 다시 시도해 주세요.");
+            setIsLoading(false);
+            return;
+          } else {
+            setError("유효하지 않은 SVG 데이터입니다.");
+            setIsLoading(false);
+            return;
           }
 
+          // 최종 저장
           const blob = await d.blob();
           const url = URL.createObjectURL(blob);
           setConvertedFileUrl(url);
@@ -165,7 +206,7 @@ const PdfToSvgPage: React.FC = () => {
           <div 
             className="absolute inset-0 opacity-30"
             style={{
-              backgroundImage: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><pattern id='grain' width='100' height='100' patternUnits='userSpaceOnUse'><circle cx='12' cy='8' r='0.6' fill='%23ffffff' opacity='0.18'/><circle cx='37' cy='23' r='1.8' fill='%23ffffff' opacity='0.06'/><circle cx='68' cy='15' r='0.9' fill='%23ffffff' opacity='0.14'/><circle cx='91' cy='42' r='1.3' fill='%23ffffff' opacity='0.09'/><circle cx='24' cy='56' r='0.7' fill='%23ffffff' opacity='0.16'/><circle cx='55' cy='73' r='1.5' fill='%23ffffff' opacity='0.07'/><circle cx='83' cy='88' r='1.1' fill='%23ffffff' opacity='0.11'/><circle cx='6' cy='34' r='2.0' fill='%23ffffff' opacity='0.05'/><circle cx='45' cy='47' r='0.8' fill='%23ffffff' opacity='0.13'/><circle cx='72' cy='61' r='1.2' fill='%23ffffff' opacity='0.10'/><circle cx='18' cy='79' r='0.5' fill='%23ffffff' opacity='0.19'/><circle cx='63' cy='29' r='1.7' fill='%23ffffff' opacity='0.08'/><circle cx='89' cy='18' r='0.9' fill='%23ffffff' opacity='0.15'/><circle cx='31' cy='91' r='1.4' fill='%23ffffff' opacity='0.12'/><circle cx='76' cy='5' r='0.6' fill='%23ffffff' opacity='0.17'/><circle cx='9' cy='67' r='1.6' fill='%23ffffff' opacity='0.06'/><circle cx='52' cy='12' r='1.0' fill='%23ffffff' opacity='0.14'/><circle cx='95' cy='76' r='0.8' fill='%23ffffff' opacity='0.11'/></pattern></defs><rect width='100' height='100' fill='url(%23grain)'/></svg>")`,
+              backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cdefs%3E%3Cpattern id='grain' width='100' height='100' patternUnits='userSpaceOnUse'%3E%3Ccircle cx='12' cy='8' r='0.6' fill='%23ffffff' opacity='0.18'/%3E%3Ccircle cx='37' cy='23' r='1.8' fill='%23ffffff' opacity='0.06'/%3E%3Ccircle cx='68' cy='15' r='0.9' fill='%23ffffff' opacity='0.14'/%3E%3Ccircle cx='91' cy='42' r='1.3' fill='%23ffffff' opacity='0.09'/%3E%3Ccircle cx='24' cy='56' r='0.7' fill='%23ffffff' opacity='0.16'/%3E%3Ccircle cx='55' cy='73' r='1.5' fill='%23ffffff' opacity='0.07'/%3E%3Ccircle cx='83' cy='88' r='1.1' fill='%23ffffff' opacity='0.11'/%3E%3Ccircle cx='6' cy='34' r='2.0' fill='%23ffffff' opacity='0.05'/%3E%3Ccircle cx='45' cy='47' r='0.8' fill='%23ffffff' opacity='0.13'/%3E%3Ccircle cx='72' cy='61' r='1.2' fill='%23ffffff' opacity='0.10'/%3E%3Ccircle cx='18' cy='79' r='0.5' fill='%23ffffff' opacity='0.19'/%3E%3Ccircle cx='63' cy='29' r='1.7' fill='%23ffffff' opacity='0.08'/%3E%3Ccircle cx='89' cy='18' r='0.9' fill='%23ffffff' opacity='0.15'/%3E%3Ccircle cx='31' cy='91' r='1.4' fill='%23ffffff' opacity='0.12'/%3E%3Ccircle cx='76' cy='5' r='0.6' fill='%23ffffff' opacity='0.17'/%3E%3Ccircle cx='9' cy='67' r='1.6' fill='%23ffffff' opacity='0.06'/%3E%3Ccircle cx='52' cy='12' r='1.0' fill='%23ffffff' opacity='0.14'/%3E%3Ccircle cx='95' cy='76' r='0.8' fill='%23ffffff' opacity='0.11'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='100' height='100' fill='url(%23grain)'/%3E%3C/svg%3E")`,
               backgroundRepeat: 'repeat',
               animation: 'float 20s ease-in-out infinite'
             }}
@@ -251,38 +292,6 @@ const PdfToSvgPage: React.FC = () => {
                     <span>2.0x (크게)</span>
                   </div>
                 </div>
-
-                {/* 변환 진행률 표시 */}
-                {isConverting && (
-                  <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                      <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div 
-                        className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                        style={{ width: `${conversionProgress}%` }}
-                      ></div>
-                    </div>
-                    <div className="flex items-center justify-center mt-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                      <span className="text-sm text-gray-600">PDF를 SVG로 변환 중...</span>
-                    </div>
-                  </div>
-                )}
-
-                {/* 성공 메시지 */}
-                {showSuccessMessage && (
-                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-green-700 font-medium">{successMessage}</span>
-                    </div>
-                  </div>
-                )}
 
                 <div className="flex gap-4">
                   <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>

@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -42,13 +42,30 @@ const PdfToAiPage: React.FC = () => {
   const [scale, setScale] = useState(0.5);
   const [progress, setProgress] = useState(0);
   const [progressText, setProgressText] = useState("");
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // 타이머 ref 타입(브라우저 환경)
+  const timerRef = useRef<number | null>(null);
   const downloadedRef = useRef(false);
   const [isLoading, setIsLoading] = useState(false);
   const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
   const [convertedFileName, setConvertedFileName] = useState<string>("");
-  const [error, setError] = useState("");
+  const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 기존 코드에서 쓰던 이름들을 표준 상태로 연결(별칭)
+  const errorMessage = error ?? "";
+  const isConverting = isLoading;
+  const conversionProgress = progress;
+  const showSuccessMessage = !!convertedFileUrl;
+  const successMessage = convertedFileName 
+    ? `변환 완료! ${convertedFileName} 파일이 다운로드됩니다.`
+    : "변환 완료!";
+
+  // 언마운트 시 자동 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) window.clearInterval(timerRef.current);
+    };
+  }, []);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -65,11 +82,12 @@ const PdfToAiPage: React.FC = () => {
 
   const handleReset = () => {
     setSelectedFile(null);
-    setError('');
+    setError(null);
     setProgress(0);
     setProgressText('');
     setConvertedFileUrl(null);
     setConvertedFileName('');
+    // 타이머 정리할 때
     if (timerRef.current) {
       window.clearInterval(timerRef.current);
       timerRef.current = null;
@@ -87,7 +105,7 @@ const PdfToAiPage: React.FC = () => {
 
     downloadedRef.current = false;
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI로 변환 중..."); setError("");
+    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI로 변환 중..."); setError(null);
 
     const form = new FormData();
     form.append("file", selectedFile);
@@ -101,6 +119,7 @@ const PdfToAiPage: React.FC = () => {
     if (!up.ok) { setError(await up.text()); setIsLoading(false); return; }
     const { job_id } = await up.json();
 
+    // 타이머 시작할 때
     timerRef.current = window.setInterval(async () => {
       const r = await fetchWithFallback(`${AI_DIRECT}/job/${job_id}`, `${AI_PROXY}/job/${job_id}`, {});
       const j = await r.json();
@@ -113,27 +132,50 @@ const PdfToAiPage: React.FC = () => {
         if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
         const d = await fetchWithFallback(`${AI_DIRECT}/download/${job_id}`, `${AI_PROXY}/download/${job_id}`, {});
-        if (!d.ok) { setError(await d.text()); setIsLoading(false); return; }
+        
+        // d: /download/<job_id> 응답
+        if (!d.ok) {
+          const ct = d.headers.get("content-type") || "";
+          const body = ct.includes("application/json") ? await d.json().catch(() => null) : await d.text().catch(() => "");
+          setError((body && (body.error || body.message || body.toString().slice(0,200))) || `요청 실패(${d.status})`);
+          setIsLoading(false);
+          return;
+        }
 
+        // 1) 헤더 타입
         const ct = (d.headers.get("content-type") || "").toLowerCase();
-        const base = selectedFile.name.replace(/\.[^.]+$/,"");
+        // 2) 바이트 시그니처(매직 넘버)
+        const buf = new Uint8Array(await d.clone().arrayBuffer());
+        const head4 = Array.from(buf.slice(0, 4));
+        const isZip = head4[0] === 0x50 && head4[1] === 0x4b;                // "PK"
+        const isPdf = head4[0] === 0x25 && head4[1] === 0x50 && head4[2] === 0x44 && head4[3] === 0x46; // "%PDF"
+        const sniff = new TextDecoder().decode(buf.slice(0, 128)).trimStart();
+        const looksText = /^[a-zA-Z0-9\s\n\r\t가-힣]/.test(sniff);
+
+        if (ct.includes("text/html") || ct.includes("application/json")) {
+          // 서버 에러 페이지나 JSON을 파일로 저장하지 않도록 처리
+          const txt = await d.text().catch(() => "");
+          setError(txt.slice(0, 300) || "서버 에러 응답");
+          setIsLoading(false);
+          return;
+        }
+
+        const base = selectedFile.name.replace(/\.[^.]+$/, "");
         let name = safeGetFilename(d, base);
 
-        // 1) 응답 바이트로 매직넘버 확인
-        const buf = new Uint8Array(await d.clone().arrayBuffer());
-        const head = Array.from(buf.slice(0, 4));
-        const isZip = head[0] === 0x50 && head[1] === 0x4b; // PK..
-        const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
-        const isSvg = head[0] === 0x3c || ( // '<'
-          head[0] === 0xef && head[1] === 0xbb && head[2] === 0xbf && head[3] === 0x3c // BOM + '<'
-        );
-
-        // 2) 페이지별로 올바른 확장자 강제
-        if (isZip) {
+        if (isZip || ct.includes("zip")) {
           if (!/\.zip$/i.test(name)) name = `${name}.zip`;
         } else if (isPdf) {
           // AI 서비스에서 가끔 PDF가 내려오면 .ai로 표기
           if (!/\.ai$/i.test(name)) name = `${name}.ai`;
+        } else if (looksText || ct.includes("text/")) {
+          // 텍스트 파일인 경우
+          if (!/\.(txt|ai)$/i.test(name)) name = `${name}.txt`;
+        } else {
+          // 알 수 없는 바이너리 → 저장하지 말고 에러 표시
+          setError("유효하지 않은 AI 분석 데이터입니다.");
+          setIsLoading(false);
+          return;
         }
 
         const blob = await d.blob();
@@ -306,7 +348,7 @@ const PdfToAiPage: React.FC = () => {
             </div>
           )}
           
-          {errorMessage && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
+          {error && <p className="mt-4 text-center text-red-500">{error}</p>}
         </div>
       </div>
 

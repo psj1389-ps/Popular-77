@@ -53,11 +53,8 @@ JOBS = {}  # job_id -> dict
 
 def guess_mime_by_name(name: str) -> str:
     n = (name or "").lower()
-    if n.endswith(".svg"): return "image/svg+xml"
-    if n.endswith(".zip"): return "application/zip"
-    if n.endswith(".ai"): return "application/pdf"  # Illustrator 호환 PDF
-    if n.endswith(".pptx"): return "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-    if n.endswith(".xlsx"): return "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    if n.endswith(".svg"):  return "image/svg+xml"
+    if n.endswith(".zip"):  return "application/zip"
     return mimetypes.guess_type(n)[0] or "application/octet-stream"
 
 def safe_base_name(filename: str) -> str:
@@ -88,6 +85,8 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
             set_progress(current_job_id, 10 + int(80*(i+1)/page_count), f"페이지 {i+1}/{page_count} 벡터 추출 중")
             page = doc.load_page(i)
             svg = page.get_svg_image(matrix=mat)
+            if not svg.lstrip().startswith("<"):
+                svg = '<?xml version="1.0" encoding="UTF-8"?>\n' + svg
             out_p = os.path.join(tmp, f"{base_name}_{i+1:0{max(2,len(str(page_count)))}d}.svg")
             with open(out_p, "w", encoding="utf-8") as f:
                 f.write(svg)
@@ -162,18 +161,20 @@ def job_status(job_id):
     info.setdefault("progress", 0); info.setdefault("message", "")
     return jsonify(info), 200
 
-@app.get("/download/<job_id>")
+@app.route("/download/<job_id>")
 def job_download(job_id):
     info = JOBS.get(job_id)
     if not info: return jsonify({"error":"job not found"}), 404
     if info.get("status") != "done": return jsonify({"error":"not ready"}), 409
-    
-    path, name = info.get("path"), info.get("name")
-    if not path or not os.path.exists(path): return jsonify({"error":"output file missing"}), 500
-    
-    ctype = guess_mime_by_name(name)
+
+    path = info.get("path")
+    if not path or not os.path.exists(path):
+        return jsonify({"error":"output file missing"}), 500
+
+    name = os.path.basename(path)                 # 경로에서 이름 확정
+    ctype = guess_mime_by_name(name)              # 확장자로 MIME 결정
     resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
-    # 파일명 한글 안정화
+    resp.headers["Cache-Control"] = "no-store"
     return attach_download_headers(resp, name)
 
 @app.post("/convert")
