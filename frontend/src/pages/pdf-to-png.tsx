@@ -43,144 +43,113 @@ const formatFileSize = (bytes: number) => {
 
 const PdfToPngPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [quality, setQuality] = useState<"low" | "medium" | "high">("low");
   const [scale, setScale] = useState(0.5);
   const [transparent, setTransparent] = useState<"off" | "on">("off");
-  const [whiteThreshold, setWhiteThreshold] = useState(250);
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
+  const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
-  const [errorMessage, setErrorMessage] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      if (file.size > 100 * 1024 * 1024) {
-        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
-        setSelectedFile(null);
-      } else {
-        setSelectedFile(file);
-        setErrorMessage('');
-      }
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setErrorMessage(null);
+      setShowSuccessMessage(false);
     }
   };
 
   const handleReset = () => {
     setSelectedFile(null);
-    setErrorMessage('');
+    setErrorMessage(null);
     setShowSuccessMessage(false);
-    setSuccessMessage('');
     setConversionProgress(0);
+    setIsConverting(false);
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // 파일 입력 초기화
+      fileInputRef.current.value = '';
     }
   };
 
   const pollJobStatus = async (jobId: string): Promise<void> => {
-    const maxAttempts = 60; // 최대 5분 대기 (5초 간격)
+    const maxAttempts = 60;
     let attempts = 0;
 
-    const poll = async (): Promise<void> => {
-      try {
-        const response = await fetch(`/api/pdf-png/job/${jobId}`);
-        if (!response.ok) {
-          throw new Error(`작업 상태 확인 실패: ${response.status}`);
-        }
+    return new Promise((resolve, reject) => {
+      const poll = async () => {
+        try {
+          const response = await fetch(`${API_BASE}/status/${jobId}`);
+          const data = await response.json();
 
-        const jobData = await response.json();
-        
-        if (jobData.status === 'completed') {
-          // 작업 완료 - 결과 다운로드
-          setConversionProgress(100);
-          
-          const ct = (jobData.headers?.get?.("content-type") || "").toLowerCase?.() || "";
-          const base = selectedFile!.name.replace(/\.[^.]+$/, "");
-          let name = base;
-          const isZip = ct.includes("zip") || /\.zip/i.test(name);
-          if (!/\.(png|zip)$/i.test(name)) name = isZip ? `${name}.zip` : `${name}.png`;
-          
-          const downloadUrl = `${API_BASE}/download/${jobId}`;
-          
-          // 성공 메시지 표시
-          setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
-          setShowSuccessMessage(true);
-          setIsConverting(false);
-          
-          // 자동 다운로드 시작
-          setTimeout(() => {
-            triggerDirectDownload(downloadUrl, name);
-          }, 1000);
-          
-        } else if (jobData.status === 'failed') {
-          throw new Error(jobData.error || '변환 작업이 실패했습니다.');
-        } else if (jobData.status === 'processing') {
-          // 진행률 업데이트
-          if (jobData.progress) {
-            setConversionProgress(jobData.progress);
+          if (data.status === 'completed') {
+            resolve();
+          } else if (data.status === 'failed') {
+            reject(new Error(data.error || '변환 실패'));
+          } else if (attempts >= maxAttempts) {
+            reject(new Error('변환 시간 초과'));
+          } else {
+            attempts++;
+            setTimeout(poll, 1000);
           }
-          
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw new Error('변환 시간이 초과되었습니다. 다시 시도해주세요.');
-          }
-          
-          // 5초 후 다시 확인
-          setTimeout(poll, 5000);
-        } else {
-          // pending 상태 - 계속 대기
-          attempts++;
-          if (attempts >= maxAttempts) {
-            throw new Error('변환 시간이 초과되었습니다. 다시 시도해주세요.');
-          }
-          
-          // 5초 후 다시 확인
-          setTimeout(poll, 5000);
+        } catch (error) {
+          reject(error);
         }
-      } catch (error) {
-        setErrorMessage(error instanceof Error ? error.message : '작업 상태 확인 중 오류가 발생했습니다.');
-        setIsConverting(false);
-        setConversionProgress(0);
-      }
-    };
-
-    poll();
+      };
+      poll();
+    });
   };
 
   const handleConvert = async () => {
-    if (!selectedFile) {
-      setErrorMessage('먼저 파일을 선택해주세요.');
-      return;
-    }
+    if (!selectedFile) return;
+
     setIsConverting(true);
-    setErrorMessage('');
-    setShowSuccessMessage(false);
     setConversionProgress(0);
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append('scale', String(scale)); // 크기 배율
-    formData.append("transparent", transparent === "on" ? "1" : "0");
-    if (transparent === "on") {
-      formData.append('white_threshold', String(whiteThreshold));
-    }
-    
+    setErrorMessage(null);
+    setShowSuccessMessage(false);
+
+    const progressInterval = setInterval(() => {
+      setConversionProgress(prev => Math.min(prev + Math.random() * 15, 90));
+    }, 800);
+
     try {
-      const response = await fetch('/api/pdf-png/convert-async', { method: 'POST', body: formData });
+      const formData = new FormData();
+      formData.append('file', selectedFile);
+      formData.append('quality', quality);
+      formData.append('scale', scale.toString());
+      formData.append('transparent', transparent);
+
+      const response = await fetch(`${API_BASE}/convert`, {
+        method: 'POST',
+        body: formData,
+      });
+
       if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
+        const errorData = await response.json();
+        throw new Error(errorData.error || '변환 요청 실패');
       }
+
+      const { job_id } = await response.json();
       
-      const jobData = await response.json();
-      if (!jobData.job_id) {
-        throw new Error('작업 ID를 받지 못했습니다.');
-      }
+      await pollJobStatus(job_id);
       
-      // 작업 상태 폴링 시작
-      await pollJobStatus(jobData.job_id);
+      clearInterval(progressInterval);
+      setConversionProgress(100);
+
+      const downloadUrl = `${API_BASE}/download/${job_id}`;
+      const downloadFilename = selectedFile.name.replace(/\.pdf$/i, '.png');
+      
+      setSuccessMessage(`변환 완료! ${downloadFilename} 파일이 다운로드됩니다.`);
+      setShowSuccessMessage(true);
+      setIsConverting(false);
+      
+      setTimeout(() => {
+        triggerDirectDownload(downloadUrl, downloadFilename);
+      }, 1000);
       
     } catch (error) {
+      clearInterval(progressInterval);
       setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
     } finally {
@@ -246,6 +215,25 @@ const PdfToPngPage: React.FC = () => {
                   <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
                   <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
                 </div>
+              
+              {/* 변환 품질 선택 섹션 */}
+              <div>
+                <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as "low" | "medium" | "high")} className="w-4 h-4 text-blue-600" />
+                    <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                  </label>
+                </div>
+              </div>
 
               {/* 고급 옵션 */}
               <div className="bg-gray-50 border rounded-lg p-4 mb-4">
@@ -297,29 +285,6 @@ const PdfToPngPage: React.FC = () => {
                       <span>사용</span>
                     </label>
                   </div>
-                  
-                  {/* 흰색 임계값 설정 (투명 배경 사용 시에만 표시) */}
-                  {transparent === "on" && (
-                    <div className="mt-3">
-                      <div className="flex items-center justify-between mb-2">
-                        <label className="text-sm font-medium text-gray-700">흰색 임계값</label>
-                        <span className="text-sm text-gray-600">{whiteThreshold}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="200"
-                        max="255"
-                        step="5"
-                        value={whiteThreshold}
-                        onChange={(e) => setWhiteThreshold(parseInt(e.target.value))}
-                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-                      />
-                      <div className="flex justify-between text-xs text-gray-500 mt-1">
-                        <span>200 (더 많이 투명)</span>
-                        <span>255 (덜 투명)</span>
-                      </div>
-                    </div>
-                  )}
                 </div>
               </div>
 
