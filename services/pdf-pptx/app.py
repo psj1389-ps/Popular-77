@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify
+from flask import Flask, request, jsonify, render_template
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
 import os, mimetypes
@@ -46,7 +46,7 @@ def handle_any_exc(e):
 
 @app.route("/")
 def index():
-    return "PDF to PPTX Converter is running!"
+    return render_template('index.html')
 
 @app.route("/health")
 def health():
