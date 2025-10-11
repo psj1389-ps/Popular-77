@@ -125,14 +125,23 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
                 zf.write(p, arcname=os.path.basename(p))
         return final_path, final_name, "application/zip"
 
+# 루트 → index.html
 @app.get("/")
-def home():
-    return redirect(HOME_URL, code=302)
+def index():
+    return send_from_directory(app.static_folder, "index.html")
 
-@app.route("/tools", defaults={"path": ""})
-@app.route("/tools/<path:path>")
-def tools_redirect(path):
-    return redirect(HOME_URL, code=302)
+# SPA fallback + 정적 파일
+@app.route("/<path:path>")
+def spa(path):
+    # API 경로는 제외
+    if path in ("health", "convert-async") or \
+       path.startswith(("job/", "download/")):
+        abort(404)
+    full = os.path.join(app.static_folder, path)
+    if os.path.isfile(full):
+        return send_from_directory(app.static_folder, path)
+    # 나머지는 SPA index.html 반환
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.get("/health")
 def health():
