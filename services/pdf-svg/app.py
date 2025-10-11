@@ -128,7 +128,7 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
 # 루트 → index.html
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return send_from_directory("templates", "index.html")
 
 # SPA fallback + 정적 파일
 @app.route("/<path:path>")
