@@ -45,6 +45,11 @@ const PdfToSvgPage: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
+  // SVG 벡터화 옵션 상태
+  const [vectorColors, setVectorColors] = useState(128);  // 2~256
+  const [vectorDetail, setVectorDetail] = useState(5);    // 1~10
+  const [vectorDenoise, setVectorDenoise] = useState(50); // 0~100
+
   // 기존 코드에서 쓰던 이름들을 표준 상태로 연결(별칭)
   const errorMessage = error ?? "";
   const isConverting = isLoading;
@@ -105,7 +110,10 @@ setError(null);
     const form = new FormData();
     form.append("file", selectedFile);
     form.append("quality", quality);
-    form.append("scale", String(scale));
+    form.append("vector_colors", String(vectorColors));
+    form.append("vector_detail", String(vectorDetail));
+    form.append("vector_denoise", String(vectorDenoise));
+    form.append("scale", "1.0"); // 크기 x UI 제거했으므로 기본값만 전송
 
     try {
       const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
@@ -263,29 +271,70 @@ setError(null);
                   </label>
                 </div>
 
-                {/* 고급 옵션 - 크기 조정 */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    <div className="flex items-center justify-between mb-2">
-                      <label className="text-sm font-medium text-gray-700">크기 x</label>
-                      <span className="text-sm text-gray-600">{scale.toFixed(1)}x</span>
+                {/* SVG 벡터화 옵션 */}
+                <fieldset className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
+                  <legend className="px-1 text-sm font-semibold text-gray-700">SVG 벡터화 옵션</legend>
+
+                  {/* 색상 수 */}
+                  <div className="mt-3 mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>색상 수: {vectorColors}</span>
+                      <span className="text-gray-400">2-256</span>
                     </div>
-                    <input
-                      type="range"
-                      min="0.2"
-                      max="2.0"
-                      step="0.1"
-                      value={scale}
-                      onChange={(e) => setScale(parseFloat(e.target.value))}
-                      className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                    <input 
+                      type="range" 
+                      min={2} 
+                      max={256} 
+                      step={1} 
+                      value={vectorColors} 
+                      onChange={(e) => setVectorColors(Math.min(256, Math.max(2, Number(e.target.value))))} 
+                      className="w-full" 
                     />
-                    <div className="flex justify-between text-xs text-gray-500 mt-1">
-                      <span>0.2x (작게)</span>
-                      <span>2.0x (크게)</span>
-                    </div>
+                    <p className="mt-1 text-xs text-gray-500">
+                      변환될 SVG 파일에 사용될 색상의 개수를 조절합니다. (단순한 로고, 아이콘에 효과적)
+                    </p>
                   </div>
-                </div>
+
+                  {/* 상세 수준 */}
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>상세 수준: {vectorDetail}</span>
+                      <span className="text-gray-400">1-10</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min={1} 
+                      max={10} 
+                      step={1} 
+                      value={vectorDetail} 
+                      onChange={(e) => setVectorDetail(Math.min(10, Math.max(1, Number(e.target.value))))} 
+                      className="w-full" 
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      원본 이미지의 외곽선을 얼마나 정교하게 따라 그릴지 결정합니다.
+                    </p>
+                  </div>
+
+                  {/* 노이즈 억제 */}
+                  <div>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>노이즈 억제: {vectorDenoise}%</span>
+                      <span className="text-gray-400">0-100%</span>
+                    </div>
+                    <input 
+                      type="range" 
+                      min={0} 
+                      max={100} 
+                      step={1} 
+                      value={vectorDenoise} 
+                      onChange={(e) => setVectorDenoise(Math.min(100, Math.max(0, Number(e.target.value))))} 
+                      className="w-full" 
+                    />
+                    <p className="mt-1 text-xs text-gray-500">
+                      이미지의 작은 점이나 잡티를 무시하여 더 깔끔한 결과물을 만듭니다.
+                    </p>
+                  </div>
+                </fieldset>
 
                 <div className="flex gap-4">
                   <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>

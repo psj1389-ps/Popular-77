@@ -92,6 +92,38 @@ def set_progress(job_id, p, msg=None):
     if msg is not None:
         info["message"] = msg
 
+def send_download_memory(path: str):
+    if not path or not os.path.exists(path):
+        return jsonify({"error": "output file missing"}), 500
+
+    name = os.path.basename(path).strip() or "output.svg"
+    n = name.lower()
+    if n.endswith(".svg"):
+        ctype = "image/svg+xml"
+    elif n.endswith(".zip"):
+        ctype = "application/zip"
+    else:
+        ctype = "application/octet-stream"
+
+    with open(path, "rb") as f:
+        data = f.read()
+    size = len(data)
+
+    resp = send_file(
+        io.BytesIO(data),
+        mimetype=ctype,
+        as_attachment=True,
+        download_name=name,
+        conditional=False
+    )
+    resp.direct_passthrough = False
+    resp.headers["Content-Length"] = str(size)
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Content-Disposition"] = (
+        f"attachment; filename*=UTF-8''{urllib.parse.quote(name)}"
+    )
+    return resp
+
 def perform_svg_conversion(in_path, scale: float, base_name: str):
     result_paths = []
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
@@ -196,60 +228,10 @@ def job_status(job_id):
 @app.get("/download/<job_id>")
 def job_download(job_id):
     info = JOBS.get(job_id)
-    if not info:
-        return jsonify({"error": "job not found"}), 404
-    if info.get("status") != "done":
-        return jsonify({"error": "not ready"}), 409
-
+    if not info:  return jsonify({"error":"job not found"}), 404
+    if info.get("status") != "done":  return jsonify({"error":"not ready"}), 409
     path = info.get("path")
-    if not path or not os.path.exists(path):
-        return jsonify({"error": "output file missing"}), 500
-
-    name = os.path.basename(path).strip() or "output.svg"
-    # MIME 고정(확장자 기준)
-    if name.lower().endswith(".svg"):
-        ctype = "image/svg+xml"
-    elif name.lower().endswith(".zip"):
-        ctype = "application/zip"
-    else:
-        ctype = "application/octet-stream"
-
-    size = os.path.getsize(path)
-    app.logger.info(f"[{job_id}] download: {name} size={size} ctype={ctype}")
-
-    try:
-        # send_file을 사용하여 파일 전송
-        resp = send_file(
-            path,
-            mimetype=ctype,
-            as_attachment=True,
-            download_name=name
-        )
-        
-        # Content-Disposition 헤더를 올바르게 설정
-        attach_download_headers(resp, name)
-        
-        # 파일 전송 후 정리 (성공적으로 전송된 후에만)
-        def cleanup_after_response():
-            try:
-                if os.path.exists(path):
-                    os.remove(path)
-                    app.logger.info(f"[{job_id}] cleaned up: {path}")
-                # 작업 정보도 정리
-                if job_id in JOBS:
-                    del JOBS[job_id]
-            except Exception as e:
-                app.logger.warning(f"[{job_id}] cleanup failed: {e}")
-        
-        # Flask의 after_this_request를 사용하여 응답 후 정리
-        from flask import after_this_request
-        after_this_request(lambda response: (cleanup_after_response(), response)[1])
-        
-        return resp
-        
-    except Exception as e:
-        app.logger.exception(f"[{job_id}] download error: {e}")
-        return jsonify({"error": "download failed"}), 500
+    return send_download_memory(path)
 
 @app.post("/convert")
 def convert_compat():
