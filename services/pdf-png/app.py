@@ -9,13 +9,13 @@ import logging
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, send_from_directory, abort
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import fitz  # PyMuPDF
 from PIL import Image
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
 
 # CORS (프리뷰/프로덕션 허용)
@@ -126,42 +126,9 @@ def perform_png_conversion(in_path: str, base_name: str,
                 zf.write(p, arcname=os.path.basename(p))
         return final_path, final_name, "application/zip"
 
-@app.route("/", methods=["GET"])
+@app.get("/")
 def index():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>PDF to PNG Conversion Service</title>
-        <style>
-            body { font-family: Arial, sans-serif; margin: 40px; }
-            h1 { color: #333; }
-            ul { margin: 20px 0; }
-            li { margin: 5px 0; }
-            code { background: #f4f4f4; padding: 2px 4px; border-radius: 3px; }
-        </style>
-    </head>
-    <body>
-        <h1>PDF to PNG Conversion Service</h1>
-        <p>This is a backend service for converting PDF files to PNG images with transparent background support.</p>
-        <p><strong>Available endpoints:</strong></p>
-        <ul>
-            <li><code>GET /health</code> - Health check</li>
-            <li><code>POST /convert-async</code> - Start conversion job (recommended)</li>
-            <li><code>GET /job/&lt;id&gt;</code> - Check job status</li>
-            <li><code>GET /download/&lt;id&gt;</code> - Download result</li>
-            <li><code>POST /convert</code> - Synchronous conversion (legacy)</li>
-        </ul>
-        <p><strong>Parameters for conversion:</strong></p>
-        <ul>
-            <li><code>file</code> - PDF file to convert</li>
-            <li><code>scale</code> - Scale factor (0.2-2.0, default: 1.0)</li>
-            <li><code>transparent</code> - Enable transparent background (0 or 1, default: 0)</li>
-            <li><code>white_threshold</code> - White color threshold for transparency (0-255, default: 250)</li>
-        </ul>
-    </body>
-    </html>
-    '''
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
@@ -317,6 +284,38 @@ def convert_sync():
             except:
                 pass
         current_job_id = None
+
+# SPA fallback route
+@app.route("/<path:path>")
+def spa(path):
+    # API 경로는 제외
+    if path in ("health", "convert", "convert-async") or path.startswith(("job/", "download/")) or path.startswith("api/"):
+        abort(404)
+    full = os.path.join(app.static_folder, path)
+    if os.path.isfile(full):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, "index.html")
+
+# API alias routes for /api/pdf-png/* paths
+@app.get("/api/pdf-png/health")
+def _alias_health():
+    return health()
+
+@app.post("/api/pdf-png/convert-async")
+def _alias_convert_async():
+    return convert_async()
+
+@app.post("/api/pdf-png/convert")
+def _alias_convert_sync():
+    return convert_sync()
+
+@app.get("/api/pdf-png/job/<job_id>")
+def _alias_job(job_id):
+    return get_job_status(job_id)
+
+@app.get("/api/pdf-png/download/<job_id>")
+def _alias_download(job_id):
+    return download_result(job_id)
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=int(os.environ.get("PORT", 5000)), debug=False)
