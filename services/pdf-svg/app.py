@@ -157,23 +157,14 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
                 zf.write(p, arcname=os.path.basename(p))
         return final_path, final_name, "application/zip"
 
-# 루트 → index.html
+# 루트: web/index.html 있으면 서빙, 없으면 도구 페이지로 폴백(임시 안전장치)
 @app.get("/")
 def index():
-    return send_from_directory("templates", "index.html")
-
-# SPA fallback + 정적 파일
-@app.route("/<path:path>")
-def spa(path):
-    # API 경로는 제외
-    if path in ("health", "convert-async") or \
-       path.startswith(("job/", "download/")):
-        abort(404)
-    full = os.path.join(app.static_folder, path)
-    if os.path.isfile(full):
-        return send_from_directory(app.static_folder, path)
-    # 나머지는 SPA index.html 반환
-    return send_from_directory(app.static_folder, "index.html")
+    idx = os.path.join(app.static_folder, "index.html")
+    if os.path.exists(idx):
+        return send_from_directory(app.static_folder, "index.html")
+    # web이 아직 없을 때 임시로 프론트 페이지로 이동(원치 않으면 return "index.html missing", 500)
+    return redirect("https://77-tools.xyz/tools/pdf-svg", code=302)
 
 @app.get("/health")
 def health():
@@ -288,6 +279,17 @@ def convert_to_svg():
         try: os.remove(in_path)
         except: pass
         return jsonify({"error": str(e)}), 500
+
+# 정적 파일 or SPA fallback(가장 아래에 위치)
+@app.route("/<path:path>")
+def spa(path):
+    # API 경로는 제외
+    if path in ("health", "convert-async") or path.startswith(("job/", "download/")):
+        abort(404)
+    full = os.path.join(app.static_folder, path)
+    if os.path.isfile(full):
+        return send_from_directory(app.static_folder, path)
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.errorhandler(Exception)
 def handle_any(e):
