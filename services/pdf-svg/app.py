@@ -11,8 +11,7 @@ import fitz  # PyMuPDF
 app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
 
-# Redirect URL
-HOME_URL = "https://77-tools.xyz/tools/pdf-svg"
+# HOME_URL 변수 제거 - 자체 인터페이스 서빙
 
 # CORS
 CORS(app, resources={
@@ -160,6 +159,11 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
 # 루트: web/index.html 서빙
 @app.get("/")
 def index():
+    return send_from_directory(app.static_folder, "index.html")
+
+# /tools 경로도 동일한 인터페이스 서빙
+@app.get("/tools")
+def tools():
     return send_from_directory(app.static_folder, "index.html")
 
 @app.get("/health")
