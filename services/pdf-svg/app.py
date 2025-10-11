@@ -1,14 +1,18 @@
 import os, re, io, zipfile, tempfile, logging, urllib.parse, mimetypes
+import shutil, errno
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, redirect, send_from_directory, abort
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException, NotFound, MethodNotAllowed
 import fitz  # PyMuPDF
 
-app = Flask(__name__)
+app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
+
+# Redirect URL
+HOME_URL = "https://77-tools.xyz/tools/pdf-svg"
 
 # CORS
 CORS(app, resources={
@@ -26,11 +30,7 @@ CORS(app, resources={
     }
 })
 
-@app.before_request
-def reject_front_routes():
-    if request.path.startswith("/tools/"):
-        # 백엔드가 처리하지 않는 프론트 전용 경로
-        raise NotFound()
+# 기존 before_request 제거 - SPA fallback으로 대체됨
 
 @app.errorhandler(HTTPException)
 def handle_http_exc(e):
@@ -50,6 +50,24 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}  # job_id -> dict
+
+def safe_move(src: str, dst: str):
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    try:
+        # 같은 파일시스템이면 원자적 교체
+        if os.path.exists(dst):
+            os.remove(dst)
+        os.replace(src, dst)
+    except OSError as e:
+        # 다른 파일시스템이면 복사 → 원본 삭제
+        if getattr(e, "errno", None) == errno.EXDEV:
+            shutil.copy2(src, dst)
+            try: 
+                os.unlink(src)
+            except FileNotFoundError: 
+                pass
+        else:
+            raise
 
 def guess_mime_by_name(name: str) -> str:
     n = (name or "").lower()
@@ -76,7 +94,7 @@ def set_progress(job_id, p, msg=None):
 
 def perform_svg_conversion(in_path, scale: float, base_name: str):
     result_paths = []
-    with tempfile.TemporaryDirectory() as tmp:
+    with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
         doc = fitz.open(in_path)
         page_count = doc.page_count
         mat = fitz.Matrix(scale, scale)
@@ -96,7 +114,7 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
             final_name = f"{base_name}.svg"
             final_path = os.path.join(OUTPUTS_DIR, final_name)
             if os.path.exists(final_path): os.remove(final_path)
-            os.replace(result_paths[0], final_path)
+            safe_move(result_paths[0], final_path)
             return final_path, final_name, "image/svg+xml"
 
         final_name = f"{base_name}.zip"
@@ -108,8 +126,20 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
         return final_path, final_name, "application/zip"
 
 @app.get("/")
-def home():
-    return "OK (pdf-svg)"
+def index():
+    return send_from_directory(app.static_folder, "index.html")
+
+@app.route("/<path:path>")
+def spa(path):
+    # API 경로는 정적 서빙 대상이 아님
+    if path.startswith(("convert", "convert-async", "job", "download", "health", "api")):
+        abort(404)
+    # 실제 파일이 있으면 파일 서빙
+    full_path = os.path.join(app.static_folder, path)
+    if os.path.isfile(full_path):
+        return send_from_directory(app.static_folder, path)
+    # 그 외 경로는 SPA용 index.html 반환
+    return send_from_directory(app.static_folder, "index.html")
 
 @app.get("/health")
 def health():
