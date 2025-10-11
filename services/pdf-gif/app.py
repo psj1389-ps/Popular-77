@@ -2,7 +2,7 @@ import os, io, urllib.parse, tempfile, shutil, errno, zipfile, logging
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import fitz  # PyMuPDF
@@ -155,17 +155,7 @@ def perform_gif_conversion(in_path: str, base_name: str, job_id: str,
 
 @app.route("/", methods=["GET"])
 def root():
-    return jsonify({
-        "service": "PDF-GIF Converter",
-        "version": "1.0",
-        "endpoints": {
-            "health": "GET /health",
-            "convert": "POST /convert",
-            "convert_async": "POST /convert-async",
-            "job_status": "GET /job/<job_id>",
-            "download": "GET /download/<job_id>"
-        }
-    }), 200
+    return render_template("index.html")
 
 @app.route("/health", methods=["GET"])
 def health():
