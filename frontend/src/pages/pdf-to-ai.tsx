@@ -1,6 +1,28 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 
+function triggerDirectDownload(url: string, filename?: string) {
+  try {
+    const a = document.createElement("a");
+    a.href = url;
+    if (filename) a.download = filename;          // 헤더가 없어도 저장 유도
+    a.style.display = "none";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  } catch {
+    // 무시
+  }
+  // 폴백: 일부 브라우저/확장기능 차단 대비
+  setTimeout(() => {
+    const iframe = document.createElement("iframe");
+    iframe.style.display = "none";
+    iframe.src = url;
+    document.body.appendChild(iframe);
+    setTimeout(() => iframe.remove(), 60_000);
+  }, 300);
+}
+
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -106,7 +128,10 @@ const PdfToAiPage: React.FC = () => {
 
     downloadedRef.current = false;
     if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-    setIsLoading(true); setProgress(1); setProgressText("PDF를 AI(일러스트레이터)로 변환 중..."); setError(null);
+    setIsLoading(true);
+    setProgress(1);
+    setProgressText("PDF를 AI로 변환 중...");
+    setError("");
 
     const form = new FormData();
     form.append("file", selectedFile);
@@ -129,63 +154,26 @@ const PdfToAiPage: React.FC = () => {
       if (j.message) setProgressText(j.message);
 
       if (j.status === "done") {
-        if (downloadedRef.current) return;
-        downloadedRef.current = true;
         if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
 
-        const d = await fetch(`${API_BASE}/download/${job_id}`);
-        
-        // d: /download/<job_id> 응답
-        if (!d.ok) {
-          const ct = d.headers.get("content-type") || "";
-          const body = ct.includes("application/json") ? await d.json().catch(() => null) : await d.text().catch(() => "");
-          setError((body && (body.error || body.message || body.toString().slice(0,200))) || `요청 실패(${d.status})`);
-          setIsLoading(false);
-          return;
-        }
+        // 1) 다운로드 URL 확정(동일 출처: /api → Vercel rewrites)
+        const downloadUrl = `${API_BASE}/download/${job_id}`;
 
-        // 1) 헤더 타입
-        const ct = (d.headers.get("content-type") || "").toLowerCase();
-        // 2) 바이트 시그니처(매직 넘버)
-        const buf = new Uint8Array(await d.clone().arrayBuffer());
-        const head4 = Array.from(buf.slice(0, 4));
-        const isZip = head4[0] === 0x50 && head4[1] === 0x4b;                // "PK"
-        const isPdf = head4[0] === 0x25 && head4[1] === 0x50 && head4[2] === 0x44 && head4[3] === 0x46; // "%PDF"
-        const sniff = new TextDecoder().decode(buf.slice(0, 128)).trimStart();
-        const looksText = /^[a-zA-Z0-9\s\n\r\t가-힣]/.test(sniff);
-
-        if (ct.includes("text/html") || ct.includes("application/json")) {
-          // 서버 에러 페이지나 JSON을 파일로 저장하지 않도록 처리
-          const txt = await d.text().catch(() => "");
-          setError(txt.slice(0, 300) || "서버 에러 응답");
-          setIsLoading(false);
-          return;
-        }
-
+        // 2) 파일명(UI 표시에만 사용; 최종 파일명은 서버 Content-Disposition이 결정)
         const base = selectedFile.name.replace(/\.[^.]+$/, "");
-        let name = safeGetFilename(d, base);
+        let name = base; // safeGetFilename(d, base) 사용 중이면 그대로 두셔도 됩니다.
 
-        if (isZip || ct.includes("zip")) {
-          if (!/\.zip$/i.test(name)) name = `${name}.zip`;
-        } else if (isPdf) {
-          // AI 서비스에서 가끔 PDF가 내려오면 .ai로 표기
-          if (!/\.ai$/i.test(name)) name = `${name}.ai`;
-        } else if (looksText || ct.includes("text/")) {
-          // 텍스트 파일인 경우
-          if (!/\.(txt|ai)$/i.test(name)) name = `${name}.txt`;
-        } else {
-          // 알 수 없는 바이너리 → 저장하지 말고 에러 표시
-          setError("유효하지 않은 AI 변환 데이터입니다.");
-          setIsLoading(false);
-          return;
-        }
-
-        const blob = await d.blob();
-        const url = URL.createObjectURL(blob);
-        setConvertedFileUrl(url);
+        // 3) 상태 업데이트(기존 UI 유지)
+        setConvertedFileUrl(downloadUrl);     // 수동 버튼이 이 URL을 사용
         setConvertedFileName(name);
         setProgress(100);
         setIsLoading(false);
+
+        // 4) 자동 다운로드(1회)
+        if (!downloadedRef.current) {
+          downloadedRef.current = true;
+          triggerDirectDownload(downloadUrl, name);
+        }
       }
       if (j.status === "error") {
         if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
@@ -350,18 +338,9 @@ const PdfToAiPage: React.FC = () => {
                 </div>
               </fieldset>
 
-              <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
-                  {isLoading ? '변환 중...' : '변환하기'}
-                </button>
-                <button onClick={handleReset} disabled={isLoading} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
-                  파일 초기화
-                </button>
-              </div>
-
               {/* 진행률 바 */}
               {isLoading && (
-                <div className="mt-4">
+                <div className="mb-4">
                   <div className="flex justify-between text-sm mb-1">
                     <span>변환 진행률</span>
                     <span>{progress}%</span>
@@ -373,6 +352,26 @@ const PdfToAiPage: React.FC = () => {
                     />
                   </div>
                   <div className="mt-2 text-sm text-gray-500">⏳ {progressText || "변환 중..."}</div>
+                </div>
+              )}
+
+              {/* 변환 완료 메시지 */}
+              {convertedFileUrl && (
+                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                      <span className="text-green-700 font-medium">AI 변환 완료! {convertedFileName} 파일이 다운로드됩니다.</span>
+                    </div>
+                    <button
+                      onClick={() => convertedFileUrl && triggerDirectDownload(convertedFileUrl, convertedFileName || undefined)}
+                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
+                    >
+                      다운로드
+                    </button>
+                  </div>
                 </div>
               )}
 
@@ -388,26 +387,14 @@ const PdfToAiPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 변환 완료 메시지 */}
-              {convertedFileUrl && (
-                <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                      <span className="text-green-700 font-medium">변환 완료!</span>
-                    </div>
-                    <a
-                      href={convertedFileUrl}
-                      download={convertedFileName}
-                      className="bg-green-600 text-white px-4 py-2 rounded-lg text-sm font-semibold hover:bg-green-700"
-                    >
-                      다운로드
-                    </a>
-                  </div>
-                </div>
-              )}
+              <div className="flex gap-4">
+                <button onClick={handleConvert} disabled={isLoading} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                  {isLoading ? '변환 중...' : '변환하기'}
+                </button>
+                <button onClick={handleReset} disabled={isLoading} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                  파일 초기화
+                </button>
+              </div>
             </div>
           )}
           
