@@ -1,58 +1,19 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
+import { getPdfPageCount, directPostAndDownload, triggerDirectDownload } from '@/utils/pdfUtils';
 
 // Force Vercel deployment - Updated: 2024-12-30 16:16 - GITHUB INTEGRATION
 
-const API_BASE = "/api/pdf-pptx";
+const API_PROXY_BASE = "/api/pdf-pptx";
+const API_DIRECT_BASE = import.meta.env.PROD 
+  ? "https://pdf-pptx.onrender.com" 
+  : "/api/pdf-pptx";
 
-// 503 회피를 위한 상수들
-const SYNC_MAX_SIZE = 10 * 1024 * 1024; // 10MB
-const SYNC_MAX_PAGES = 20; // 20페이지
+// 임계값(조정 가능)
+const SYNC_MAX_SIZE = 8 * 1024 * 1024; // 8MB 이하
+const SYNC_MAX_PAGES = 20;             // 20페이지 이하
 
-// PDF 페이지 수 계산 함수
-async function getPdfPageCount(file: File): Promise<number> {
-  return new Promise((resolve) => {
-    const reader = new FileReader();
-    reader.onload = function() {
-      const typedArray = new Uint8Array(this.result as ArrayBuffer);
-      const text = String.fromCharCode.apply(null, Array.from(typedArray));
-      const matches = text.match(/\/Type\s*\/Page[^s]/g);
-      resolve(matches ? matches.length : 0);
-    };
-    reader.onerror = () => resolve(0);
-    reader.readAsArrayBuffer(file);
-  });
-}
-
-// 공통 유틸리티 함수들
-function safeGetFilenameFromCD(cd?: string | null, fallback = "output") {
-  if (!cd) return fallback;
-  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
-  if (star?.[1]) { try { return decodeURIComponent(star[1]); } catch {} }
-  const normal = /filename="?([^";]+)"?/i.exec(cd);
-  return normal?.[1] || fallback;
-}
-
-async function directPostAndDownload(url: string, form: FormData, fallbackName: string) {
-  const res = await fetch(url, { method: "POST", body: form });
-  if (!res.ok) {
-    const ct = res.headers.get("content-type") || "";
-    const msg = ct.includes("application/json") ? (await res.json().catch(()=>null))?.error : await res.text().catch(()=> "");
-    throw new Error(msg || `요청 실패(${res.status})`);
-  }
-  const cd = res.headers.get("content-disposition");
-  const name = safeGetFilenameFromCD(cd, fallbackName);
-  const blob = await res.blob();
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = href;
-  a.download = name;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  setTimeout(()=>URL.revokeObjectURL(href), 60_000);
-  return name;
-}
+// 공통 유틸리티 함수들 (import된 함수들 사용)
 
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
@@ -73,14 +34,6 @@ const formatFileSize = (bytes: number) => {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
 };
 
-const triggerDirectDownload = (url: string, filename?: string) => {
-  const a = document.createElement('a');
-  a.href = url;
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-};
 
 const PdfToPptxPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
@@ -132,7 +85,7 @@ const PdfToPptxPage: React.FC = () => {
     }
   };
 
-  const handleConvert = async () => {
+  async function handleConvert() {
     if (!selectedFile) return;
     setIsLoading(true);
     setProgress(1);
@@ -143,58 +96,54 @@ const PdfToPptxPage: React.FC = () => {
     try {
       const form = new FormData();
       form.append("file", selectedFile);
-      form.append("quality", speed === "fast" ? "low" : "standard");
+      form.append("quality", speed === "fast" ? "low" : "standard"); // doc과 동일 키
       form.append("scale", "1.0");
 
       const pages = await getPdfPageCount(selectedFile).catch(() => 0);
       const useSync = selectedFile.size <= SYNC_MAX_SIZE && (pages === 0 || pages <= SYNC_MAX_PAGES);
 
       if (useSync) {
-        // 동기식: 즉시 다운로드 → Render 503 회피(짧은 작업에만 사용)
+        // 동기식: onrender 직행 (/convert)
         const base = selectedFile.name.replace(/\.[^.]+$/, "");
-        const shown = await directPostAndDownload(`${API_BASE}/convert`, form, `${base}.pptx`);
+        const shown = await directPostAndDownload(`${API_DIRECT_BASE}/convert`, form, `${base}.pptx`);
         setConvertedFileName(shown);
         setProgress(100);
-        setSuccessMessage(`변환 완료! ${shown} 파일이 다운로드됩니다.`);
-        setShowSuccessMessage(true);
-      } else {
-        // 비동기: 긴 작업 안전
-        const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
-        if (!up.ok) throw new Error(`요청 실패(${up.status})`);
-        const { job_id } = await up.json();
-
-        // 폴링
-        if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-        timerRef.current = window.setInterval(async () => {
-          const r = await fetch(`${API_BASE}/job/${job_id}`);
-          const j = await r.json();
-          if (typeof j.progress === "number") setProgress(j.progress);
-          if (j.message) setProgressText(j.message);
-          if (j.status === "done") {
-            if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-            const downloadUrl = `${API_BASE}/download/${job_id}`;
-            const base = selectedFile.name.replace(/\.[^.]+$/, "");
-            setConvertedFileUrl(downloadUrl);
-            setConvertedFileName(`${base}.pptx`);
-            setProgress(100);
-            setIsLoading(false);
-            setSuccessMessage(`변환 완료! ${base}.pptx 파일이 다운로드됩니다.`);
-            setShowSuccessMessage(true);
-            if (!downloadedRef.current) { downloadedRef.current = true; triggerDirectDownload(downloadUrl); }
-          }
-          if (j.status === "error") {
-            if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
-            setErrorMessage(j.error || "변환 중 오류"); setIsLoading(false);
-          }
-        }, 1500);
+        setIsLoading(false);
         return;
       }
+
+      // 비동기(/api 프록시 유지)
+      const up = await fetch(`${API_PROXY_BASE}/convert-async`, { method: "POST", body: form });
+      if (!up.ok) throw new Error(`요청 실패(${up.status})`);
+      const { job_id } = await up.json();
+
+      if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+      timerRef.current = window.setInterval(async () => {
+        const r = await fetch(`${API_PROXY_BASE}/job/${job_id}`);
+        const j = await r.json();
+        if (typeof j.progress === "number") setProgress(j.progress);
+        if (j.message) setProgressText(j.message);
+
+        if (j.status === "done") {
+          if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+          const downloadUrl = `${API_PROXY_BASE}/download/${job_id}`; // 주의: /job/.../download 아님
+          const base = selectedFile.name.replace(/\.[^.]+$/, "");
+          setConvertedFileUrl(downloadUrl);
+          setConvertedFileName(`${base}.pptx`);
+          setProgress(100);
+          setIsLoading(false);
+          if (!downloadedRef.current) { downloadedRef.current = true; triggerDirectDownload(downloadUrl); }
+        }
+        if (j.status === "error") {
+          if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+          setErrorMessage(j.error || "변환 중 오류"); setIsLoading(false);
+        }
+      }, 1500);
     } catch (e: any) {
       setErrorMessage(e?.message || "변환 중 오류");
-    } finally {
       setIsLoading(false);
     }
-  };
+  }
 
   // 컴포넌트 언마운트 시 타이머 정리
   useEffect(() => {
