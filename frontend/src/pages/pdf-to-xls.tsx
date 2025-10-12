@@ -1,7 +1,16 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 import { getPdfPageCount, directPostAndDownload, triggerDirectDownload } from '@/utils/pdfUtils';
-import { BTN_PRIMARY, BTN_SECONDARY } from '../lib/styles';
+
+// 버튼 클래스 상수
+const BTN_PRIMARY = 
+  "w-full sm:w-auto px-6 py-4 rounded-xl text-base md:text-lg font-semibold text-white " + 
+  "bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 " + 
+  "shadow transition disabled:opacity-60 disabled:cursor-not-allowed";
+
+const BTN_SECONDARY = 
+  "w-full sm:w-auto px-6 py-4 rounded-xl text-base md:text-lg font-semibold text-white " + 
+  "bg-gray-700 hover:bg-gray-800 shadow transition disabled:opacity-60 disabled:cursor-not-allowed";
 
 const API_PROXY_BASE = "/api/pdf-xls";
 const API_DIRECT_BASE = import.meta.env.PROD 
