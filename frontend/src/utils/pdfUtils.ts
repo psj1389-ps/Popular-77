@@ -1,5 +1,26 @@
 import * as pdfjsLib from "pdfjs-dist";
-(pdfjsLib as any).GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.js";
+
+// 1회 설정 가드
+let workerReady = false;
+function ensurePdfWorker() {
+  if (workerReady) return;
+  if (typeof window === "undefined") return; // 브라우저에서만
+
+  try {
+    // 1) CDN 워커(버전 고정)
+    (pdfjsLib as any).GlobalWorkerOptions.workerSrc = 
+      "https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.js";
+    workerReady = true;
+  } catch {
+    // no-op
+  }
+
+  // 2) 폴백: 로컬 워커는 빌드 오류를 방지하기 위해 제거
+  // CDN이 실패하면 콘솔 경고만 남기고 계속 진행
+  if (!workerReady) {
+    console.warn("[pdfjs] CDN worker setup failed, PDF functionality may be limited.");
+  }
+}
 
 // 직접 다운로드(직행 URL/프록시 URL 공통)
 export function triggerDirectDownload(url: string, filename?: string) {
@@ -22,6 +43,7 @@ export function triggerDirectDownload(url: string, filename?: string) {
 }
 
 export async function getPdfPageCount(file: File): Promise<number> {
+  ensurePdfWorker();
   const buf = await file.arrayBuffer();
   const doc = await pdfjsLib.getDocument({ data: buf }).promise;
   const n = doc.numPages;

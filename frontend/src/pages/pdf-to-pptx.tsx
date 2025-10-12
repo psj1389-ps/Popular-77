@@ -109,6 +109,8 @@ const PdfToPptxPage: React.FC = () => {
         setConvertedFileName(shown);
         setProgress(100);
         setIsLoading(false);
+        setShowSuccessMessage(true);
+        setSuccessMessage(`변환 완료! 파일명: ${shown}로 다운로드됩니다.`);
         return;
       }
 
@@ -132,6 +134,8 @@ const PdfToPptxPage: React.FC = () => {
           setConvertedFileName(`${base}.pptx`);
           setProgress(100);
           setIsLoading(false);
+          setShowSuccessMessage(true);
+          setSuccessMessage(`변환 완료! 파일명: ${base}.pptx로 다운로드됩니다.`);
           if (!downloadedRef.current) { downloadedRef.current = true; triggerDirectDownload(downloadUrl); }
         }
         if (j.status === "error") {
@@ -241,8 +245,13 @@ const PdfToPptxPage: React.FC = () => {
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
-                <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-4">
-                  <p>{successMessage}</p>
+                <div className="bg-green-50 border border-green-200 text-green-800 px-4 py-3 rounded-lg mb-4">
+                  <div className="flex items-center">
+                    <svg className="w-5 h-5 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    </svg>
+                    <p>{successMessage}</p>
+                  </div>
                 </div>
               )}
 
@@ -251,7 +260,7 @@ const PdfToPptxPage: React.FC = () => {
                   type="button" 
                   disabled={isLoading || !selectedFile} 
                   onClick={handleConvert}
-                  className="px-5 py-2.5 rounded-md text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow disabled:opacity-50"
+                  className="px-8 py-3 rounded-lg text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg disabled:opacity-50 font-medium"
                 >
                   {isLoading ? "변환 중..." : "변환하기"}
                 </button>
@@ -259,7 +268,7 @@ const PdfToPptxPage: React.FC = () => {
                   type="button" 
                   disabled={isLoading} 
                   onClick={handleReset}
-                  className="px-5 py-2.5 rounded-md text-white bg-gray-700 hover:bg-gray-800 shadow disabled:opacity-50"
+                  className="px-8 py-3 rounded-lg text-white bg-gray-600 hover:bg-gray-700 shadow-lg disabled:opacity-50 font-medium"
                 >
                   파일 초기화
                 </button>
