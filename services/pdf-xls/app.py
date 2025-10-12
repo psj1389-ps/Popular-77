@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import io, os, urllib.parse, tempfile, shutil, errno, logging
@@ -137,6 +137,10 @@ def perform_xlsx_conversion(in_path: str, base_name: str, scale: float = 1.0):
             os.remove(final_path)
         wb.save(final_path)
         return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+
+@app.route("/")
+def index():
+    return render_template("index.html")
 
 @app.get("/health")
 def health():

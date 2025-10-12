@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory, abort
+from flask import Flask, request, jsonify, send_file, send_from_directory, abort, render_template
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import io, os, urllib.parse, tempfile, shutil, errno, logging
@@ -177,7 +177,7 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
 
 @app.get("/")
 def index():
-    return send_from_directory(app.static_folder, "index.html")
+    return render_template("index.html")
 
 @app.route("/<path:path>")
 def spa(path):
