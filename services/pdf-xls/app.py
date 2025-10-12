@@ -217,22 +217,6 @@ def job_download(job_id):
     return send_download_memory(info["path"], info["name"], info["ctype"])
 
 # API aliases: /api/pdf-xls/*
-@app.get("/api/pdf-xls/health")
-def _b1(): 
-    return health()
-
-@app.post("/api/pdf-xls/convert-async")
-def _b2(): 
-    return convert_async()
-
-@app.get("/api/pdf-xls/job/<job_id>")
-def _api_job_status(job_id): 
-    return job_status(job_id)
-
-@app.get("/api/pdf-xls/download/<job_id>")
-def _api_job_download(job_id): 
-    return job_download(job_id)
-
 @app.post("/convert")
 def convert_sync():
     f = request.files.get("file") or request.files.get("pdfFile")
@@ -265,17 +249,26 @@ def convert_sync():
     
     return send_download_memory(out_path, name, ctype)
 
-@app.post("/api/pdf-xls/convert")
-def _alias_convert_sync():
-    return convert_sync()
+# /api aliases (frontend uses /api paths only)
+@app.route("/api/pdf-xls/health", methods=["GET", "HEAD"])
+def _xls_a_health(): return health()
 
-@app.get("/api/pdf-xls/job/<job_id>")
-def _b3(job_id): 
-    return job_status(job_id)
+@app.route("/api/pdf-xls/convert", methods=["POST", "OPTIONS"])
+def _xls_a_convert_sync(): return convert_sync()
 
-@app.get("/api/pdf-xls/download/<job_id>")
-def _b4(job_id): 
-    return job_download(job_id)
+@app.route("/api/pdf-xls/convert-async", methods=["POST", "OPTIONS"])
+def _xls_a_convert_async(): return convert_async()
+
+@app.route("/api/pdf-xls/job/<job_id>", methods=["GET", "HEAD"])
+def _xls_a_job(job_id): return job_status(job_id)
+
+@app.route("/api/pdf-xls/download/<job_id>", methods=["GET", "HEAD"])
+def _xls_a_download(job_id): return job_download(job_id)
+
+# Protection for wrong methods
+@app.route("/api/pdf-xls/convert-async", methods=["GET", "HEAD"])
+def _xls_a_convert_async_wrong_method():
+    return jsonify({"error": "use POST for /convert-async"}), 405
 
 @app.errorhandler(HTTPException)
 def handle_http_exc(e):

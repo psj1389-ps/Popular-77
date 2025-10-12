@@ -262,22 +262,6 @@ def job_download(job_id):
     return send_download_memory(info["path"], info["name"], info["ctype"])
 
 # API aliases: /api/pdf-pptx/*
-@app.route("/api/pdf-pptx/health", methods=["GET"])
-def _a1(): 
-    return health()
-
-@app.route("/api/pdf-pptx/convert-async", methods=["POST"])
-def _a2(): 
-    return convert_async()
-
-@app.route("/api/pdf-pptx/job/<job_id>", methods=["GET"])
-def _a3(job_id): 
-    return job_status(job_id)
-
-@app.route("/api/pdf-pptx/download/<job_id>", methods=["GET"])
-def _a4(job_id): 
-    return job_download(job_id)
-
 @app.post("/convert")
 def convert_sync():
     f = request.files.get("file") or request.files.get("pdfFile")
@@ -316,10 +300,21 @@ def convert_sync():
         except: 
             pass
 
-# /api 별칭(온렌더에서 /api 경로도 동작하도록)
-@app.post("/api/pdf-pptx/convert")
-def _alias_convert_sync():
-    return convert_sync()
+# /api aliases (frontend uses /api paths only)
+@app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])
+def _pptx_a_health(): return health()
+
+@app.route("/api/pdf-pptx/convert-async", methods=["POST","OPTIONS"])
+def _pptx_a_convert_async(): return convert_async()
+
+@app.route("/api/pdf-pptx/convert", methods=["POST","OPTIONS"])
+def _pptx_a_convert_sync(): return convert_sync()
+
+@app.route("/api/pdf-pptx/job/<job_id>", methods=["GET","HEAD"])
+def _pptx_a_job(job_id): return job_status(job_id)
+
+@app.route("/api/pdf-pptx/download/<job_id>", methods=["GET","HEAD"])
+def _pptx_a_download(job_id): return job_download(job_id)
 
 @app.errorhandler(Exception)
 def handle_exception(e):
