@@ -8,21 +8,18 @@ import fitz  # PyMuPDF
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
+from typing import Optional
 
-# Adobe PDF Services SDK imports (v4.2.0 compatible)
+# Adobe PDF Services SDK imports
 ADOBE_AVAILABLE = False
 try:
-    from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
-    from adobe.pdfservices.operation.config.client_config import ClientConfig
-    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
-    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
-    from adobe.pdfservices.operation.pdf_ops.export_pdf_operation import ExportPDFOperation
-    from adobe.pdfservices.operation.pdf_ops.options.export_pdf_options import ExportPDFOptions
-    from adobe.pdfservices.operation.pdf_ops.options.export_pdf_target_format import ExportPDFTargetFormat
     from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+    from adobe.pdfservices.operation.execution_context import ExecutionContext
+    from adobe.pdfservices.operation.io.file_ref import FileRef
+    from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
+    from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
     ADOBE_AVAILABLE = True
-    logging.info("Adobe PDF Services SDK v4.2.0 loaded successfully")
+    logging.info("Adobe PDF Services SDK loaded successfully")
 except ImportError as e:
     logging.warning(f"Adobe PDF Services SDK not available: {e}")
     logging.info("Service will use fallback image-based conversion")
@@ -44,6 +41,7 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
+current_job_id: Optional[str] = None
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -75,12 +73,13 @@ def _env(key: str, alt: list[str] = []):
     raise KeyError(f"Missing env: {key}")
 
 def adobe_context():
-    # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
-    client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
-    client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
+    # ADOBE_* 또는 PDF_SERVICES_* 둘 다 허용
+    client_id = os.environ.get("ADOBE_CLIENT_ID") or os.environ.get("PDF_SERVICES_CLIENT_ID")
+    client_secret = os.environ.get("ADOBE_CLIENT_SECRET") or os.environ.get("PDF_SERVICES_CLIENT_SECRET")
     org_id = os.environ.get("ADOBE_ORGANIZATION_ID") or os.environ.get("PDF_SERVICES_ORGANIZATION_ID")
     account_id = os.environ.get("ADOBE_ACCOUNT_ID") or os.environ.get("PDF_SERVICES_ACCOUNT_ID")
-    # org/account이 없는 환경에서도 대부분 동작하지만, 있으면 정확
+    if not client_id or not client_secret:
+        raise KeyError("Adobe credentials missing: ADOBE_CLIENT_ID / ADOBE_CLIENT_SECRET")
     if org_id and account_id:
         creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret,
                                           organization_id=org_id, account_id=account_id)
@@ -90,12 +89,12 @@ def adobe_context():
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
     ctx = adobe_context()
-    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])
+    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])  # "XLSX"
     op.set_input(FileRef.create_from_local_file(in_pdf_path))
-    result = op.execute(ctx)  # Adobe 서버에서 변환
+    result = op.execute(ctx)
     if os.path.exists(out_path):
         os.remove(out_path)
-    result.save_as(out_path)  # 파일 저장
+    result.save_as(out_path)
 
 def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
     final_name = f"{base_name}.xlsx"
@@ -171,20 +170,25 @@ def convert_async():
         global current_job_id
         current_job_id = job_id
         try:
-            set_progress(job_id, 30, "Adobe로 변환 중")
-            out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
-            set_progress(job_id, 90, "파일 저장 중")
+            set_progress(job_id, 10, "변환 준비 중")
+            try:
+                set_progress(job_id, 30, "Adobe로 변환 중")
+                out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
+            except Exception as e:
+                app.logger.exception("Adobe export failed; fallback to image-based.")
+                set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
+                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)  # 기존 이미지 방식
+            JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
+                           "progress":100,"message":"완료"}
         except Exception as e:
-            app.logger.exception("Adobe export failed; fallback to image-based.")
-            set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-            out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
-        
-        JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
-        
-        try: 
-            os.remove(in_path)
-        except: 
-            pass
+            app.logger.exception("convert error")
+            JOBS[job_id] = {"status":"error","error":str(e),"progress":0,"message":"오류"}
+        finally:
+            current_job_id = None
+            try: 
+                os.remove(in_path)
+            except: 
+                pass
 
     executor.submit(run_job)
     return jsonify({"job_id": job_id}), 202

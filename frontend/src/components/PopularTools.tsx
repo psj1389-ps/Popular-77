@@ -102,22 +102,15 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
             PDF변환도구
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
             <div 
-              onClick={() => window.open('https://popular-77-deoe.vercel.app/tools/pdf-doc', '_blank')}
+              onClick={() => window.open('https://popular-77.vercel.app/tools/pdf-doc', '_blank')}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
               <h4 className="font-semibold text-lg mb-2">PDF to DOCX</h4>
               <p className="text-gray-600">PDF 파일을 DOCX로 변환합니다.</p>
             </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">PDF 병합</h4>
-              <p className="text-gray-600">여러 PDF 파일을 하나로 병합합니다.</p>
-            </div>
-            <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">PDF 분할</h4>
-              <p className="text-gray-600">PDF 파일을 여러 개로 분할합니다.</p>
-            </div>
+
             <div 
               onClick={() => window.location.href = '/tools/pdf-jpg'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
