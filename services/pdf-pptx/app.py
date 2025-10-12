@@ -264,11 +264,12 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
-        out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
-    except Exception:
-        out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
-    
-    return send_download_memory(out_path, name, ctype)
+        try:
+            out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+        except Exception:
+            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
+        
+        return send_download_memory(out_path, name, ctype)
     finally:
         try: 
             os.remove(in_path)
