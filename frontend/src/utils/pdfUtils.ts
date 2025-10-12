@@ -1,4 +1,4 @@
-import { pdfjsLib } from "@/lib/pdfjs";
+import { pdfjsLib } from "../lib/pdfjs";
 
 // 직접 다운로드(직행 URL/프록시 URL 공통)
 export function triggerDirectDownload(url: string, filename?: string) {

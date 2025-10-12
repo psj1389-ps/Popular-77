@@ -12,6 +12,7 @@
     "check": "tsc -b --noEmit"
   },
   "dependencies": {
+    "@types/pdfjs-dist": "^2.10.377",
     "clsx": "^2.1.1",
     "lucide-react": "^0.511.0",
     "pdfjs-dist": "^5.4.296",
