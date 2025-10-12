@@ -126,18 +126,18 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               <p className="text-gray-600">PDF 파일을 PNG 이미지로 변환합니다.</p>
             </div>
             <div 
-              onClick={() => window.location.href = '/tools/pdf-xls'}
-              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
-            >
-              <h4 className="font-semibold text-lg mb-2">PDF to Excel</h4>
-              <p className="text-gray-600">PDF 파일을 Excel 스프레드시트로 변환합니다.</p>
-            </div>
-            <div 
               onClick={() => window.location.href = '/tools/pdf-pptx'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
               <h4 className="font-semibold text-lg mb-2">PDF to PPTX</h4>
               <p className="text-gray-600">PDF 파일을 PPTX로 변환합니다.</p>
+            </div>
+            <div 
+              onClick={() => window.location.href = '/tools/pdf-xls'}
+              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
+              <h4 className="font-semibold text-lg mb-2">PDF to Excel</h4>
+              <p className="text-gray-600">PDF 파일을 Excel 스프레드시트로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-svg'}
@@ -171,7 +171,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               onClick={() => window.location.href = '/tools/pdf-ai'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to AI(일러스트레이터) 변환기</h4>
+              <h4 className="font-semibold text-lg mb-2">PDF to AI</h4>
               <p className="text-gray-600">PDF 파일을 AI(일러스트레이터) 형식으로 변환합니다.</p>
             </div>
           </div>
