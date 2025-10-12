@@ -244,7 +244,7 @@ const PdfToAiPage: React.FC = () => {
               </div>
               
               {/* 변환 품질 선택 */}
-              {false && (
+              {/*
               <div className="space-y-2 mb-4">
                 <p className="font-medium">변환 품질 선택:</p>
                 <label className="flex items-center gap-2">
@@ -263,10 +263,10 @@ const PdfToAiPage: React.FC = () => {
                   <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
                 </label>
               </div>
-              )}
+              */}
 
               {/* 고급 옵션 - 크기 조정 */}
-              {false && (
+              {/*
               <div>
                 <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
                 <div className="bg-gray-50 p-4 rounded-lg">
@@ -289,7 +289,7 @@ const PdfToAiPage: React.FC = () => {
                   </div>
                 </div>
               </div>
-              )}
+              */}
 
               {/* AI 변환 옵션 */}
               <fieldset className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">

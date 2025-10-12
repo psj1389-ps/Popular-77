@@ -93,7 +93,7 @@ const PdfToXlsPage: React.FC = () => {
   const [progressText, setProgressText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
   const downloadedRef = useRef(false);
-  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const timerRef = useRef<number | null>(null);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {

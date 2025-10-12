@@ -258,7 +258,7 @@ setError(null);
                 </div>
                 
                 {/* 변환 품질 선택 - 숨김 처리 */}
-                {false && (
+                {/*
                   <div className="space-y-2 mb-4">
                     <p className="font-medium">변환 품질 선택:</p>
                     <label className="flex items-center gap-2">
@@ -277,7 +277,7 @@ setError(null);
                       <span>고품질 (더 높은 품질, 더 큰 파일 크기)</span>
                     </label>
                   </div>
-                )}
+                */}
 
                 {/* SVG 벡터화 옵션 */}
                 <fieldset className="mt-4 rounded-xl border border-gray-200 bg-gray-50 p-4">
