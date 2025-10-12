@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
 import { getPdfPageCount, directPostAndDownload, triggerDirectDownload } from '@/utils/pdfUtils';
+import { BTN_PRIMARY, BTN_SECONDARY } from '../lib/styles';
 
 const API_PROXY_BASE = "/api/pdf-xls";
 const API_DIRECT_BASE = import.meta.env.PROD 
@@ -254,12 +255,12 @@ const PdfToXlsPage: React.FC = () => {
                 </div>
               )}
 
-              <div className="mt-6 flex gap-3">
+              <div className="mt-6 grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <button 
                   type="button" 
                   disabled={isLoading || !selectedFile} 
                   onClick={handleConvert}
-                  className="px-8 py-3 rounded-lg text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow-lg disabled:opacity-50 font-medium"
+                  className={BTN_PRIMARY}
                 >
                   {isLoading ? "변환 중..." : "변환하기"}
                 </button>
@@ -267,7 +268,7 @@ const PdfToXlsPage: React.FC = () => {
                   type="button" 
                   disabled={isLoading} 
                   onClick={handleReset}
-                  className="px-8 py-3 rounded-lg text-white bg-gray-600 hover:bg-gray-700 shadow-lg disabled:opacity-50 font-medium"
+                  className={BTN_SECONDARY}
                 >
                   파일 초기화
                 </button>
