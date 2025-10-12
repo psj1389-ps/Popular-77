@@ -1,5 +1,28 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import PageTitle from '../shared/PageTitle';
+
+// Force Vercel deployment - Updated: 2024-12-30 16:15 - GITHUB INTEGRATION
+
+const API_BASE = "/api/pdf-pptx";
+
+// 503 회피를 위한 상수들
+const SYNC_MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const SYNC_MAX_PAGES = 20; // 20페이지
+
+// PDF 페이지 수 계산 함수
+async function getPdfPageCount(file: File): Promise<number> {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = function() {
+      const typedArray = new Uint8Array(this.result as ArrayBuffer);
+      const text = String.fromCharCode.apply(null, Array.from(typedArray));
+      const matches = text.match(/\/Type\s*\/Page[^s]/g);
+      resolve(matches ? matches.length : 0);
+    };
+    reader.onerror = () => resolve(0);
+    reader.readAsArrayBuffer(file);
+  });
+}
 
 // 공통 유틸리티 함수들
 function safeGetFilenameFromCD(cd?: string | null, fallback = "output") {
@@ -31,8 +54,6 @@ async function directPostAndDownload(url: string, form: FormData, fallbackName: 
   return name;
 }
 
-const API_BASE = "/api/pdf-pptx";
-
 const downloadBlob = (blob: Blob, filename: string) => {
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
@@ -55,7 +76,7 @@ const formatFileSize = (bytes: number) => {
 const triggerDirectDownload = (url: string, filename?: string) => {
   const a = document.createElement('a');
   a.href = url;
-  if (filename) a.download = filename;
+  a.download = filename;
   document.body.appendChild(a);
   a.click();
   a.remove();
@@ -64,26 +85,30 @@ const triggerDirectDownload = (url: string, filename?: string) => {
 const PdfToPptxPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [speed, setSpeed] = useState<"fast" | "standard">("fast");
-  const [isConverting, setIsConverting] = useState(false);
-  const [conversionProgress, setConversionProgress] = useState(0);
+  const [isLoading, setIsLoading] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
-  const [convertedFileName, setConvertedFileName] = useState<string | null>(null);
-  const [progressText, setProgressText] = useState('');
+  const [convertedFileUrl, setConvertedFileUrl] = useState<string | null>(null);
+  const [convertedFileName, setConvertedFileName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // 다운로드 방지 및 타이머 관리용 refs
+  const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const downloadedRef = useRef(false);
 
+  // 진행률 상태
+  const [progressText, setProgressText] = useState("");
+
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
-    if (event.target.files && event.target.files[0]) {
-      const file = event.target.files[0];
-      if (file.size > 100 * 1024 * 1024) {
-        setErrorMessage('파일 크기는 100MB를 초과할 수 없습니다.');
-        setSelectedFile(null);
-      } else {
-        setSelectedFile(file);
-        setErrorMessage('');
-      }
+    const file = event.target.files?.[0];
+    if (file) {
+      setSelectedFile(file);
+      setErrorMessage('');
+      setShowSuccessMessage(false);
+      setConvertedFileUrl(null);
+      setConvertedFileName('');
     }
   };
 
@@ -91,40 +116,94 @@ const PdfToPptxPage: React.FC = () => {
     setSelectedFile(null);
     setErrorMessage('');
     setShowSuccessMessage(false);
-    setSuccessMessage('');
-    setConversionProgress(0);
-    setConvertedFileName(null);
+    setConvertedFileUrl(null);
+    setConvertedFileName('');
+    setProgress(0);
+    setIsLoading(false);
+    
+    // 타이머 정리
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    
     if (fileInputRef.current) {
-      fileInputRef.current.value = ""; // 파일 입력 초기화
+      fileInputRef.current.value = '';
     }
   };
 
   const handleConvert = async () => {
     if (!selectedFile) return;
-    setIsConverting(true);
-    setConversionProgress(1);
+    setIsLoading(true);
+    setProgress(1);
+    setProgressText("PDF를 PPTX로 변환 중...");
     setErrorMessage("");
+    downloadedRef.current = false;
 
     try {
       const form = new FormData();
       form.append("file", selectedFile);
-      // DOC 방식과 동일: 품질은 low/standard 중 선택했다면 매핑해서 전송(표시만 하고 서버에선 무시 가능)
-      const quality = speed === "fast" ? "low" : "standard";
-      form.append("quality", quality);
-      form.append("scale", "1.0"); // UI에 슬라이더 없으면 기본값
+      form.append("quality", speed === "fast" ? "low" : "standard");
+      form.append("scale", "1.0");
 
-      const base = selectedFile.name.replace(/\.[^.]+$/, "");
-      const shownName = await directPostAndDownload(`${API_BASE}/convert`, form, `${base}.pptx`);
-      setConvertedFileName(shownName);
-      setConversionProgress(100);
-      setSuccessMessage(`변환 완료! ${shownName} 파일이 다운로드됩니다.`);
-      setShowSuccessMessage(true);
+      const pages = await getPdfPageCount(selectedFile).catch(() => 0);
+      const useSync = selectedFile.size <= SYNC_MAX_SIZE && (pages === 0 || pages <= SYNC_MAX_PAGES);
+
+      if (useSync) {
+        // 동기식: 즉시 다운로드 → Render 503 회피(짧은 작업에만 사용)
+        const base = selectedFile.name.replace(/\.[^.]+$/, "");
+        const shown = await directPostAndDownload(`${API_BASE}/convert`, form, `${base}.pptx`);
+        setConvertedFileName(shown);
+        setProgress(100);
+        setSuccessMessage(`변환 완료! ${shown} 파일이 다운로드됩니다.`);
+        setShowSuccessMessage(true);
+      } else {
+        // 비동기: 긴 작업 안전
+        const up = await fetch(`${API_BASE}/convert-async`, { method: "POST", body: form });
+        if (!up.ok) throw new Error(`요청 실패(${up.status})`);
+        const { job_id } = await up.json();
+
+        // 폴링
+        if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+        timerRef.current = window.setInterval(async () => {
+          const r = await fetch(`${API_BASE}/job/${job_id}`);
+          const j = await r.json();
+          if (typeof j.progress === "number") setProgress(j.progress);
+          if (j.message) setProgressText(j.message);
+          if (j.status === "done") {
+            if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+            const downloadUrl = `${API_BASE}/download/${job_id}`;
+            const base = selectedFile.name.replace(/\.[^.]+$/, "");
+            setConvertedFileUrl(downloadUrl);
+            setConvertedFileName(`${base}.pptx`);
+            setProgress(100);
+            setIsLoading(false);
+            setSuccessMessage(`변환 완료! ${base}.pptx 파일이 다운로드됩니다.`);
+            setShowSuccessMessage(true);
+            if (!downloadedRef.current) { downloadedRef.current = true; triggerDirectDownload(downloadUrl); }
+          }
+          if (j.status === "error") {
+            if (timerRef.current) { window.clearInterval(timerRef.current); timerRef.current = null; }
+            setErrorMessage(j.error || "변환 중 오류"); setIsLoading(false);
+          }
+        }, 1500);
+        return;
+      }
     } catch (e: any) {
       setErrorMessage(e?.message || "변환 중 오류");
     } finally {
-      setIsConverting(false);
+      setIsLoading(false);
     }
   };
+
+  // 컴포넌트 언마운트 시 타이머 정리
+  useEffect(() => {
+    return () => {
+      if (timerRef.current) {
+        clearInterval(timerRef.current);
+      }
+    };
+  }, []);
 
   return (
     <>
@@ -185,61 +264,31 @@ const PdfToPptxPage: React.FC = () => {
               {/* 변환 품질 선택: doc과 동일 */}
               <div className="space-y-2 mb-4">
                 <p className="font-medium">변환 품질 선택:</p>
-
                 <label className="flex items-center gap-2">
-                  <input 
-                    type="radio" 
-                    name="pptx-speed" 
-                    value="fast" 
-                    checked={speed === "fast"} 
-                    onChange={() => setSpeed("fast")} 
-                  />
+                  <input type="radio" name="speed" value="fast" checked={speed==="fast"} onChange={() => setSpeed("fast")} />
                   <span>빠른 변환 (권장)</span>
                 </label>
-
                 <label className="flex items-center gap-2">
-                  <input 
-                    type="radio" 
-                    name="pptx-speed" 
-                    value="standard" 
-                    checked={speed === "standard"} 
-                    onChange={() => setSpeed("standard")} 
-                  />
+                  <input type="radio" name="speed" value="standard" checked={speed==="standard"} onChange={() => setSpeed("standard")} />
                   <span>표준 변환</span>
                 </label>
               </div>
 
-              {/* 크기 x UI는 화면에서 숨김(문법 안전하게 "통째 주석") */}
-              {/*
-              <div className="bg-gray-50 border rounded-lg p-4 mb-4">
-                <p className="font-medium mb-3">고급 옵션:</p>
-                <div className="flex items-center gap-4">
-                  <label className="whitespace-nowrap">크기 x</label>
-                  <input type="range" min={0.2} max={2} step={0.1} value={1.0} onChange={() => {}} className="flex-1" />
-                  <div className="w-16 text-right text-sm text-gray-600">1.0x</div>
+              {/* 변환 진행률 표시 - pdf-doc과 동일한 스타일 */}
+              <div className="mt-4">
+                <div className="flex justify-between text-sm mb-1">
+                  <span>변환 진행률</span>
+                  <span>{Math.max(0, Math.min(100, Math.round(progress)))}%</span>
                 </div>
+                <div className="h-2 bg-gray-200 rounded">
+                  <div className="h-2 bg-indigo-500 rounded transition-[width] duration-300" style={{ width: `${Math.max(2, progress)}%` }} />
+                </div>
+                {isLoading && (
+                  <div className="mt-2 text-sm text-gray-500">
+                    ⏳ PDF를 PPTX로 변환 중...
+                  </div>
+                )}
               </div>
-              */}
-
-              {/* 변환 진행률 표시 */}
-              {isConverting && (
-                <div className="mb-4">
-                  <div className="flex justify-between items-center mb-2">
-                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2.5">
-                    <div 
-                      className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out"
-                      style={{ width: `${conversionProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="flex items-center justify-center mt-3">
-                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                    <span className="text-sm text-gray-600">PDF를 PPTX로 변환 중...</span>
-                  </div>
-                </div>
-              )}
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
@@ -248,20 +297,24 @@ const PdfToPptxPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 버튼들 */}
-              <div className="flex gap-4">
+              {/* 버튼들 - pdf-doc과 동일한 스타일 */}
+              <div className="mt-6 flex gap-3">
                 <button 
-                  onClick={handleConvert} 
-                  disabled={isConverting}
-                  className="flex-1 bg-blue-600 text-white py-3 px-6 rounded-lg hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+                  type="button" 
+                  disabled={isLoading || !selectedFile} 
+                  onClick={handleConvert}
+                  className="px-5 py-2.5 rounded-md text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow disabled:opacity-50" 
                 >
-                  {isConverting ? '변환 중...' : '변환하기'}
+                  {isLoading ? "변환 중..." : "변환하기"}
                 </button>
+
                 <button 
-                  onClick={handleReset} 
-                  className="bg-gray-500 text-white py-3 px-6 rounded-lg hover:bg-gray-600 transition-colors"
+                  type="button" 
+                  disabled={isLoading} 
+                  onClick={handleReset}
+                  className="px-5 py-2.5 rounded-md text-white bg-gray-700 hover:bg-gray-800 shadow disabled:opacity-50" 
                 >
-                  다시 선택
+                  파일 초기화
                 </button>
               </div>
             </div>
@@ -317,7 +370,6 @@ const PdfToPptxPage: React.FC = () => {
             </div>
           </div>
         </div>
-      </div>
       </div>
     </>
   );
