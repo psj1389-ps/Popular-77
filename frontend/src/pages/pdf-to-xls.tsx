@@ -1,6 +1,36 @@
 import React, { useState, useRef } from 'react';
 import PageTitle from '../shared/PageTitle';
 
+// 공통 유틸리티 함수들
+function safeGetFilenameFromCD(cd?: string | null, fallback = "output") {
+  if (!cd) return fallback;
+  const star = /filename\*=UTF-8''([^;]+)/i.exec(cd);
+  if (star?.[1]) { try { return decodeURIComponent(star[1]); } catch {} }
+  const normal = /filename="?([^";]+)"?/i.exec(cd);
+  return normal?.[1] || fallback;
+}
+
+async function directPostAndDownload(url: string, form: FormData, fallbackName: string) {
+  const res = await fetch(url, { method: "POST", body: form });
+  if (!res.ok) {
+    const ct = res.headers.get("content-type") || "";
+    const msg = ct.includes("application/json") ? (await res.json().catch(()=>null))?.error : await res.text().catch(()=> "");
+    throw new Error(msg || `요청 실패(${res.status})`);
+  }
+  const cd = res.headers.get("content-disposition");
+  const name = safeGetFilenameFromCD(cd, fallbackName);
+  const blob = await res.blob();
+  const href = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = href;
+  a.download = name;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  setTimeout(()=>URL.revokeObjectURL(href), 60_000);
+  return name;
+}
+
 const API_BASE = "/api/pdf-xls";
 
 const downloadBlob = (blob: Blob, filename: string) => {
@@ -40,7 +70,9 @@ const PdfToXlsPage: React.FC = () => {
   const [successMessage, setSuccessMessage] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
   const [convertedFileName, setConvertedFileName] = useState<string | null>(null);
+  const [progressText, setProgressText] = useState('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const downloadedRef = useRef(false);
 
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     if (event.target.files && event.target.files[0]) {
@@ -68,67 +100,29 @@ const PdfToXlsPage: React.FC = () => {
   };
 
   const handleConvert = async () => {
-    if (!selectedFile) {
-      setErrorMessage('먼저 파일을 선택해주세요.');
-      return;
-    }
+    if (!selectedFile) return;
     setIsConverting(true);
-    setErrorMessage('');
-    setShowSuccessMessage(false);
-    setConversionProgress(0);
-    
-    const formData = new FormData();
-    formData.append('file', selectedFile);
-    formData.append("quality", speed === "fast" ? "low" : "standard");
-    formData.append("scale", "1.0");
-    
+    setConversionProgress(1);
+    setProgressText("PDF를 Excel로 변환 중...");
+    setErrorMessage("");
+    downloadedRef.current = false;
+
     try {
-      const response = await fetch(`${API_BASE}/convert-async`, { method: 'POST', body: formData });
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({ error: '알 수 없는 서버 오류' }));
-        throw new Error(errorData.error || `서버 오류: ${response.status}`);
-      }
-      
-      const { job_id } = await response.json();
-      
-      // 진행률 폴링
-      const pollProgress = async () => {
-        try {
-          const statusResponse = await fetch(`${API_BASE}/job/${job_id}`);
-          if (!statusResponse.ok) throw new Error('상태 확인 실패');
-          
-          const status = await statusResponse.json();
-          setConversionProgress(status.progress || 0);
-          
-          if (status.status === 'done') {
-            setConversionProgress(100);
-            const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
-            const fileName = `${baseName}.xlsx`;
-            setConvertedFileName(fileName);
-            
-            // 자동 다운로드
-            const downloadUrl = `${API_BASE}/download/${job_id}`;
-            triggerDirectDownload(downloadUrl, fileName);
-            
-            setSuccessMessage(`변환 완료! ${fileName} 파일이 다운로드됩니다.`);
-            setShowSuccessMessage(true);
-            setIsConverting(false);
-          } else if (status.status === 'error') {
-            throw new Error(status.error || '변환 중 오류 발생');
-          } else {
-            setTimeout(pollProgress, 1000);
-          }
-        } catch (error) {
-          setErrorMessage(error instanceof Error ? error.message : '상태 확인 중 오류 발생');
-          setIsConverting(false);
-        }
-      };
-      
-      pollProgress();
-      
-    } catch (error) {
-      setConversionProgress(0);
-      setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
+      const form = new FormData();
+      form.append("file", selectedFile);
+      const quality = speed === "fast" ? "low" : "standard";
+      form.append("quality", quality);
+      form.append("scale", "1.0");
+
+      const base = selectedFile.name.replace(/\.[^.]+$/, "");
+      const shownName = await directPostAndDownload(`${API_BASE}/convert`, form, `${base}.xlsx`);
+      setConvertedFileName(shownName);
+      setConversionProgress(100);
+      setSuccessMessage(`변환 완료! ${shownName} 파일이 다운로드됩니다.`);
+      setShowSuccessMessage(true);
+    } catch (e: any) {
+      setErrorMessage(e?.message || "변환 중 오류");
+    } finally {
       setIsConverting(false);
     }
   };
