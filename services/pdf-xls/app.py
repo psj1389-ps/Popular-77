@@ -9,12 +9,23 @@ from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 
-# Adobe PDF Services SDK imports
-from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-from adobe.pdfservices.operation.execution_context import ExecutionContext
-from adobe.pdfservices.operation.io.file_ref import FileRef
-from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
+# Adobe PDF Services SDK imports (v4.2.0 compatible)
+ADOBE_AVAILABLE = False
+try:
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+    from adobe.pdfservices.operation.config.client_config import ClientConfig
+    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
+    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
+    from adobe.pdfservices.operation.pdf_ops.export_pdf_operation import ExportPDFOperation
+    from adobe.pdfservices.operation.pdf_ops.options.export_pdf_options import ExportPDFOptions
+    from adobe.pdfservices.operation.pdf_ops.options.export_pdf_target_format import ExportPDFTargetFormat
+    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+    ADOBE_AVAILABLE = True
+    logging.info("Adobe PDF Services SDK v4.2.0 loaded successfully")
+except ImportError as e:
+    logging.warning(f"Adobe PDF Services SDK not available: {e}")
+    logging.info("Service will use fallback image-based conversion")
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
@@ -202,11 +213,11 @@ def _b2():
     return convert_async()
 
 @app.get("/api/pdf-xls/job/<job_id>")
-def _b3(job_id): 
+def _api_job_status(job_id): 
     return job_status(job_id)
 
 @app.get("/api/pdf-xls/download/<job_id>")
-def _b4(job_id): 
+def _api_job_download(job_id): 
     return job_download(job_id)
 
 @app.post("/convert")
@@ -233,13 +244,13 @@ def convert_sync():
         out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
     except Exception:
         out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
-    
-    return send_download_memory(out_path, name, ctype)
     finally:
         try: 
             os.remove(in_path)
         except: 
             pass
+    
+    return send_download_memory(out_path, name, ctype)
 
 @app.post("/api/pdf-xls/convert")
 def _alias_convert_sync():
