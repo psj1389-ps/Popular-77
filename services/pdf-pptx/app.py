@@ -66,7 +66,7 @@ def safe_move(src: str, dst: str):
         else:
             raise
 
-def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0):
+def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, job_id: str = None):
     """
     PDF → PPTX (페이지당 슬라이드 1장, 전체 이미지 맞춤)
     """
@@ -83,7 +83,9 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0):
         prs.slide_height = Emu(pix0.height * 9525)
 
         for i in range(doc.page_count):
-            set_progress(current_job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
+            # job_id가 있을 때만 progress 업데이트 (비동기식에서만)
+            if job_id:
+                set_progress(job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
             page = doc.load_page(i)
             pix = page.get_pixmap(matrix=mat, alpha=False)
             img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
@@ -142,11 +144,9 @@ def convert_async():
     app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}")
 
     def run_job():
-        global current_job_id
-        current_job_id = job_id
         try:
             set_progress(job_id, 10, "변환 준비 중")
-            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale)
+            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
         except Exception as e:
             app.logger.exception("convert error")
@@ -218,7 +218,7 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
-        out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale)
+        out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
         return send_download_memory(out_path, name, ctype)
     except Exception as e:
         app.logger.exception("convert sync error")
