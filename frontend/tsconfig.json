@@ -31,6 +31,8 @@
   },
   "include": [
     "src",
-    "api"
+    "src/types",
+    "api",
+    "vite.config.ts"
   ]
 }
