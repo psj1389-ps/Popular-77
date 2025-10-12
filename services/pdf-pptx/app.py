@@ -8,12 +8,21 @@ import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
 
-# Adobe PDF Services SDK imports
-from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-from adobe.pdfservices.operation.execution_context import ExecutionContext
-from adobe.pdfservices.operation.io.file_ref import FileRef
-from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
+# Adobe PDF Services SDK imports - v4.2.0 compatible
+try:
+    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
+    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+    from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
+    from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
+    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException, SdkException
+    ADOBE_AVAILABLE = True
+except ImportError as e:
+    logging.warning(f"Adobe PDF Services SDK not available: {e}")
+    ADOBE_AVAILABLE = False
 
 app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
@@ -81,29 +90,49 @@ def _env(key: str, alt: list[str] = []):
     raise KeyError(f"Missing env: {key}")
 
 def adobe_context():
+    if not ADOBE_AVAILABLE:
+        raise ImportError("Adobe PDF Services SDK not available")
+    
     # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
     client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
     client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
-    org_id = os.environ.get("ADOBE_ORGANIZATION_ID") or os.environ.get("PDF_SERVICES_ORGANIZATION_ID")
-    account_id = os.environ.get("ADOBE_ACCOUNT_ID") or os.environ.get("PDF_SERVICES_ACCOUNT_ID")
-    # org/account이 없는 환경에서도 대부분 동작하지만, 있으면 정확
-    if org_id and account_id:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret,
-                                          organization_id=org_id, account_id=account_id)
-    else:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
-    return ExecutionContext.create(creds)
+    
+    # v4.2.0 API - ServicePrincipalCredentials 사용
+    creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
+    return PDFServices(credentials=creds)
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
-    ctx = adobe_context()
-    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])
-    op.set_input(FileRef.create_from_local_file(in_pdf_path))
-    result = op.execute(ctx)  # Adobe 서버에서 변환
+    pdf_services = adobe_context()
+    
+    # PDF 파일을 읽어서 StreamAsset으로 업로드
+    with open(in_pdf_path, 'rb') as file:
+        input_stream = file.read()
+    
+    input_asset = pdf_services.upload(input_stream=input_stream, mime_type=PDFServicesMediaType.PDF)
+    
+    # Export 파라미터 설정
+    export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat.PPTX)
+    export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
+    
+    # 작업 실행
+    location = pdf_services.submit(export_pdf_job)
+    pdf_services_response = pdf_services.get_job_result(location, ExportPDFResult)
+    
+    # 결과 다운로드
+    result_asset = pdf_services_response.get_result().get_asset()
+    stream_asset = pdf_services.get_content(result_asset)
+    
+    # 파일 저장
     if os.path.exists(out_path):
         os.remove(out_path)
-    result.save_as(out_path)  # 파일 저장
+    
+    with open(out_path, "wb") as file:
+        file.write(stream_asset.get_input_stream())
 
 def perform_pptx_conversion_adobe(in_path: str, base_name: str):
+    if not ADOBE_AVAILABLE:
+        raise ImportError("Adobe PDF Services SDK not available")
+    
     final_name = f"{base_name}.pptx"
     final_path = os.path.join(OUTPUTS_DIR, final_name)
     _export_via_adobe(in_path, "PPTX", final_path)
@@ -188,9 +217,12 @@ def convert_async():
 
     def run_job():
         try:
-            set_progress(job_id, 30, "Adobe로 변환 중")
-            out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
-            set_progress(job_id, 90, "파일 저장 중")
+            if ADOBE_AVAILABLE:
+                set_progress(job_id, 30, "Adobe로 변환 중")
+                out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+                set_progress(job_id, 90, "파일 저장 중")
+            else:
+                raise ImportError("Adobe SDK not available")
         except Exception as e:
             app.logger.exception("Adobe export failed; fallback to image-based.")
             set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
@@ -265,7 +297,10 @@ def convert_sync():
 
     try:
         try:
-            out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+            if ADOBE_AVAILABLE:
+                out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+            else:
+                raise ImportError("Adobe SDK not available")
         except Exception:
             out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
         
