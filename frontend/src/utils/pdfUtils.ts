@@ -1,4 +1,5 @@
-import { pdfjsLib } from "../lib/pdfjs";
+import * as pdfjsLib from "pdfjs-dist";
+(pdfjsLib as any).GlobalWorkerOptions.workerSrc = "https://unpkg.com/pdfjs-dist@5.4.296/build/pdf.worker.min.js";
 
 // 직접 다운로드(직행 URL/프록시 URL 공통)
 export function triggerDirectDownload(url: string, filename?: string) {
