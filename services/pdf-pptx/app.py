@@ -8,6 +8,13 @@ import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
 
+# Adobe PDF Services SDK imports
+from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+from adobe.pdfservices.operation.execution_context import ExecutionContext
+from adobe.pdfservices.operation.io.file_ref import FileRef
+from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
+from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
+
 app = Flask(__name__, static_folder="web", static_url_path="")
 logging.basicConfig(level=logging.INFO)
 
@@ -65,6 +72,42 @@ def safe_move(src: str, dst: str):
                 pass
         else:
             raise
+
+def _env(key: str, alt: list[str] = []):
+    import os
+    for k in [key, *alt]:
+        v = os.environ.get(k)
+        if v: return v
+    raise KeyError(f"Missing env: {key}")
+
+def adobe_context():
+    # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
+    client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
+    client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
+    org_id = os.environ.get("ADOBE_ORGANIZATION_ID") or os.environ.get("PDF_SERVICES_ORGANIZATION_ID")
+    account_id = os.environ.get("ADOBE_ACCOUNT_ID") or os.environ.get("PDF_SERVICES_ACCOUNT_ID")
+    # org/account이 없는 환경에서도 대부분 동작하지만, 있으면 정확
+    if org_id and account_id:
+        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret,
+                                          organization_id=org_id, account_id=account_id)
+    else:
+        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
+    return ExecutionContext.create(creds)
+
+def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
+    ctx = adobe_context()
+    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])
+    op.set_input(FileRef.create_from_local_file(in_pdf_path))
+    result = op.execute(ctx)  # Adobe 서버에서 변환
+    if os.path.exists(out_path):
+        os.remove(out_path)
+    result.save_as(out_path)  # 파일 저장
+
+def perform_pptx_conversion_adobe(in_path: str, base_name: str):
+    final_name = f"{base_name}.pptx"
+    final_path = os.path.join(OUTPUTS_DIR, final_name)
+    _export_via_adobe(in_path, "PPTX", final_path)
+    return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
 
 def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, job_id: str = None):
     """
@@ -145,17 +188,20 @@ def convert_async():
 
     def run_job():
         try:
-            set_progress(job_id, 10, "변환 준비 중")
-            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
-            JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
+            set_progress(job_id, 30, "Adobe로 변환 중")
+            out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+            set_progress(job_id, 90, "파일 저장 중")
         except Exception as e:
-            app.logger.exception("convert error")
-            JOBS[job_id] = {"status":"error","error":str(e),"progress":0,"message":"오류"}
-        finally:
-            try: 
-                os.remove(in_path)
-            except: 
-                pass
+            app.logger.exception("Adobe export failed; fallback to image-based.")
+            set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
+            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
+        
+        JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
+        
+        try: 
+            os.remove(in_path)
+        except: 
+            pass
 
     executor.submit(run_job)
     return jsonify({"job_id": job_id}), 202
@@ -218,11 +264,11 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
+        out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
+    except Exception:
         out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
-        return send_download_memory(out_path, name, ctype)
-    except Exception as e:
-        app.logger.exception("convert sync error")
-        return jsonify({"error": str(e)}), 500
+    
+    return send_download_memory(out_path, name, ctype)
     finally:
         try: 
             os.remove(in_path)
