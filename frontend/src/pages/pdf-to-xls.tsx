@@ -297,25 +297,20 @@ const PdfToXlsPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 버튼들 - pdf-doc과 동일한 스타일 */}
-              <div className="mt-6 flex gap-4">
+              <div className="mt-6 flex gap-3">
                 <button 
                   type="button" 
                   disabled={isLoading || !selectedFile} 
                   onClick={handleConvert}
-                  className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" 
-                  style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} 
-                  onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} 
-                  onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}
+                  className="px-5 py-2.5 rounded-md text-white bg-gradient-to-r from-indigo-500 to-purple-500 hover:from-indigo-600 hover:to-purple-600 shadow disabled:opacity-50"
                 >
                   {isLoading ? "변환 중..." : "변환하기"}
                 </button>
-
                 <button 
                   type="button" 
                   disabled={isLoading} 
                   onClick={handleReset}
-                  className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                  className="px-5 py-2.5 rounded-md text-white bg-gray-700 hover:bg-gray-800 shadow disabled:opacity-50"
                 >
                   파일 초기화
                 </button>

@@ -26,6 +26,11 @@ except ImportError as e:
 
 app = Flask(__name__)
 logging.basicConfig(level=logging.INFO)
+
+# 요청 로깅 추가
+@app.before_request
+def _trace():
+    app.logger.info(f">>> {request.method} {request.path}")
 CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
     "https://77-tools.xyz",
