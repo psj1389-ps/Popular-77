@@ -24,35 +24,59 @@ import json
 def _truthy(v: str | None) -> bool:
     return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
-def ensure_adobe_creds_file():
-    import os, json, tempfile
-    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
-    js = os.getenv("ADOBE_CREDENTIALS_JSON")
-    if path and os.path.exists(path): 
+def ensure_adobe_creds_file() -> str:
+    import os, json, tempfile, base64
+    
+    # 1) JSON/FILE 직접 제공 시
+    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
+    js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
+    if path and os.path.exists(path):
         return path
     if js:
         fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
-        with os.fdopen(fd, "w") as f: 
-            f.write(js)
+        with os.fdopen(fd, "w") as f: f.write(js)
         return tmp
-    # 아래부터 ADOBE_*로 JSON 생성
+    
+    # 2) ADOBE_*로 JSON 생성 (private key: 파일/평문/B64 모두 지원)
     cid = os.getenv("ADOBE_CLIENT_ID")
     csec = os.getenv("ADOBE_CLIENT_SECRET")
     org = os.getenv("ADOBE_ORGANIZATION_ID")
     acct = os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")
     key_path = os.getenv("ADOBE_PRIVATE_KEY_PATH")
-    for k, v in {"ADOBE_CLIENT_ID":cid,"ADOBE_CLIENT_SECRET":csec,"ADOBE_ORGANIZATION_ID":org,"ADOBE_ACCOUNT_ID/ADOBE_TECHNICAL_ACCOUNT_EMAIL":acct,"ADOBE_PRIVATE_KEY_PATH":key_path}.items():
-        if not v: 
-            raise RuntimeError(f"Missing {k}")
-    with open(key_path, "r") as f: 
-        private_key = f.read()
+    key_text = os.getenv("ADOBE_PRIVATE_KEY")
+    key_b64 = os.getenv("ADOBE_PRIVATE_KEY_B64")
+    
+    if not (cid and csec and org and acct and (key_path or key_text or key_b64)):
+        missing = [k for k, v in {
+            "ADOBE_CLIENT_ID": cid,
+            "ADOBE_CLIENT_SECRET": csec,
+            "ADOBE_ORGANIZATION_ID": org,
+            "ADOBE_ACCOUNT_ID/ADOBE_TECHNICAL_ACCOUNT_EMAIL": acct,
+            "ADOBE_PRIVATE_KEY_PATH/ADOBE_PRIVATE_KEY/ADOBE_PRIVATE_KEY_B64": key_path or key_text or key_b64,
+        }.items() if not v]
+        raise RuntimeError(f"Missing Adobe env(s): {', '.join(missing)}")
+    
+    private_key = None
+    if key_text:
+        private_key = key_text
+    elif key_b64:
+        private_key = base64.b64decode(key_b64).decode("utf-8")
+    elif key_path:
+        if not os.path.exists(key_path):
+            raise RuntimeError(f"Private key not found: {key_path}")
+        with open(key_path, "r") as f:
+            private_key = f.read()
+    
     payload = {
         "client_credentials": {"client_id": cid, "client_secret": csec},
-        "service_account_credentials": {"organization_id": org, "account_id": acct, "private_key": private_key}
+        "service_account_credentials": {
+            "organization_id": org,
+            "account_id": acct,
+            "private_key": private_key
+        }
     }
     fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
-    with os.fdopen(fd, "w") as f: 
-        json.dump(payload, f)
+    with os.fdopen(fd, "w") as f: json.dump(payload, f)
     return tmp
 
 # Adobe 자격 증명 (개선된 디버그 출력)
@@ -76,19 +100,17 @@ ADOBE_SDK_VERSION = None
 ADOBE_IMPORT_ERROR = None
 
 try:
-    # params (상위 → 하위 경로 폴백)
     try:
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
     except Exception:
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
-    # job
+    
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-    # FileRef: pdfjobs.io → 공용 io 순서로 시도
     try:
         from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
     except Exception:
-        from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
+        from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef  # 폴백
     from adobe.pdfservices.operation.pdfservices import PDFServices
     from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
     ADOBE_AVAILABLE = True
@@ -350,21 +372,41 @@ def health_check():
             sdk_ver = None
     except Exception:
         sdk_ver = None
+    
+    # 자격증명 상태 세부 체크
+    adobe_disabled = os.getenv("ADOBE_DISABLED")
+    creds_json = bool(os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON"))
+    creds_file = bool(os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH"))
+    
+    # ADOBE_* 개별 환경변수 체크
+    cid = bool(os.getenv("ADOBE_CLIENT_ID"))
+    csecret = bool(os.getenv("ADOBE_CLIENT_SECRET"))
+    org = bool(os.getenv("ADOBE_ORGANIZATION_ID"))
+    acct = bool(os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL"))
+    
+    # Private key 체크 (파일/평문/B64)
+    key_path = os.getenv("ADOBE_PRIVATE_KEY_PATH")
+    key_text = bool(os.getenv("ADOBE_PRIVATE_KEY"))
+    key_b64 = bool(os.getenv("ADOBE_PRIVATE_KEY_B64"))
+    key_file_exists = os.path.exists(key_path) if key_path else False
+    
     return {
         "python": sys.version,
         "pdfservices_sdk": sdk_ver,
         "adobe_available": ADOBE_AVAILABLE,
         "adobe_sdk_version": ADOBE_SDK_VERSION,
-        "adobe_error": ADOBE_IMPORT_ERROR,  # 미정의로 500 나지 않음
+        "adobe_error": ADOBE_IMPORT_ERROR,
         "creds": {
-            "json": bool(os.getenv("ADOBE_CREDENTIALS_JSON")),
-            "file": bool(os.getenv("ADOBE_CREDENTIALS_FILE_PATH")),
-            "cid": bool(os.getenv("ADOBE_CLIENT_ID")),
-            "csecret": bool(os.getenv("ADOBE_CLIENT_SECRET")),
-            "org": bool(os.getenv("ADOBE_ORGANIZATION_ID")),
-            "acct": bool(os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")),
-            "key_file_exists": os.path.exists(os.getenv("ADOBE_PRIVATE_KEY_PATH","")),
-            "disabled": os.getenv("ADOBE_DISABLED"),
+            "json": creds_json,
+            "file": creds_file,
+            "cid": cid,
+            "csecret": csecret,
+            "org": org,
+            "acct": acct,
+            "key_file_exists": key_file_exists,
+            "key_text": key_text,
+            "key_b64": key_b64,
+            "disabled": adobe_disabled,
         },
     }
 
