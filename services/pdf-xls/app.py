@@ -30,6 +30,7 @@ try:
     from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
     from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
+    from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
     from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
     from adobe.pdfservices.operation.io.stream_asset import StreamAsset
 
@@ -206,39 +207,70 @@ def adobe_context():
     client_id = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID")
     client_secret = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET")
     
-    if not client_id or not client_secret:
-        raise RuntimeError("Adobe credentials not found in environment variables")
+    # 디버그 로그 추가
+    logging.info(f"Adobe credentials check - Client ID exists: {bool(client_id)}, Client Secret exists: {bool(client_secret)}")
     
-    # v4 SDK 방식: ServicePrincipalCredentials 직접 생성자 사용
-    creds = ServicePrincipalCredentials(
-        client_id=client_id,
-        client_secret=client_secret
-    )
-    return PDFServices(credentials=creds)
+    if not client_id or not client_secret:
+        error_msg = f"Adobe credentials not found in environment variables. CLIENT_ID: {bool(client_id)}, CLIENT_SECRET: {bool(client_secret)}"
+        logging.error(error_msg)
+        raise RuntimeError(error_msg)
+    
+    try:
+        # v4 SDK 방식: ServicePrincipalCredentials 직접 생성자 사용
+        creds = ServicePrincipalCredentials(
+            client_id=client_id,
+            client_secret=client_secret
+        )
+        pdf_services = PDFServices(credentials=creds)
+        logging.info("Adobe PDF Services context created successfully")
+        return pdf_services
+    except Exception as e:
+        error_msg = f"Failed to create Adobe PDF Services context: {str(e)}"
+        logging.error(error_msg)
+        raise RuntimeError(error_msg)
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
-    pdf_services = adobe_context()
-    
-    # v4 방식: JobFileRef 생성 및 ExportPDFJob 실행
-    input_asset = pdf_services.upload(input_stream=open(in_pdf_path, 'rb'), mime_type="application/pdf")
-    
-    # ExportPDFParams 설정
-    export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat[target])
-    
-    # ExportPDFJob 생성 및 실행
-    export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
-    location = pdf_services.submit(export_pdf_job)
-    pdf_services_response = pdf_services.get_job_result(location, ExportPDFJob)
-    
-    # 결과 저장
-    result_asset = pdf_services_response.get_result().get_asset()
-    stream_asset = pdf_services.get_content(result_asset)
+    try:
+        logging.info(f"Starting Adobe PDF export: {in_pdf_path} -> {out_path} (format: {target})")
+        pdf_services = adobe_context()
+        
+        # v4 방식: JobFileRef 생성 및 ExportPDFJob 실행
+        logging.info("Uploading PDF asset to Adobe services...")
+        input_asset = pdf_services.upload(input_stream=open(in_pdf_path, 'rb'), mime_type="application/pdf")
+        
+        # ExportPDFParams 설정
+        logging.info(f"Setting export parameters for target format: {target}")
+        export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat[target])
+        
+        # ExportPDFJob 생성 및 실행
+        logging.info("Creating and submitting export job...")
+        export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
+        location = pdf_services.submit(export_pdf_job)
+        
+        logging.info(f"Job submitted, getting result from location: {location}")
+        pdf_services_response = pdf_services.get_job_result(location, ExportPDFResult)
+        
+        # 결과 저장
+        logging.info("Processing job result...")
+        result_asset = pdf_services_response.get_result().get_asset()
+        stream_asset = pdf_services.get_content(result_asset)
+        
+    except Exception as e:
+        error_msg = f"Adobe PDF export failed: {str(e)}"
+        logging.error(error_msg)
+        logging.error(f"Traceback: {traceback.format_exc()}")
+        raise RuntimeError(error_msg)
     
     if os.path.exists(out_path):
         os.remove(out_path)
     
     with open(out_path, "wb") as file:
-        file.write(stream_asset.get_input_stream().read())
+        # stream_asset.get_input_stream()이 bytes를 반환하는 경우 처리
+        input_stream = stream_asset.get_input_stream()
+        if isinstance(input_stream, bytes):
+            file.write(input_stream)
+        else:
+            file.write(input_stream.read())
 
 # v3 변환(XLSX)
 def _truthy(v: str | None) -> bool:
