@@ -117,12 +117,23 @@ from typing import Optional
 app = Flask(__name__)
 CORS(app)
 
-# 디버그 정보 출력
-print(f"=== Final Status ===")
+# Adobe 자격 증명 (개선된 디버그 출력)
+ENV_CLIENT_ID = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID") or ""
+ENV_CLIENT_SECRET = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET") or ""
+ENV_CREDS_JSON = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON") or ""
+ENV_CREDS_FILE_PATH = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH") or ""
+
+print("Environment Variables Check:")
+print(f"ADOBE/PDF_SERVICES CLIENT_ID exists: {bool(ENV_CLIENT_ID)}")
+print(f"ADOBE/PDF_SERVICES CLIENT_SECRET exists: {bool(ENV_CLIENT_SECRET)}")
+print(f"ADOBE_CREDENTIALS_JSON exists: {bool(ENV_CREDS_JSON)}")
+print(f"ADOBE_CREDENTIALS_FILE_PATH exists: {bool(ENV_CREDS_FILE_PATH)}")
+
+print("=== Final Status ===")
 print(f"Adobe SDK Available: {ADOBE_AVAILABLE}")
 print(f"Adobe SDK Version: {ADOBE_SDK_VERSION if ADOBE_AVAILABLE else 'None'}")
-print(f"Client ID configured: {bool(CLIENT_ID)}")
-print(f"Client Secret configured: {bool(CLIENT_SECRET)}")
+print(f"Client ID configured: {bool(ENV_CLIENT_ID)}")
+print(f"Client Secret configured: {bool(ENV_CLIENT_SECRET)}")
 
 logging.basicConfig(level=logging.INFO)
 
@@ -469,21 +480,16 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     # 라우팅/실행 흐름은 기존처럼 Adobe → 실패시 폴백
-    def convert_pdf_to_xlsx(input_pdf_path, output_xlsx_path):
+    def convert_pdf_to_xlsx(input_pdf_path, output_xlsx_path, scale: float = 1.0):
         import logging
         if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "4.x":
             try:
-                return perform_xlsx_conversion_adobe(input_pdf_path, output_xlsx_path)
+                perform_xlsx_conversion_adobe(input_pdf_path, output_xlsx_path)
+                return
             except Exception as e:
                 logging.warning("Adobe v4 conversion failed; fallback. err=%s", e, exc_info=True)
-        # v3 설치 시 (requirements를 3.4.2로 내렸다면) v3 경로 시도
-        if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "3.x":
-            try:
-                return perform_xlsx_conversion_adobe_v3(input_pdf_path, output_xlsx_path) # 기존 v3 함수가 있다면
-            except Exception as e:
-                logging.warning("Adobe v3 conversion failed; fallback. err=%s", e, exc_info=True)
         # 최종 폴백
-        return perform_xlsx_conversion_fallback(input_pdf_path, base_name, scale=scale)
+        perform_xlsx_conversion_fallback(input_pdf_path, output_xlsx_path, scale=scale)
 
     try:
         # 1. Adobe API를 먼저 시도합니다.
@@ -491,14 +497,15 @@ def convert_sync():
         final_name = f"{base_name}.xlsx"
         final_path = os.path.join(OUTPUTS_DIR, final_name)
         
-        convert_pdf_to_xlsx(in_path, final_path)
+        convert_pdf_to_xlsx(in_path, final_path, scale=scale)
         
         out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     except Exception as e:
         # 2. 어떤 이유로든 실패하면 (자격증명 오류, Adobe 서버 문제 등)
         app.logger.exception("Adobe export failed; falling back to image-based conversion.")
         # 3. 기존의 이미지 방식으로 변환을 시도합니다.
-        out_path, name, ctype = perform_xlsx_conversion_fallback(in_path, base_name, scale=scale)
+        perform_xlsx_conversion_fallback(in_path, final_path, scale=scale)
+        out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     finally:
         try: 
             os.remove(in_path)
