@@ -1,4 +1,4 @@
-# --- Python 3.13 호환 빌드 도구 ---
+# --- Python 3.12 호환 빌드 도구 ---
 pip>=24.0
 setuptools>=69.0.0
 wheel>=0.43.0
@@ -15,5 +15,5 @@ pdfservices-sdk==4.2.0
 
 # --- 폴백(Fallback)용 ---
 Pillow>=10.2.0
-PyMuPDF>=1.24.9  # PyMuPDF는 3.13도 잘 지원합니다.
+PyMuPDF>=1.24.9
 openpyxl>=3.1.5
