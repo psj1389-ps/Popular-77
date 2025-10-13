@@ -134,7 +134,7 @@ def debug_adobe_modules():
     for base in [
         "adobe.pdfservices.operation.pdfjobs.params",
         "adobe.pdfservices.operation.pdfjobs.jobs",
-        "adobe.pdfservices.operation.pdfjobs.io",
+        "adobe.pdfservices.operation.io",
     ]:
         try:
             m = importlib.import_module(base)
