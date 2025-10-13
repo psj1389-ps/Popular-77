@@ -28,7 +28,7 @@ if CLIENT_ID:
 if CLIENT_SECRET:
     print(f"CLIENT_SECRET length: {len(CLIENT_SECRET)}")
 
-# Adobe SDK import 시도 (SDK 4.2.0 올바른 경로)
+# Adobe SDK import 시도 (SDK 4.2.0 전용)
 ADOBE_AVAILABLE = False
 adobe_error_msg = "Not attempted"
 
@@ -51,8 +51,9 @@ try:
     
 except ImportError as e:
     adobe_error_msg = str(e)
-    print(f"WARNING: Adobe PDF Services SDK import failed: {e}")
-    
+    print(f"WARNING: Adobe PDF Services SDK 4.2.0 import failed: {e}")
+    print("INFO: Using fallback conversion method only")
+
     # SDK 2.3.0 시도
     try:
         print("Trying older SDK import paths...")
