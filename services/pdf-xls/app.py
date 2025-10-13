@@ -16,61 +16,72 @@ from openpyxl.drawing.image import Image as OpenpyxlImage
 # 환경 변수 먼저 로드
 load_dotenv()
 
-# Adobe 자격 증명 (디버그 출력 추가)
+# 자격 증명 파일 확보 유틸 (ADOBE_CREDENTIALS_JSON/ADOBE_CREDENTIALS_FILE_PATH 기준)
+import tempfile
+import logging
+
+def ensure_adobe_creds_file() -> str:
+    creds_path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
+    creds_json = os.getenv("ADOBE_CREDENTIALS_JSON")
+    logging.info("Adobe creds -> JSON:%s FILE:%s", 
+                 bool(creds_json), bool(creds_path))
+    if creds_path and os.path.exists(creds_path):
+        return creds_path
+    if creds_json:
+        fd, path = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
+        with os.fdopen(fd, "w") as f:
+            f.write(creds_json)
+        return path
+    raise RuntimeError("Missing ADOBE_CREDENTIALS_JSON or ADOBE_CREDENTIALS_FILE_PATH")
+
+# Adobe 자격 증명 (개선된 디버그 출력)
 CLIENT_ID = os.environ.get('PDF_SERVICES_CLIENT_ID')
 CLIENT_SECRET = os.environ.get('PDF_SERVICES_CLIENT_SECRET')
+ADOBE_CREDENTIALS_JSON = os.environ.get('ADOBE_CREDENTIALS_JSON')
+ADOBE_CREDENTIALS_FILE_PATH = os.environ.get('ADOBE_CREDENTIALS_FILE_PATH')
 
 print(f"Environment Variables Check:")
 print(f"PDF_SERVICES_CLIENT_ID exists: {bool(CLIENT_ID)}")
 print(f"PDF_SERVICES_CLIENT_SECRET exists: {bool(CLIENT_SECRET)}")
+print(f"ADOBE_CREDENTIALS_JSON exists: {bool(ADOBE_CREDENTIALS_JSON)}")
+print(f"ADOBE_CREDENTIALS_FILE_PATH exists: {bool(ADOBE_CREDENTIALS_FILE_PATH)}")
 if CLIENT_ID:
     print(f"CLIENT_ID length: {len(CLIENT_ID)}")
 if CLIENT_SECRET:
     print(f"CLIENT_SECRET length: {len(CLIENT_SECRET)}")
 
-# Adobe SDK import 시도 (SDK 4.2.0 전용)
-ADOBE_AVAILABLE = False
-adobe_error_msg = "Not attempted"
-
+# Adobe SDK import 시도 (v4.2.0 snake_case 전용)
 try:
-    # SDK 4.2.0의 올바른 import 경로
-    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException
-    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
-    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
-    from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.pdf_services_job import PDFServicesJob
-    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+    # v4.2.0 전용 import (snake_case 주의)
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-    from adobe.pdfservices.operation.pdfjobs.params.exportpdf.export_pdf_params import ExportPDFParams
-    from adobe.pdfservices.operation.pdfjobs.params.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
-    
-    ADOBE_AVAILABLE = True
-    adobe_error_msg = "Successfully loaded"
-    print("SUCCESS: Adobe PDF Services SDK 4.2.0 loaded successfully")
-    
-except ImportError as e:
-    adobe_error_msg = str(e)
-    print(f"WARNING: Adobe PDF Services SDK 4.2.0 import failed: {e}")
-    print("INFO: Using fallback conversion method only")
-
-    # SDK 2.3.0 시도
+    from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
+    from adobe.pdfservices.operation.pdfservices import PDFServices
+    # 일부 배포판은 OAuthServiceAccountCredentials가 제공됩니다
     try:
-        print("Trying older SDK import paths...")
-        from adobe.pdfservices.operation.auth.credentials import Credentials
-        from adobe.pdfservices.operation.exception.exceptions import ServiceApiException
-        from adobe.pdfservices.operation.execution_context import ExecutionContext
-        from adobe.pdfservices.operation.io.file_ref import FileRef
+        from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials as V4Creds
+        V4_CREDS_KIND = "oauth_service_account"
+    except Exception:
+        V4Creds = None
+        V4_CREDS_KIND = None
+    ADOBE_SDK_VERSION = "4.x"
+    ADOBE_AVAILABLE = True
+except Exception as e_v4:
+    import logging
+    logging.warning("Adobe v4 import failed: %s", e_v4)
+    # 선택지: v3로 폴백 임포트 (requirements를 3.4.2로 내릴 때만 유효)
+    try:
+        from adobe.pdfservices.operation.auth.credentials import Credentials as V3Creds
+        from adobe.pdfservices.operation.io.file_ref import FileRef as V3FileRef
         from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-        from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
-        
+        from adobe.pdfservices.operation.pdfops.options.export_pdf.export_pdf_target_format import ExportPDFTargetFormat as V3Target
+        from adobe.pdfservices.operation.execution_context import ExecutionContext
+        ADOBE_SDK_VERSION = "3.x"
         ADOBE_AVAILABLE = True
-        adobe_error_msg = "Successfully loaded (SDK 2.x)"
-        print("SUCCESS: Adobe PDF Services SDK 2.x loaded successfully")
-    except ImportError as e2:
-        adobe_error_msg = f"4.2.0: {str(e)}, 2.x: {str(e2)}"
-        print(f"WARNING: Both SDK versions failed to import")
-        print("INFO: Using fallback conversion method")
+    except Exception as e_v3:
+        ADOBE_SDK_VERSION = None
+        ADOBE_AVAILABLE = False
+        logging.warning("Adobe v3 import also failed: %s", e_v3)
 
 # 추가 imports
 from werkzeug.exceptions import HTTPException
@@ -87,11 +98,30 @@ CORS(app)
 # 디버그 정보 출력
 print(f"=== Final Status ===")
 print(f"Adobe SDK Available: {ADOBE_AVAILABLE}")
-print(f"Adobe Error Message: {adobe_error_msg}")
+print(f"Adobe SDK Version: {ADOBE_SDK_VERSION if ADOBE_AVAILABLE else 'None'}")
 print(f"Client ID configured: {bool(CLIENT_ID)}")
 print(f"Client Secret configured: {bool(CLIENT_SECRET)}")
 
 logging.basicConfig(level=logging.INFO)
+
+# 디버그 함수: v4 모듈 네임스페이스 확인
+def debug_adobe_modules():
+    import importlib, pkgutil, logging
+    for base in [
+        "adobe.pdfservices.operation.pdfjobs.params",
+        "adobe.pdfservices.operation.pdfjobs.jobs",
+        "adobe.pdfservices.operation.pdfjobs.io",
+    ]:
+        try:
+            m = importlib.import_module(base)
+            subs = [name for _, name, _ in pkgutil.iter_modules(m.__path__)]
+            logging.info("%s -> %s", base, subs)
+        except Exception as e:
+            logging.warning("Cannot import %s: %s", base, e)
+
+# 앱 시작 시 디버그 모듈 확인
+if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "4.x":
+    debug_adobe_modules()
 
 # 요청 로깅 추가
 @app.before_request
@@ -167,62 +197,32 @@ def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
         os.remove(out_path)
     result.save_as(out_path)
 
-def perform_xlsx_conversion_adobe(pdf_buffer):
-    """Adobe SDK를 사용한 PDF to XLSX 변환 (편집 가능)"""
-    if not ADOBE_AVAILABLE:
-        raise Exception("Adobe SDK not available")
-    
-    if not CLIENT_ID or not CLIENT_SECRET:
-        raise Exception("Adobe credentials not configured")
-    
-    try:
-        # 자격 증명 설정
-        credentials = ServicePrincipalCredentials(
-            client_id=CLIENT_ID,
-            client_secret=CLIENT_SECRET
-        )
-        
-        # PDF Services 초기화
-        pdf_services = PDFServices(credentials=credentials)
-        
-        # StreamAsset 생성
-        input_asset = pdf_services.upload(
-            input_stream=io.BytesIO(pdf_buffer),
-            mime_type=PDFServicesMediaType.PDF
-        )
-        
-        # Export 작업 설정
-        export_pdf_params = ExportPDFParams(
-            target_format=ExportPDFTargetFormat.XLSX
-        )
-        
-        # Export 작업 생성
-        export_pdf_job = ExportPDFJob(
-            input_asset=input_asset,
-            export_pdf_params=export_pdf_params
-        )
-        
-        # 작업 실행
-        location = pdf_services.submit(export_pdf_job)
-        pdf_services_response = pdf_services.get_job_result(
-            location,
-            ExportPDFJob
-        )
-        
-        # 결과 다운로드
-        result_asset = pdf_services_response.get_result().get_asset()
-        stream_asset = pdf_services.get_content(result_asset)
-        
-        output_buffer = io.BytesIO()
-        output_buffer.write(stream_asset.get_input_stream())
-        output_buffer.seek(0)
-        
-        print("SUCCESS: Adobe SDK conversion completed")
-        return output_buffer.getvalue()
-        
-    except Exception as e:
-        print(f"ERROR: Adobe SDK conversion failed: {str(e)}")
-        raise
+def perform_xlsx_conversion_adobe(input_pdf_path: str, output_xlsx_path: str):
+    if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
+        raise RuntimeError("Adobe v4 SDK not available")
+
+    creds_file = ensure_adobe_creds_file()
+
+    # 자격 증명 생성: SDK 배포판에 따라 이름이 다를 수 있어 분기 처리
+    if V4Creds:
+        credentials = V4Creds.create_from_file(creds_file)
+    else:
+        # 일부 환경에서는 기존 Credentials 빌더가 그대로 동작
+        from adobe.pdfservices.operation.auth.credentials import Credentials
+        credentials = Credentials.service_account_credentials_builder() \
+            .from_file(creds_file).build()
+
+    pdf_services = PDFServices(credentials)
+
+    # 입력/파라미터/잡 생성
+    input_ref = JobFileRef.create_from_local_file(input_pdf_path)
+    params = ExportPDFParams(ExportPDFTargetFormat.XLSX)
+    job = ExportPDFJob(input_ref, params)
+
+    # 잡 제출 및 결과 수신
+    location = pdf_services.submit(job)          # 제출
+    result = pdf_services.get_job_result(location)  # 완료까지 내부적으로 폴링
+    result.save_as(output_xlsx_path)
 
 def perform_xlsx_conversion_fallback(in_path: str, base_name: str, scale: float = 1.0):
     """
@@ -464,19 +464,30 @@ def convert_sync():
         return max(lo, min(hi, x))
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
+    # 라우팅/실행 흐름은 기존처럼 Adobe → 실패시 폴백
+    def convert_pdf_to_xlsx(input_pdf_path, output_xlsx_path):
+        import logging
+        if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "4.x":
+            try:
+                return perform_xlsx_conversion_adobe(input_pdf_path, output_xlsx_path)
+            except Exception as e:
+                logging.warning("Adobe v4 conversion failed; fallback. err=%s", e, exc_info=True)
+        # v3 설치 시 (requirements를 3.4.2로 내렸다면) v3 경로 시도
+        if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "3.x":
+            try:
+                return perform_xlsx_conversion_adobe_v3(input_pdf_path, output_xlsx_path) # 기존 v3 함수가 있다면
+            except Exception as e:
+                logging.warning("Adobe v3 conversion failed; fallback. err=%s", e, exc_info=True)
+        # 최종 폴백
+        return perform_xlsx_conversion_fallback(input_pdf_path, base_name, scale=scale)
+
     try:
-        # 1. Adobe 변환을 먼저 시도합니다.
+        # 1. Adobe API를 먼저 시도합니다.
         app.logger.info("Attempting conversion with Adobe API...")
-        # PDF 파일을 읽어서 버퍼로 변환
-        with open(in_path, 'rb') as f:
-            pdf_buffer = f.read()
-        xlsx_data = perform_xlsx_conversion_adobe(pdf_buffer)
-        
-        # 결과를 파일로 저장
         final_name = f"{base_name}.xlsx"
         final_path = os.path.join(OUTPUTS_DIR, final_name)
-        with open(final_path, 'wb') as f:
-            f.write(xlsx_data)
+        
+        convert_pdf_to_xlsx(in_path, final_path)
         
         out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     except Exception as e:
