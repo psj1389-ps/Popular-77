@@ -19,11 +19,15 @@ load_dotenv()
 # 자격 증명 파일 확보 유틸 (ADOBE_CREDENTIALS_JSON/ADOBE_CREDENTIALS_FILE_PATH 기준)
 import tempfile
 import logging
+import json
+
+def _truthy(v: str | None) -> bool:
+    return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
 def ensure_adobe_creds_file() -> str:
-    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
-    js = os.getenv("ADOBE_CREDENTIALS_JSON")
-    logging.info("Adobe creds -> JSON:%s FILE:%s", bool(js), bool(path))
+    # 우선 기존 방식도 지원
+    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
+    js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
     if path and os.path.exists(path):
         return path
     if js:
@@ -31,7 +35,46 @@ def ensure_adobe_creds_file() -> str:
         with os.fdopen(fd, "w") as f:
             f.write(js)
         return tmp
-    raise RuntimeError("Missing ADOBE_CREDENTIALS_JSON or ADOBE_CREDENTIALS_FILE_PATH")
+
+    # ADOBE_* 환경변수로 JSON을 생성
+    cid = os.getenv("ADOBE_CLIENT_ID")
+    csecret = os.getenv("ADOBE_CLIENT_SECRET")
+    org = os.getenv("ADOBE_ORGANIZATION_ID")
+    acct = os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")
+    key_path = os.getenv("ADOBE_PRIVATE_KEY_PATH")
+
+    missing = [k for k, v in {
+        "ADOBE_CLIENT_ID": cid,
+        "ADOBE_CLIENT_SECRET": csecret,
+        "ADOBE_ORGANIZATION_ID": org,
+        "ADOBE_ACCOUNT_ID/ADOBE_TECHNICAL_ACCOUNT_EMAIL": acct,
+        "ADOBE_PRIVATE_KEY_PATH": key_path,
+    }.items() if not v]
+    if missing:
+        raise RuntimeError(f"Missing Adobe env(s): {', '.join(missing)}")
+
+    if not os.path.exists(key_path):
+        raise RuntimeError(f"Private key not found: {key_path}")
+
+    with open(key_path, "r") as f:
+        private_key = f.read()
+
+    payload = {
+        "client_credentials": {
+            "client_id": cid,
+            "client_secret": csecret
+        },
+        "service_account_credentials": {
+            "organization_id": org,
+            "account_id": acct,                # 예: abcd@techacct.adobe.com
+            "private_key": private_key         # v4는 private_key(내용) 방식이 안전
+        }
+    }
+    fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
+    with os.fdopen(fd, "w") as f:
+        json.dump(payload, f)
+    logging.info("Built Adobe credentials JSON from ADOBE_* envs at %s", tmp)
+    return tmp
 
 # Adobe 자격 증명 (개선된 디버그 출력)
 CLIENT_ID = os.environ.get('PDF_SERVICES_CLIENT_ID')
@@ -63,8 +106,15 @@ try:
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
 
+    # job
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-    from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
+
+    # FileRef: pdfjobs.io 실패 시 공용 io로 폴백
+    try:
+        from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
+    except Exception:
+        from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
+
     from adobe.pdfservices.operation.pdfservices import PDFServices
     from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
 
@@ -202,16 +252,22 @@ def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
     result.save_as(out_path)
 
 def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
+    if _truthy(os.getenv("ADOBE_DISABLED")):
+        raise RuntimeError("Adobe is disabled via ADOBE_DISABLED")
+
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
+
     creds_file = ensure_adobe_creds_file()
     credentials = OAuthServiceAccountCredentials.create_from_file(creds_file)
     pdf_services = PDFServices(credentials)
+
     input_ref = JobFileRef.create_from_local_file(in_pdf_path)
     params = ExportPDFParams(ExportPDFTargetFormat.XLSX)
     job = ExportPDFJob(input_ref, params)
-    location = pdf_services.submit(job)
-    result = pdf_services.get_job_result(location)
+
+    loc = pdf_services.submit(job)
+    result = pdf_services.get_job_result(loc)
     result.save_as(out_xlsx_path)
 
 def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str):
