@@ -5,7 +5,7 @@ import json
 import time
 import requests
 import traceback
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import fitz  # PyMuPDF
@@ -276,100 +276,7 @@ def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale
 
 @app.route('/', methods=['GET'])
 def index():
-    return '''
-    <!DOCTYPE html>
-    <html>
-    <head>
-        <title>PDF to XLSX Converter</title>
-        <style>
-            body { font-family: Arial; max-width: 600px; margin: 50px auto; padding: 20px; }
-            .upload-area { border: 2px dashed #ccc; border-radius: 10px; padding: 30px; text-align: center; }
-            .upload-area.active { border-color: #4CAF50; background: #f0f8ff; }
-            button { background: #4CAF50; color: white; padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; }
-            button:hover { background: #45a049; }
-            .message { margin-top: 20px; padding: 10px; border-radius: 5px; }
-            .success { background: #d4edda; color: #155724; }
-            .error { background: #f8d7da; color: #721c24; }
-            .info { background: #d1ecf1; color: #0c5460; }
-        </style>
-    </head>
-    <body>
-        <h1>PDF to XLSX Converter</h1>
-        <div class="upload-area" id="uploadArea">
-            <p>Choose a PDF file or drag & drop here</p>
-            <input type="file" id="fileInput" accept=".pdf" style="display: none;">
-            <button onclick="document.getElementById('fileInput').click()">Select PDF</button>
-        </div>
-        <div id="message"></div>
-        
-        <script>
-            const uploadArea = document.getElementById('uploadArea');
-            const fileInput = document.getElementById('fileInput');
-            const messageDiv = document.getElementById('message');
-            
-            uploadArea.addEventListener('dragover', (e) => {
-                e.preventDefault();
-                uploadArea.classList.add('active');
-            });
-            
-            uploadArea.addEventListener('dragleave', () => {
-                uploadArea.classList.remove('active');
-            });
-            
-            uploadArea.addEventListener('drop', (e) => {
-                e.preventDefault();
-                uploadArea.classList.remove('active');
-                const files = e.dataTransfer.files;
-                if (files.length > 0) handleFile(files[0]);
-            });
-            
-            fileInput.addEventListener('change', (e) => {
-                if (e.target.files.length > 0) handleFile(e.target.files[0]);
-            });
-            
-            function showMessage(text, type) {
-                messageDiv.className = 'message ' + type;
-                messageDiv.textContent = text;
-            }
-            
-            async function handleFile(file) {
-                if (!file.name.toLowerCase().endsWith('.pdf')) {
-                    showMessage('Please select a PDF file', 'error');
-                    return;
-                }
-                
-                showMessage('Converting... Please wait...', 'info');
-                
-                const formData = new FormData();
-                formData.append('file', file);
-                
-                try {
-                    const response = await fetch('/convert', {
-                        method: 'POST',
-                        body: formData
-                    });
-                    
-                    if (response.ok) {
-                        const blob = await response.blob();
-                        const url = window.URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = file.name.replace('.pdf', '.xlsx');
-                        a.click();
-                        window.URL.revokeObjectURL(url);
-                        showMessage('Conversion successful! Download started.', 'success');
-                    } else {
-                        const error = await response.text();
-                        showMessage('Conversion failed: ' + error, 'error');
-                    }
-                } catch (error) {
-                    showMessage('Error: ' + error.message, 'error');
-                }
-            }
-        </script>
-    </body>
-    </html>
-    '''
+    return render_template('index.html')
 
 # health 응답(무엇이 보이는지 명확히)
 @app.get("/health")
