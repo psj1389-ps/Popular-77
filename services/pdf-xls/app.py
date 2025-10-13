@@ -200,9 +200,12 @@ def adobe_context():
     if not ADOBE_AVAILABLE:
         raise RuntimeError("Adobe SDK is not installed or configured.")
     
-    # 환경변수에서 자격증명 읽기
-    client_id = os.environ["ADOBE_CLIENT_ID"]
-    client_secret = os.environ["ADOBE_CLIENT_SECRET"]
+    # 환경변수에서 자격증명 읽기 - 여러 변수명 지원
+    client_id = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID")
+    client_secret = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise RuntimeError("Adobe credentials not found in environment variables")
     
     # v4 SDK 방식: ServicePrincipalCredentials 사용
     creds = ServicePrincipalCredentials.builder() \
@@ -240,10 +243,20 @@ def _truthy(v: str | None) -> bool:
     return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
 def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
-    if _truthy(os.getenv("ADOBE_DISABLED")):
-        raise RuntimeError("Adobe is disabled via ADOBE_DISABLED")
+    # Adobe SDK 가용성 체크
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
+    
+    # Adobe 자격증명 체크 - 필수 환경변수가 있으면 ADOBE_DISABLED 무시
+    client_id = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID")
+    client_secret = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET")
+    
+    if not client_id or not client_secret:
+        raise RuntimeError("Adobe credentials not configured")
+    
+    # ADOBE_DISABLED가 설정되어 있어도 자격증명이 있으면 경고만 출력하고 계속 진행
+    if _truthy(os.getenv("ADOBE_DISABLED")):
+        logging.warning("ADOBE_DISABLED is set but Adobe credentials are available - proceeding with conversion")
 
     # v4 방식으로 변환 실행
     _export_via_adobe(in_pdf_path, "XLSX", out_xlsx_path)
