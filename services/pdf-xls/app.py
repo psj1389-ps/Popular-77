@@ -78,18 +78,18 @@ def _env(key: str, alt: list[str] = []):
     raise KeyError(f"Missing env: {key}")
 
 def adobe_context():
-    # ADOBE_* 또는 PDF_SERVICES_* 둘 다 허용
-    client_id = os.environ.get("ADOBE_CLIENT_ID") or os.environ.get("PDF_SERVICES_CLIENT_ID")
-    client_secret = os.environ.get("ADOBE_CLIENT_SECRET") or os.environ.get("PDF_SERVICES_CLIENT_SECRET")
-    org_id = os.environ.get("ADOBE_ORGANIZATION_ID") or os.environ.get("PDF_SERVICES_ORGANIZATION_ID")
-    account_id = os.environ.get("ADOBE_ACCOUNT_ID") or os.environ.get("PDF_SERVICES_ACCOUNT_ID")
-    if not client_id or not client_secret:
-        raise KeyError("Adobe credentials missing: ADOBE_CLIENT_ID / ADOBE_CLIENT_SECRET")
-    if org_id and account_id:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret,
-                                          organization_id=org_id, account_id=account_id)
-    else:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
+    if not ADOBE_AVAILABLE:
+        raise RuntimeError("Adobe SDK is not installed or configured.")
+    
+    # 환경변수에서 자격증명 읽기
+    client_id = os.environ["ADOBE_CLIENT_ID"]
+    client_secret = os.environ["ADOBE_CLIENT_SECRET"]
+    
+    # 최신 SDK 방식: client_id와 client_secret만 사용
+    creds = ServicePrincipalCredentials(
+        client_id=client_id,
+        client_secret=client_secret,
+    )
     return ExecutionContext.create(creds)
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
