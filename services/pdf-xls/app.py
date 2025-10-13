@@ -1,30 +1,76 @@
-from flask import Flask, request, jsonify, send_file, render_template
+import os
+import sys
+import io
+import json
+import time
+import requests
+import traceback
+from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
-from werkzeug.exceptions import HTTPException
-import io, os, urllib.parse, tempfile, shutil, errno, logging
-from uuid import uuid4
-from concurrent.futures import ThreadPoolExecutor
+from dotenv import load_dotenv
 import fitz  # PyMuPDF
 from PIL import Image
+import openpyxl
+from openpyxl.drawing.image import Image as OpenpyxlImage
+
+# 환경 변수 먼저 로드
+load_dotenv()
+
+# Adobe SDK import 시도 (더 세밀한 에러 처리)
+ADOBE_AVAILABLE = False
+adobe_error_msg = "Not attempted"
+
+try:
+    # 단계별 import 시도
+    import adobe
+    import adobe.pdfservices
+    import adobe.pdfservices.operation
+    
+    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException
+    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
+    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.pdf_services_job import PDFServicesJob
+    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+    from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
+    from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
+    from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_params import ExportPDFParams
+    
+    ADOBE_AVAILABLE = True
+    adobe_error_msg = "Successfully loaded"
+    print("SUCCESS: Adobe PDF Services SDK loaded successfully")
+    
+except ImportError as e:
+    adobe_error_msg = str(e)
+    print(f"WARNING: Adobe PDF Services SDK import failed: {e}")
+    print("INFO: Using fallback conversion method")
+except Exception as e:
+    adobe_error_msg = f"Unexpected error: {str(e)}"
+    print(f"ERROR: Unexpected error loading Adobe SDK: {e}")
+
+# 추가 imports
+from werkzeug.exceptions import HTTPException
+import urllib.parse, tempfile, shutil, errno, logging
+from uuid import uuid4
+from concurrent.futures import ThreadPoolExecutor
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
 from typing import Optional
 
-# Adobe PDF Services SDK imports
-ADOBE_AVAILABLE = False
-try:
-    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.execution_context import ExecutionContext
-    from adobe.pdfservices.operation.io.file_ref import FileRef
-    from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-    from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
-    ADOBE_AVAILABLE = True
-    logging.info("Adobe PDF Services SDK loaded successfully")
-except Exception as e:
-    logging.warning(f"Adobe PDF Services SDK import failed: {e}")
-    logging.info("Service will use fallback image-based conversion")
-
 app = Flask(__name__)
+CORS(app)
+
+# Adobe 자격 증명
+CLIENT_ID = os.environ.get('PDF_SERVICES_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('PDF_SERVICES_CLIENT_SECRET')
+
+# 디버그 정보 출력
+print(f"Adobe SDK Available: {ADOBE_AVAILABLE}")
+print(f"Adobe Error Message: {adobe_error_msg}")
+print(f"Client ID configured: {bool(CLIENT_ID)}")
+print(f"Client Secret configured: {bool(CLIENT_SECRET)}")
+
 logging.basicConfig(level=logging.INFO)
 
 # 요청 로깅 추가
@@ -146,9 +192,15 @@ def perform_xlsx_conversion_fallback(in_path: str, base_name: str, scale: float 
 def index():
     return render_template("index.html")
 
-@app.get("/health")
-def health():
-    return "ok", 200
+@app.route('/health', methods=['GET'])
+def health_check():
+    health_info = {
+        'status': 'OK',
+        'adobe_sdk': ADOBE_AVAILABLE,
+        'adobe_error': adobe_error_msg,
+        'credentials_configured': bool(CLIENT_ID and CLIENT_SECRET)
+    }
+    return jsonify(health_info), 200
 
 @app.post("/convert-async")
 def convert_async():

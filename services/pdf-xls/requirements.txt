@@ -10,8 +10,10 @@ flask-cors>=4.0.0
 python-dotenv==1.0.0
 requests>=2.31.0
 
-# --- Adobe SDK ---
+# --- Adobe SDK 및 의존성 ---
 pdfservices-sdk==4.2.0
+typing-extensions>=4.8.0
+pyjwt>=2.8.0
 
 # --- 폴백(Fallback)용 ---
 Pillow>=10.2.0
