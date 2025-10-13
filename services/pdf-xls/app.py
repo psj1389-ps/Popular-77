@@ -326,13 +326,22 @@ def index():
     '''
 
 @app.get("/health")
-def health():
-    import sys
+def health_check():
+    import os, sys
+    try:
+        from importlib.metadata import version, PackageNotFoundError
+        try:
+            sdk_ver = version("pdfservices-sdk")
+        except PackageNotFoundError:
+            sdk_ver = None
+    except Exception:
+        sdk_ver = None
     return {
         "python": sys.version,
+        "pdfservices_sdk": sdk_ver,
         "adobe_available": ADOBE_AVAILABLE,
         "adobe_sdk_version": ADOBE_SDK_VERSION,
-        "adobe_error": ADOBE_IMPORT_ERROR,  # 기본값 None
+        "adobe_error": ADOBE_IMPORT_ERROR,  # 미정의로 500 나지 않음
         "creds": {
             "json": bool(os.getenv("ADOBE_CREDENTIALS_JSON")),
             "file": bool(os.getenv("ADOBE_CREDENTIALS_FILE_PATH")),
