@@ -24,23 +24,14 @@ ADOBE_IMPORT_ERROR = None
 import logging
 
 try:
-    # v4 params (상위→하위 모듈 순 폴백)
-    try:
-        from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
-    except Exception:
-        from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
-        from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
-
+    # v4 imports - 정확한 모듈 경로 사용
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-
-    # FileRef: pdfjobs.io 우선, 실패 시 공용 io로 폴백
-    try:
-        from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
-    except Exception:
-        from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
-
-    from adobe.pdfservices.operation.pdfservices import PDFServices
-    from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
+    from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
+    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
 
     ADOBE_AVAILABLE = True
     ADOBE_SDK_VERSION = "4.x"
@@ -152,7 +143,6 @@ def debug_adobe_modules():
         except Exception as e:
             logging.warning("Cannot import %s: %s", base, e)
 
-# 앱 시작 시 디버그 모듈 확인
 if ADOBE_AVAILABLE and ADOBE_SDK_VERSION == "4.x":
     debug_adobe_modules()
 
@@ -214,23 +204,38 @@ def adobe_context():
     client_id = os.environ["ADOBE_CLIENT_ID"]
     client_secret = os.environ["ADOBE_CLIENT_SECRET"]
     
-    # 최신 SDK 방식: client_id와 client_secret만 사용
-    creds = ServicePrincipalCredentials(
-        client_id=client_id,
-        client_secret=client_secret,
-    )
-    return ExecutionContext.create(creds)
+    # v4 SDK 방식: ServicePrincipalCredentials 사용
+    creds = ServicePrincipalCredentials.builder() \
+        .with_client_id(client_id) \
+        .with_client_secret(client_secret) \
+        .build()
+    return PDFServices.builder().with_credentials(creds).build()
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
-    ctx = adobe_context()
-    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])  # "XLSX"
-    op.set_input(FileRef.create_from_local_file(in_pdf_path))
-    result = op.execute(ctx)
+    pdf_services = adobe_context()
+    
+    # v4 방식: JobFileRef 생성 및 ExportPDFJob 실행
+    input_asset = pdf_services.upload(input_stream=open(in_pdf_path, 'rb'), mime_type="application/pdf")
+    
+    # ExportPDFParams 설정
+    export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat[target])
+    
+    # ExportPDFJob 생성 및 실행
+    export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
+    location = pdf_services.submit(export_pdf_job)
+    pdf_services_response = pdf_services.get_job_result(location, ExportPDFJob)
+    
+    # 결과 저장
+    result_asset = pdf_services_response.get_result().get_asset()
+    stream_asset = pdf_services.get_content(result_asset)
+    
     if os.path.exists(out_path):
         os.remove(out_path)
-    result.save_as(out_path)
+    
+    with open(out_path, "wb") as file:
+        file.write(stream_asset.get_input_stream().read())
 
-# v4 변환(XLSX)
+# v3 변환(XLSX)
 def _truthy(v: str | None) -> bool:
     return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
@@ -240,17 +245,8 @@ def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
 
-    creds_file = ensure_adobe_creds_file()
-    credentials = OAuthServiceAccountCredentials.create_from_file(creds_file)
-    pdf_services = PDFServices(credentials)
-
-    input_ref = JobFileRef.create_from_local_file(in_pdf_path)
-    params = ExportPDFParams(ExportPDFTargetFormat.XLSX)
-    job = ExportPDFJob(input_ref, params)
-
-    loc = pdf_services.submit(job)
-    result = pdf_services.get_job_result(loc)
-    result.save_as(out_xlsx_path)
+    # v4 방식으로 변환 실행
+    _export_via_adobe(in_pdf_path, "XLSX", out_xlsx_path)
 
 # 폴백 함수(scale 인자 수용)
 def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale: float = 1.0):
