@@ -21,17 +21,16 @@ import tempfile
 import logging
 
 def ensure_adobe_creds_file() -> str:
-    creds_path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
-    creds_json = os.getenv("ADOBE_CREDENTIALS_JSON")
-    logging.info("Adobe creds -> JSON:%s FILE:%s", 
-                 bool(creds_json), bool(creds_path))
-    if creds_path and os.path.exists(creds_path):
-        return creds_path
-    if creds_json:
-        fd, path = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
-        with os.fdopen(fd, "w") as f:
-            f.write(creds_json)
+    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
+    js = os.getenv("ADOBE_CREDENTIALS_JSON")
+    logging.info("Adobe creds -> JSON:%s FILE:%s", bool(js), bool(path))
+    if path and os.path.exists(path):
         return path
+    if js:
+        fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
+        with os.fdopen(fd, "w") as f:
+            f.write(js)
+        return tmp
     raise RuntimeError("Missing ADOBE_CREDENTIALS_JSON or ADOBE_CREDENTIALS_FILE_PATH")
 
 # Adobe 자격 증명 (개선된 디버그 출력)
@@ -50,38 +49,43 @@ if CLIENT_ID:
 if CLIENT_SECRET:
     print(f"CLIENT_SECRET length: {len(CLIENT_SECRET)}")
 
-# Adobe SDK import 시도 (v4.2.0 snake_case 전용)
+ADOBE_AVAILABLE = False
+ADOBE_SDK_VERSION = None
+ADOBE_IMPORT_ERROR = None
+
+# v4 import 시도
 try:
-    # v4.2.0 전용 import (snake_case 주의)
-    from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
+    # 기본 경로
+    try:
+        from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
+    except Exception:
+        # 하위 모듈 경로 폴백
+        from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
+        from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
+
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
     from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
     from adobe.pdfservices.operation.pdfservices import PDFServices
-    # 일부 배포판은 OAuthServiceAccountCredentials가 제공됩니다
-    try:
-        from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials as V4Creds
-        V4_CREDS_KIND = "oauth_service_account"
-    except Exception:
-        V4Creds = None
-        V4_CREDS_KIND = None
-    ADOBE_SDK_VERSION = "4.x"
+    from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
+
     ADOBE_AVAILABLE = True
+    ADOBE_SDK_VERSION = "4.x"
 except Exception as e_v4:
-    import logging
-    logging.warning("Adobe v4 import failed: %s", e_v4)
-    # 선택지: v3로 폴백 임포트 (requirements를 3.4.2로 내릴 때만 유효)
+    ADOBE_IMPORT_ERROR = f"v4 import failed: {e_v4}"
+    logging.warning(ADOBE_IMPORT_ERROR)
+    # v3로 폴백하려면 requirements에서 3.4.2로 내리고 아래 임포트 열기
     try:
-        from adobe.pdfservices.operation.auth.credentials import Credentials as V3Creds
-        from adobe.pdfservices.operation.io.file_ref import FileRef as V3FileRef
+        from adobe.pdfservices.operation.auth.credentials import Credentials
+        from adobe.pdfservices.operation.io.file_ref import FileRef
         from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
         from adobe.pdfservices.operation.pdfops.options.export_pdf.export_pdf_target_format import ExportPDFTargetFormat as V3Target
         from adobe.pdfservices.operation.execution_context import ExecutionContext
-        ADOBE_SDK_VERSION = "3.x"
         ADOBE_AVAILABLE = True
+        ADOBE_SDK_VERSION = "3.x"
     except Exception as e_v3:
-        ADOBE_SDK_VERSION = None
         ADOBE_AVAILABLE = False
-        logging.warning("Adobe v3 import also failed: %s", e_v3)
+        ADOBE_IMPORT_ERROR += f"; v3 import failed: {e_v3}"
+        logging.warning(f"Adobe v3 import also failed: {e_v3}")
 
 # 추가 imports
 from werkzeug.exceptions import HTTPException
@@ -197,67 +201,32 @@ def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
         os.remove(out_path)
     result.save_as(out_path)
 
-def perform_xlsx_conversion_adobe(input_pdf_path: str, output_xlsx_path: str):
+def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
-
     creds_file = ensure_adobe_creds_file()
-
-    # 자격 증명 생성: SDK 배포판에 따라 이름이 다를 수 있어 분기 처리
-    if V4Creds:
-        credentials = V4Creds.create_from_file(creds_file)
-    else:
-        # 일부 환경에서는 기존 Credentials 빌더가 그대로 동작
-        from adobe.pdfservices.operation.auth.credentials import Credentials
-        credentials = Credentials.service_account_credentials_builder() \
-            .from_file(creds_file).build()
-
+    credentials = OAuthServiceAccountCredentials.create_from_file(creds_file)
     pdf_services = PDFServices(credentials)
-
-    # 입력/파라미터/잡 생성
-    input_ref = JobFileRef.create_from_local_file(input_pdf_path)
+    input_ref = JobFileRef.create_from_local_file(in_pdf_path)
     params = ExportPDFParams(ExportPDFTargetFormat.XLSX)
     job = ExportPDFJob(input_ref, params)
+    location = pdf_services.submit(job)
+    result = pdf_services.get_job_result(location)
+    result.save_as(out_xlsx_path)
 
-    # 잡 제출 및 결과 수신
-    location = pdf_services.submit(job)          # 제출
-    result = pdf_services.get_job_result(location)  # 완료까지 내부적으로 폴링
-    result.save_as(output_xlsx_path)
-
-def perform_xlsx_conversion_fallback(in_path: str, base_name: str, scale: float = 1.0):
-    """
-    PDF → XLSX (시트당 이미지 1장, A1에 배치)
-    """
-    with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
-        doc = fitz.open(in_path)
-        mat = fitz.Matrix(scale, scale)
-        wb = Workbook()
-        # openpyxl 기본 시트를 첫 페이지로 사용, 나머지는 추가
-        first_sheet = True
-
-        for i in range(doc.page_count):
-            set_progress(current_job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
-            page = doc.load_page(i)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-            pix.save(img_path)
-
-            if first_sheet:
-                ws = wb.active
-                ws.title = f"Page_{i+1:02d}"
-                first_sheet = False
-            else:
-                ws = wb.create_sheet(title=f"Page_{i+1:02d}")
-
-            xlimg = XLImage(img_path)
-            ws.add_image(xlimg, "A1")
-
-        final_name = f"{base_name}.xlsx"
-        final_path = os.path.join(OUTPUTS_DIR, final_name)
-        if os.path.exists(final_path): 
-            os.remove(final_path)
-        wb.save(final_path)
-        return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str):
+    import fitz, openpyxl
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "Extracted"
+    with fitz.open(in_pdf_path) as doc:
+        row = 1
+        for i, page in enumerate(doc, start=1):
+            ws.cell(row=row, column=1, value=f"=== Page {i} ==="); row += 1
+            for line in page.get_text("text").splitlines():
+                ws.cell(row=row, column=1, value=line); row += 1
+            row += 1
+    wb.save(out_xlsx_path)
 
 @app.route('/', methods=['GET'])
 def index():
@@ -356,15 +325,19 @@ def index():
     </html>
     '''
 
-@app.route('/health', methods=['GET'])
-def health_check():
-    health_info = {
-        'status': 'OK',
-        'adobe_sdk': ADOBE_AVAILABLE,
-        'adobe_error': adobe_error_msg,
-        'credentials_configured': bool(CLIENT_ID and CLIENT_SECRET)
+@app.get("/health")
+def health():
+    import sys
+    return {
+        "python": sys.version,
+        "adobe_available": ADOBE_AVAILABLE,
+        "adobe_sdk_version": ADOBE_SDK_VERSION,
+        "adobe_error": ADOBE_IMPORT_ERROR,  # 기본값 None
+        "creds": {
+            "json": bool(os.getenv("ADOBE_CREDENTIALS_JSON")),
+            "file": bool(os.getenv("ADOBE_CREDENTIALS_FILE_PATH")),
+        },
     }
-    return jsonify(health_info), 200
 
 @app.post("/convert-async")
 def convert_async():
@@ -392,24 +365,14 @@ def convert_async():
         current_job_id = job_id
         try:
             set_progress(job_id, 10, "변환 준비 중")
+            final_name = f"{base_name}.xlsx"
+            final_path = os.path.join(OUTPUTS_DIR, final_name)
             try:
-                set_progress(job_id, 30, "Adobe로 변환 중")
-                # PDF 파일을 읽어서 버퍼로 변환
-                with open(in_path, 'rb') as f:
-                    pdf_buffer = f.read()
-                xlsx_data = perform_xlsx_conversion_adobe(pdf_buffer)
-                
-                # 결과를 파일로 저장
-                final_name = f"{base_name}.xlsx"
-                final_path = os.path.join(OUTPUTS_DIR, final_name)
-                with open(final_path, 'wb') as f:
-                    f.write(xlsx_data)
-                
-                out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                perform_xlsx_conversion_adobe(in_path, final_path)
             except Exception as e:
                 app.logger.exception("Adobe export failed; fallback to image-based.")
-                set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-                out_path, name, ctype = perform_xlsx_conversion_fallback(in_path, base_name, scale=scale)  # 기존 이미지 방식
+                perform_xlsx_conversion_fallback(in_path, final_path)
+            out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
                            "progress":100,"message":"완료"}
         except Exception as e:
