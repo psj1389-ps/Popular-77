@@ -16,16 +16,24 @@ from openpyxl.drawing.image import Image as OpenpyxlImage
 # 환경 변수 먼저 로드
 load_dotenv()
 
-# Adobe SDK import 시도 (더 세밀한 에러 처리)
+# Adobe 자격 증명 (디버그 출력 추가)
+CLIENT_ID = os.environ.get('PDF_SERVICES_CLIENT_ID')
+CLIENT_SECRET = os.environ.get('PDF_SERVICES_CLIENT_SECRET')
+
+print(f"Environment Variables Check:")
+print(f"PDF_SERVICES_CLIENT_ID exists: {bool(CLIENT_ID)}")
+print(f"PDF_SERVICES_CLIENT_SECRET exists: {bool(CLIENT_SECRET)}")
+if CLIENT_ID:
+    print(f"CLIENT_ID length: {len(CLIENT_ID)}")
+if CLIENT_SECRET:
+    print(f"CLIENT_SECRET length: {len(CLIENT_SECRET)}")
+
+# Adobe SDK import 시도 (SDK 4.2.0 올바른 경로)
 ADOBE_AVAILABLE = False
 adobe_error_msg = "Not attempted"
 
 try:
-    # 단계별 import 시도
-    import adobe
-    import adobe.pdfservices
-    import adobe.pdfservices.operation
-    
+    # SDK 4.2.0의 올바른 import 경로
     from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
     from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException
     from adobe.pdfservices.operation.io.cloud_asset import CloudAsset
@@ -33,21 +41,35 @@ try:
     from adobe.pdfservices.operation.pdf_services import PDFServices
     from adobe.pdfservices.operation.pdf_services_job import PDFServicesJob
     from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
-    from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-    from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
-    from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_params import ExportPDFParams
+    from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
+    from adobe.pdfservices.operation.pdfjobs.params.exportpdf.export_pdf_params import ExportPDFParams
+    from adobe.pdfservices.operation.pdfjobs.params.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
     
     ADOBE_AVAILABLE = True
     adobe_error_msg = "Successfully loaded"
-    print("SUCCESS: Adobe PDF Services SDK loaded successfully")
+    print("SUCCESS: Adobe PDF Services SDK 4.2.0 loaded successfully")
     
 except ImportError as e:
     adobe_error_msg = str(e)
     print(f"WARNING: Adobe PDF Services SDK import failed: {e}")
-    print("INFO: Using fallback conversion method")
-except Exception as e:
-    adobe_error_msg = f"Unexpected error: {str(e)}"
-    print(f"ERROR: Unexpected error loading Adobe SDK: {e}")
+    
+    # SDK 2.3.0 시도
+    try:
+        print("Trying older SDK import paths...")
+        from adobe.pdfservices.operation.auth.credentials import Credentials
+        from adobe.pdfservices.operation.exception.exceptions import ServiceApiException
+        from adobe.pdfservices.operation.execution_context import ExecutionContext
+        from adobe.pdfservices.operation.io.file_ref import FileRef
+        from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
+        from adobe.pdfservices.operation.pdfops.options.exportpdf.export_pdf_target_format import ExportPDFTargetFormat
+        
+        ADOBE_AVAILABLE = True
+        adobe_error_msg = "Successfully loaded (SDK 2.x)"
+        print("SUCCESS: Adobe PDF Services SDK 2.x loaded successfully")
+    except ImportError as e2:
+        adobe_error_msg = f"4.2.0: {str(e)}, 2.x: {str(e2)}"
+        print(f"WARNING: Both SDK versions failed to import")
+        print("INFO: Using fallback conversion method")
 
 # 추가 imports
 from werkzeug.exceptions import HTTPException
@@ -61,11 +83,8 @@ from typing import Optional
 app = Flask(__name__)
 CORS(app)
 
-# Adobe 자격 증명
-CLIENT_ID = os.environ.get('PDF_SERVICES_CLIENT_ID')
-CLIENT_SECRET = os.environ.get('PDF_SERVICES_CLIENT_SECRET')
-
 # 디버그 정보 출력
+print(f"=== Final Status ===")
 print(f"Adobe SDK Available: {ADOBE_AVAILABLE}")
 print(f"Adobe Error Message: {adobe_error_msg}")
 print(f"Client ID configured: {bool(CLIENT_ID)}")
@@ -147,11 +166,62 @@ def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
         os.remove(out_path)
     result.save_as(out_path)
 
-def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
-    final_name = f"{base_name}.xlsx"
-    final_path = os.path.join(OUTPUTS_DIR, final_name)
-    _export_via_adobe(in_path, "XLSX", final_path)
-    return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+def perform_xlsx_conversion_adobe(pdf_buffer):
+    """Adobe SDK를 사용한 PDF to XLSX 변환 (편집 가능)"""
+    if not ADOBE_AVAILABLE:
+        raise Exception("Adobe SDK not available")
+    
+    if not CLIENT_ID or not CLIENT_SECRET:
+        raise Exception("Adobe credentials not configured")
+    
+    try:
+        # 자격 증명 설정
+        credentials = ServicePrincipalCredentials(
+            client_id=CLIENT_ID,
+            client_secret=CLIENT_SECRET
+        )
+        
+        # PDF Services 초기화
+        pdf_services = PDFServices(credentials=credentials)
+        
+        # StreamAsset 생성
+        input_asset = pdf_services.upload(
+            input_stream=io.BytesIO(pdf_buffer),
+            mime_type=PDFServicesMediaType.PDF
+        )
+        
+        # Export 작업 설정
+        export_pdf_params = ExportPDFParams(
+            target_format=ExportPDFTargetFormat.XLSX
+        )
+        
+        # Export 작업 생성
+        export_pdf_job = ExportPDFJob(
+            input_asset=input_asset,
+            export_pdf_params=export_pdf_params
+        )
+        
+        # 작업 실행
+        location = pdf_services.submit(export_pdf_job)
+        pdf_services_response = pdf_services.get_job_result(
+            location,
+            ExportPDFJob
+        )
+        
+        # 결과 다운로드
+        result_asset = pdf_services_response.get_result().get_asset()
+        stream_asset = pdf_services.get_content(result_asset)
+        
+        output_buffer = io.BytesIO()
+        output_buffer.write(stream_asset.get_input_stream())
+        output_buffer.seek(0)
+        
+        print("SUCCESS: Adobe SDK conversion completed")
+        return output_buffer.getvalue()
+        
+    except Exception as e:
+        print(f"ERROR: Adobe SDK conversion failed: {str(e)}")
+        raise
 
 def perform_xlsx_conversion_fallback(in_path: str, base_name: str, scale: float = 1.0):
     """
@@ -323,7 +393,18 @@ def convert_async():
             set_progress(job_id, 10, "변환 준비 중")
             try:
                 set_progress(job_id, 30, "Adobe로 변환 중")
-                out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
+                # PDF 파일을 읽어서 버퍼로 변환
+                with open(in_path, 'rb') as f:
+                    pdf_buffer = f.read()
+                xlsx_data = perform_xlsx_conversion_adobe(pdf_buffer)
+                
+                # 결과를 파일로 저장
+                final_name = f"{base_name}.xlsx"
+                final_path = os.path.join(OUTPUTS_DIR, final_name)
+                with open(final_path, 'wb') as f:
+                    f.write(xlsx_data)
+                
+                out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             except Exception as e:
                 app.logger.exception("Adobe export failed; fallback to image-based.")
                 set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
@@ -385,7 +466,18 @@ def convert_sync():
     try:
         # 1. Adobe 변환을 먼저 시도합니다.
         app.logger.info("Attempting conversion with Adobe API...")
-        out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
+        # PDF 파일을 읽어서 버퍼로 변환
+        with open(in_path, 'rb') as f:
+            pdf_buffer = f.read()
+        xlsx_data = perform_xlsx_conversion_adobe(pdf_buffer)
+        
+        # 결과를 파일로 저장
+        final_name = f"{base_name}.xlsx"
+        final_path = os.path.join(OUTPUTS_DIR, final_name)
+        with open(final_path, 'wb') as f:
+            f.write(xlsx_data)
+        
+        out_path, name, ctype = final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
     except Exception as e:
         # 2. 어떤 이유로든 실패하면 (자격증명 오류, Adobe 서버 문제 등)
         app.logger.exception("Adobe export failed; falling back to image-based conversion.")
