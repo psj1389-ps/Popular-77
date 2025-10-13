@@ -1,15 +1,14 @@
-pip>=25.2
-setuptools>=75.1.0
-wheel>=0.43
-packaging>=24.1
-
+# --- 기본 웹 서버 ---
 Flask>=3.0.0
 gunicorn>=21.2.0
 flask-cors>=4.0.0
-requests>=2.31.0
 python-dotenv==1.0.0
+requests>=2.31.0
 
+# --- Adobe SDK (편집 가능한 변환의 핵심) ---
 pdfservices-sdk==4.2.0
+
+# --- 폴백(Fallback)용: Adobe 실패 시 이미지만 넣는 방식 ---
 Pillow>=10.2.0
 PyMuPDF>=1.26.4,<1.27
 openpyxl>=3.1.5

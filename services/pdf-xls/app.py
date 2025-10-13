@@ -107,7 +107,7 @@ def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
     _export_via_adobe(in_path, "XLSX", final_path)
     return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
-def perform_xlsx_conversion(in_path: str, base_name: str, scale: float = 1.0):
+def perform_xlsx_conversion_fallback(in_path: str, base_name: str, scale: float = 1.0):
     """
     PDF → XLSX (시트당 이미지 1장, A1에 배치)
     """
@@ -182,7 +182,7 @@ def convert_async():
             except Exception as e:
                 app.logger.exception("Adobe export failed; fallback to image-based.")
                 set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)  # 기존 이미지 방식
+                out_path, name, ctype = perform_xlsx_conversion_fallback(in_path, base_name, scale=scale)  # 기존 이미지 방식
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
                            "progress":100,"message":"완료"}
         except Exception as e:
@@ -238,9 +238,14 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
+        # 1. Adobe 변환을 먼저 시도합니다.
+        app.logger.info("Attempting conversion with Adobe API...")
         out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
-    except Exception:
-        out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
+    except Exception as e:
+        # 2. 어떤 이유로든 실패하면 (자격증명 오류, Adobe 서버 문제 등)
+        app.logger.exception("Adobe export failed; falling back to image-based conversion.")
+        # 3. 기존의 이미지 방식으로 변환을 시도합니다.
+        out_path, name, ctype = perform_xlsx_conversion_fallback(in_path, base_name, scale=scale)
     finally:
         try: 
             os.remove(in_path)
