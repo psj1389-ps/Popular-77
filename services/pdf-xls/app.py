@@ -20,8 +20,8 @@ try:
     from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
     ADOBE_AVAILABLE = True
     logging.info("Adobe PDF Services SDK loaded successfully")
-except ImportError as e:
-    logging.warning(f"Adobe PDF Services SDK not available: {e}")
+except Exception as e:
+    logging.warning(f"Adobe PDF Services SDK import failed: {e}")
     logging.info("Service will use fallback image-based conversion")
 
 app = Flask(__name__)
