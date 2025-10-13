@@ -1,3 +1,8 @@
+# --- Python 3.13 호환 빌드 도구 ---
+pip>=24.0
+setuptools>=69.0.0
+wheel>=0.43.0
+
 # --- 기본 웹 서버 ---
 Flask>=3.0.0
 gunicorn>=21.2.0
@@ -5,10 +10,10 @@ flask-cors>=4.0.0
 python-dotenv==1.0.0
 requests>=2.31.0
 
-# --- Adobe SDK (편집 가능한 변환) ---
+# --- Adobe SDK ---
 pdfservices-sdk==4.2.0
 
-# --- 폴백(Fallback)용: 이미지 기반 변환 ---
+# --- 폴백(Fallback)용 ---
 Pillow>=10.2.0
-PyMuPDF>=1.26.4,<1.27
+PyMuPDF>=1.24.9  # PyMuPDF는 3.13도 잘 지원합니다.
 openpyxl>=3.1.5
