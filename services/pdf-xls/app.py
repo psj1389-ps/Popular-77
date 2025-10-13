@@ -163,7 +163,9 @@ OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-executor = ThreadPoolExecutor(max_workers=2)
+# 환경변수에서 워커 수 설정 (기본값: 2)
+max_workers = int(os.environ.get("MAX_WORKERS", 2))
+executor = ThreadPoolExecutor(max_workers=max_workers)
 JOBS = {}
 current_job_id: Optional[str] = None
 
@@ -207,12 +209,12 @@ def adobe_context():
     if not client_id or not client_secret:
         raise RuntimeError("Adobe credentials not found in environment variables")
     
-    # v4 SDK 방식: ServicePrincipalCredentials 사용
-    creds = ServicePrincipalCredentials.builder() \
-        .with_client_id(client_id) \
-        .with_client_secret(client_secret) \
-        .build()
-    return PDFServices.builder().with_credentials(creds).build()
+    # v4 SDK 방식: ServicePrincipalCredentials 직접 생성자 사용
+    creds = ServicePrincipalCredentials(
+        client_id=client_id,
+        client_secret=client_secret
+    )
+    return PDFServices(credentials=creds)
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
     pdf_services = adobe_context()
@@ -264,15 +266,117 @@ def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
 # 폴백 함수(scale 인자 수용)
 def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale: float = 1.0):
     import fitz, openpyxl
-    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Extracted"
+    from openpyxl.drawing.image import Image as OpenpyxlImage
+    from openpyxl.styles import Font, Alignment
+    from openpyxl.utils import get_column_letter
+    import io
+    from PIL import Image as PILImage
+    
+    # 새 워크북 생성 및 기본 설정
+    wb = openpyxl.Workbook()
+    ws = wb.active
+    ws.title = "PDF_Content"
+    
+    # 기본 스타일 설정
+    header_font = Font(bold=True, size=12)
+    normal_font = Font(size=10)
+    
     with fitz.open(in_pdf_path) as doc:
         row = 1
-        for i, page in enumerate(doc, start=1):
-            ws.cell(row=row, column=1, value=f"=== Page {i} ==="); row += 1
-            for line in page.get_text("text").splitlines():
-                ws.cell(row=row, column=1, value=line); row += 1
+        
+        for page_num, page in enumerate(doc, start=1):
+            # 페이지 헤더 추가
+            page_header = f"=== Page {page_num} ==="
+            cell = ws.cell(row=row, column=1, value=page_header)
+            cell.font = header_font
+            cell.alignment = Alignment(horizontal='center')
             row += 1
+            
+            # 텍스트 추출 및 추가
+            text_content = page.get_text("text")
+            if text_content.strip():
+                for line in text_content.splitlines():
+                    if line.strip():  # 빈 줄 제외
+                        cell = ws.cell(row=row, column=1, value=line.strip())
+                        cell.font = normal_font
+                        row += 1
+            
+            # 이미지 추출 및 추가
+            try:
+                image_list = page.get_images(full=True)
+                for img_index, img in enumerate(image_list):
+                    try:
+                        # 이미지 데이터 추출
+                        xref = img[0]
+                        pix = fitz.Pixmap(doc, xref)
+                        
+                        # CMYK를 RGB로 변환
+                        if pix.n - pix.alpha < 4:  # GRAY or RGB
+                            img_data = pix.tobytes("png")
+                        else:  # CMYK
+                            pix1 = fitz.Pixmap(fitz.csRGB, pix)
+                            img_data = pix1.tobytes("png")
+                            pix1 = None
+                        
+                        pix = None
+                        
+                        # PIL로 이미지 처리
+                        pil_img = PILImage.open(io.BytesIO(img_data))
+                        
+                        # 이미지 크기 조정 (너무 큰 경우)
+                        max_width, max_height = 400, 300
+                        if pil_img.width > max_width or pil_img.height > max_height:
+                            pil_img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
+                        
+                        # 이미지를 바이트로 변환
+                        img_buffer = io.BytesIO()
+                        pil_img.save(img_buffer, format='PNG')
+                        img_buffer.seek(0)
+                        
+                        # Excel에 이미지 추가
+                        excel_img = OpenpyxlImage(img_buffer)
+                        excel_img.anchor = f'B{row}'  # B열에 이미지 배치
+                        ws.add_image(excel_img)
+                        
+                        # 이미지 설명 추가
+                        ws.cell(row=row, column=1, value=f"[Image {img_index + 1}]").font = Font(italic=True, color="0066CC")
+                        row += max(15, int(excel_img.height / 20))  # 이미지 높이에 따라 행 조정
+                        
+                    except Exception as img_error:
+                        # 이미지 처리 실패 시 텍스트로 표시
+                        ws.cell(row=row, column=1, value=f"[Image {img_index + 1} - 처리 실패: {str(img_error)}]").font = Font(italic=True, color="FF0000")
+                        row += 1
+                        
+            except Exception as e:
+                # 이미지 추출 실패 시 로그만 남기고 계속 진행
+                logging.warning(f"Page {page_num} 이미지 추출 실패: {e}")
+            
+            row += 2  # 페이지 간 간격
+    
+    # 열 너비 자동 조정
+    for column in ws.columns:
+        max_length = 0
+        column_letter = get_column_letter(column[0].column)
+        for cell in column:
+            try:
+                if len(str(cell.value)) > max_length:
+                    max_length = len(str(cell.value))
+            except:
+                pass
+        adjusted_width = min(max_length + 2, 50)  # 최대 50자로 제한
+        ws.column_dimensions[column_letter].width = adjusted_width
+    
+    # 워크북 속성 설정 (복구 문의 방지)
+    try:
+        wb.properties.creator = "PDF-XLS Converter"
+        wb.properties.lastModifiedBy = "PDF-XLS Converter"
+        # created와 modified는 None으로 설정하지 않음 (오류 방지)
+    except Exception as e:
+        logging.warning(f"워크북 속성 설정 실패: {e}")
+    
+    # 파일 저장
     wb.save(out_xlsx_path)
+    wb.close()
 
 @app.route('/', methods=['GET'])
 def index():
@@ -461,5 +565,13 @@ def handle_any(e):
     return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
+    # 환경변수에서 포트 설정
     port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    
+    # 환경변수에서 호스트 설정 (기본값: 0.0.0.0)
+    host = os.environ.get("HOST", "0.0.0.0")
+    
+    # 환경변수에서 디버그 모드 설정 (기본값: False)
+    debug = os.environ.get("DEBUG", "false").lower() in ("true", "1", "yes", "on")
+    
+    app.run(host=host, port=port, debug=debug)
