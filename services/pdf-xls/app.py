@@ -24,56 +24,35 @@ import json
 def _truthy(v: str | None) -> bool:
     return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
-def ensure_adobe_creds_file() -> str:
-    # 우선 기존 방식도 지원
-    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
-    js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
-    if path and os.path.exists(path):
+def ensure_adobe_creds_file():
+    import os, json, tempfile
+    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH")
+    js = os.getenv("ADOBE_CREDENTIALS_JSON")
+    if path and os.path.exists(path): 
         return path
     if js:
         fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
-        with os.fdopen(fd, "w") as f:
+        with os.fdopen(fd, "w") as f: 
             f.write(js)
         return tmp
-
-    # ADOBE_* 환경변수로 JSON을 생성
+    # 아래부터 ADOBE_*로 JSON 생성
     cid = os.getenv("ADOBE_CLIENT_ID")
-    csecret = os.getenv("ADOBE_CLIENT_SECRET")
+    csec = os.getenv("ADOBE_CLIENT_SECRET")
     org = os.getenv("ADOBE_ORGANIZATION_ID")
     acct = os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")
     key_path = os.getenv("ADOBE_PRIVATE_KEY_PATH")
-
-    missing = [k for k, v in {
-        "ADOBE_CLIENT_ID": cid,
-        "ADOBE_CLIENT_SECRET": csecret,
-        "ADOBE_ORGANIZATION_ID": org,
-        "ADOBE_ACCOUNT_ID/ADOBE_TECHNICAL_ACCOUNT_EMAIL": acct,
-        "ADOBE_PRIVATE_KEY_PATH": key_path,
-    }.items() if not v]
-    if missing:
-        raise RuntimeError(f"Missing Adobe env(s): {', '.join(missing)}")
-
-    if not os.path.exists(key_path):
-        raise RuntimeError(f"Private key not found: {key_path}")
-
-    with open(key_path, "r") as f:
+    for k, v in {"ADOBE_CLIENT_ID":cid,"ADOBE_CLIENT_SECRET":csec,"ADOBE_ORGANIZATION_ID":org,"ADOBE_ACCOUNT_ID/ADOBE_TECHNICAL_ACCOUNT_EMAIL":acct,"ADOBE_PRIVATE_KEY_PATH":key_path}.items():
+        if not v: 
+            raise RuntimeError(f"Missing {k}")
+    with open(key_path, "r") as f: 
         private_key = f.read()
-
     payload = {
-        "client_credentials": {
-            "client_id": cid,
-            "client_secret": csecret
-        },
-        "service_account_credentials": {
-            "organization_id": org,
-            "account_id": acct,                # 예: abcd@techacct.adobe.com
-            "private_key": private_key         # v4는 private_key(내용) 방식이 안전
-        }
+        "client_credentials": {"client_id": cid, "client_secret": csec},
+        "service_account_credentials": {"organization_id": org, "account_id": acct, "private_key": private_key}
     }
     fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
-    with os.fdopen(fd, "w") as f:
+    with os.fdopen(fd, "w") as f: 
         json.dump(payload, f)
-    logging.info("Built Adobe credentials JSON from ADOBE_* envs at %s", tmp)
     return tmp
 
 # Adobe 자격 증명 (개선된 디버그 출력)
@@ -96,46 +75,27 @@ ADOBE_AVAILABLE = False
 ADOBE_SDK_VERSION = None
 ADOBE_IMPORT_ERROR = None
 
-# v4 import 시도
 try:
-    # 기본 경로
+    # params (상위 → 하위 경로 폴백)
     try:
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf import ExportPDFParams, ExportPDFTargetFormat
     except Exception:
-        # 하위 모듈 경로 폴백
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
         from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
-
     # job
     from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-
-    # FileRef: pdfjobs.io 실패 시 공용 io로 폴백
+    # FileRef: pdfjobs.io → 공용 io 순서로 시도
     try:
         from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
     except Exception:
         from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
-
     from adobe.pdfservices.operation.pdfservices import PDFServices
     from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
-
     ADOBE_AVAILABLE = True
     ADOBE_SDK_VERSION = "4.x"
-except Exception as e_v4:
-    ADOBE_IMPORT_ERROR = f"v4 import failed: {e_v4}"
-    logging.warning(ADOBE_IMPORT_ERROR)
-    # v3로 폴백하려면 requirements에서 3.4.2로 내리고 아래 임포트 열기
-    try:
-        from adobe.pdfservices.operation.auth.credentials import Credentials
-        from adobe.pdfservices.operation.io.file_ref import FileRef
-        from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-        from adobe.pdfservices.operation.pdfops.options.export_pdf.export_pdf_target_format import ExportPDFTargetFormat as V3Target
-        from adobe.pdfservices.operation.execution_context import ExecutionContext
-        ADOBE_AVAILABLE = True
-        ADOBE_SDK_VERSION = "3.x"
-    except Exception as e_v3:
-        ADOBE_AVAILABLE = False
-        ADOBE_IMPORT_ERROR += f"; v3 import failed: {e_v3}"
-        logging.warning(f"Adobe v3 import also failed: {e_v3}")
+except Exception as e:
+    ADOBE_AVAILABLE = False
+    ADOBE_IMPORT_ERROR = f"v4 import failed: {e}"
 
 # 추가 imports
 from werkzeug.exceptions import HTTPException
@@ -270,11 +230,9 @@ def perform_xlsx_conversion_adobe(in_pdf_path: str, out_xlsx_path: str):
     result = pdf_services.get_job_result(loc)
     result.save_as(out_xlsx_path)
 
-def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str):
+def perform_xlsx_conversion_fallback(in_pdf_path, out_xlsx_path, scale: float = 1.0):
     import fitz, openpyxl
-    wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "Extracted"
+    wb = openpyxl.Workbook(); ws = wb.active; ws.title = "Extracted"
     with fitz.open(in_pdf_path) as doc:
         row = 1
         for i, page in enumerate(doc, start=1):
@@ -401,6 +359,12 @@ def health_check():
         "creds": {
             "json": bool(os.getenv("ADOBE_CREDENTIALS_JSON")),
             "file": bool(os.getenv("ADOBE_CREDENTIALS_FILE_PATH")),
+            "cid": bool(os.getenv("ADOBE_CLIENT_ID")),
+            "csecret": bool(os.getenv("ADOBE_CLIENT_SECRET")),
+            "org": bool(os.getenv("ADOBE_ORGANIZATION_ID")),
+            "acct": bool(os.getenv("ADOBE_ACCOUNT_ID") or os.getenv("ADOBE_TECHNICAL_ACCOUNT_EMAIL")),
+            "key_file_exists": os.path.exists(os.getenv("ADOBE_PRIVATE_KEY_PATH","")),
+            "disabled": os.getenv("ADOBE_DISABLED"),
         },
     }
 
