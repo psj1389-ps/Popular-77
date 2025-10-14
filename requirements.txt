@@ -1,0 +1,30 @@
+# Essential build tools - Python 3.12 compatible
+setuptools>=75.1.0
+wheel>=0.42.0
+packaging>=24.0
+
+# Core numerical dependencies (install first) - Python 3.12 compatible
+numpy==1.26.4
+
+# Core web framework
+Flask==2.3.3
+Werkzeug==2.3.7
+gunicorn==21.2.0
+python-dotenv==1.0.0
+
+# Document processing - Python 3.12 compatible
+openpyxl>=3.1.5
+reportlab==4.0.4
+Pillow>=10.2.0,<11.0.0
+pdfservices-sdk==4.2.0
+pdf2image==1.16.3
+pdfplumber>=0.10.3
+python-pptx>=0.6.21
+PyMuPDF>=1.23.0,<1.25.0
+
+# Image processing and OCR - Python 3.12 compatible
+opencv-python-headless==4.9.0.80
+pytesseract==0.3.10
+
+Flask-Cors
+pdf2docx
