@@ -155,3 +155,33 @@ services:
       - key: PORT
         value: 10000
     healthCheckPath: /health
+
+  # PDF to Image Service (Advanced)
+  - type: web
+    name: pdf-image-service
+    env: python
+    rootDir: services/pdf-image
+    buildCommand: pip install -r requirements.txt
+    startCommand: gunicorn app:app --timeout 300 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.7
+      - key: ADOBE_CLIENT_ID
+        sync: false
+      - key: ADOBE_CLIENT_SECRET
+        sync: false
+      - key: ADOBE_ORGANIZATION_ID
+        sync: false
+      - key: ADOBE_ACCOUNT_ID
+        sync: false
+      - key: ADOBE_TECHNICAL_ACCOUNT_EMAIL
+        sync: false
+      - key: ADOBE_PRIVATE_KEY_FILE
+        sync: false
+      - key: ADOBE_ACCESS_TOKEN
+        sync: false
+    healthCheckPath: /health
