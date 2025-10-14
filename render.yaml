@@ -162,7 +162,7 @@ services:
     env: python
     rootDir: services/pdf-image
     buildCommand: pip install -r requirements.txt
-    startCommand: gunicorn app:app --timeout 300 --bind 0.0.0.0:$PORT
+    startCommand: python minimal_app.py
     envVars:
       - key: FLASK_ENV
         value: production
