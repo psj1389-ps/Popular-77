@@ -161,8 +161,8 @@ services:
     name: pdf-image-service
     env: python
     rootDir: services/pdf-image
-    buildCommand: pip install Flask
-    startCommand: python minimal_app.py
+    buildCommand: pip install -r requirements.txt
+    startCommand: python simple_app.py
     envVars:
       - key: FLASK_ENV
         value: production
