@@ -162,26 +162,12 @@ services:
     env: python
     rootDir: services/pdf-image
     buildCommand: pip install -r requirements.txt
-    startCommand: python simple_app.py
+    startCommand: python app.py
     envVars:
       - key: FLASK_ENV
         value: production
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
-        value: 3.12.7
-      - key: ADOBE_CLIENT_ID
-        sync: false
-      - key: ADOBE_CLIENT_SECRET
-        sync: false
-      - key: ADOBE_ORGANIZATION_ID
-        sync: false
-      - key: ADOBE_ACCOUNT_ID
-        sync: false
-      - key: ADOBE_TECHNICAL_ACCOUNT_EMAIL
-        sync: false
-      - key: ADOBE_PRIVATE_KEY_FILE
-        sync: false
-      - key: ADOBE_ACCESS_TOKEN
-        sync: false
+        value: 3.12.6
     healthCheckPath: /health
