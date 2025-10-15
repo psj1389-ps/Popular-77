@@ -38,12 +38,29 @@ function safeGetFilename(res: Response, fallback: string) {
 // 에러 메시지 파싱
 async function getErrorMessage(res: Response) {
   const ct = res.headers.get("content-type") || "";
-  if (ct.includes("application/json")) {
-    const j = await res.json().catch(() => null);
-    if (j?.error) return j.error; // 서버가 { error: "메시지" }로 내려줄 때
+  
+  // 바이너리 파일 응답인 경우 (ZIP, SVG 등)
+  if (ct.includes("application/zip") || ct.includes("image/svg") || ct.includes("application/octet-stream")) {
+    return `서버에서 파일을 반환했지만 예상치 못한 상태 코드입니다 (${res.status})`;
   }
-  const t = await res.text().catch(() => "");
-  return t || `요청 실패(${res.status})`;
+  
+  // JSON 응답 시도
+  if (ct.includes("application/json")) {
+    try {
+      const j = await res.json();
+      if (j?.error) return j.error; // 서버가 { error: "메시지" }로 내려줄 때
+    } catch (e) {
+      // JSON 파싱 실패 시 텍스트로 fallback
+    }
+  }
+  
+  // 텍스트 응답 시도
+  try {
+    const t = await res.text();
+    return t || `요청 실패(${res.status})`;
+  } catch (e) {
+    return `요청 실패(${res.status})`;
+  }
 }
 
 const PdfVectorPage: React.FC = () => {
