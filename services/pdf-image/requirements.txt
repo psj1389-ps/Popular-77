@@ -1,9 +1,29 @@
-# Updated: 2024-12-19 - Force fresh deployment without svglib/cairosvg/reportlab
+# ===================================================
+# PDF-IMAGE SERVICE REQUIREMENTS - RENDER DEPLOYMENT
+# Updated: 2024-12-19 15:30 KST
+# CLEAN BUILD - NO LEGACY DEPENDENCIES
+# ===================================================
+
+# Web Framework
 Flask==2.3.3
 Werkzeug==2.3.7
+
+# PDF Processing
 PyMuPDF>=1.23.0,<1.27
+
+# Image Processing  
 Pillow>=10.2.0
+
+# Web Server
 gunicorn==21.2.0
+
+# Environment
 python-dotenv==1.0.0
+
+# Adobe PDF Services
 pdfservices-sdk==4.2.0
+
+# ===================================================
+# END OF REQUIREMENTS - NO ADDITIONAL PACKAGES
+# ===================================================
 
