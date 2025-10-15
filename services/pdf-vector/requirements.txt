@@ -1,6 +1,6 @@
 # ===================================================
 # PDF-VECTOR SERVICE REQUIREMENTS
-# Updated: 2024-12-19 16:10 KST
+# Updated: 2024-12-19 16:20 KST
 # For PDF to Vector conversion service
 # ===================================================
 
@@ -11,13 +11,8 @@ gunicorn==21.2.0
 python-dotenv==1.0.0
 
 # PDF processing
-PyMuPDF>=1.23.0,<1.27
-pdfservices-sdk==4.2.0
+PyMuPDF==1.24.14
 
-# Image processing
-Pillow>=10.2.0
-
-# Vector graphics processing
-cairosvg==2.7.1
-reportlab==4.0.4
+# Vector graphics processing (핵심 의존성)
+reportlab>=4.4.3,<5
 svglib==1.6.0
