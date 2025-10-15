@@ -44,6 +44,5 @@ Icon?
 *.temp
 .vercel
 
-# sitemap & robots
-public/sitemap*.xml
+# robots
 public/robots.txt
