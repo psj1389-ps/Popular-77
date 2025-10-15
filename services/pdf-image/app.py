@@ -47,6 +47,14 @@ app = Flask(__name__)
 app.secret_key = 'your-secret-key-here'
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024  # 100MB max file size
 
+@app.route("/health", methods=["GET", "HEAD"])
+def health():
+    return jsonify({
+        "ok": True,
+        "python": platform.python_version(),
+        "service": "pdf-image"
+    }), 200
+
 # Adobe PDF Services API 구성 - 실제 인증 정보 사용
 ADOBE_CONFIG = {
     "client_credentials": {
