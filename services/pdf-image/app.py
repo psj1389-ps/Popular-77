@@ -8,8 +8,8 @@ import json
 from dotenv import load_dotenv
 import subprocess
 import platform
-import cv2
-import numpy as np
+# import cv2  # Removed to fix ModuleNotFoundError
+# import numpy as np  # Removed to fix ModuleNotFoundError
 import fitz  # PyMuPDF
 import re
 from typing import List, Tuple, Dict, Any
