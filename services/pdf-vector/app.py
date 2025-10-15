@@ -1163,6 +1163,15 @@ def zip_paths(paths):
     buf.seek(0)
     return buf
 
+def _zip_paths(paths):
+    """Create a ZIP file in memory from a list of file paths"""
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in paths:
+            z.write(p, arcname=os.path.basename(p))
+    buf.seek(0)
+    return buf
+
 @app.route('/convert_to_vector', methods=['POST'])
 def convert_to_vector():
     try:
@@ -1255,125 +1264,31 @@ def convert_to_vector():
 
         logging.info(f"convert_to_vector: Successfully generated {len(valid_files)} files")
 
-        # Return JSON response with file information
-        file_info = []
-        for file_path in valid_files:
-            file_info.append({
-                "filename": os.path.basename(file_path),
-                "size": os.path.getsize(file_path),
-                "path": file_path
-            })
-
-        response_data = {
-            "success": True,
-            "mode": mode,
-            "files": file_info,
-            "total_files": len(valid_files)
-        }
-
-        logging.info(f"convert_to_vector: Returning JSON response with {len(valid_files)} files")
-        return jsonify(response_data), 200
+        # Return files directly (single file or ZIP)
+        if len(valid_files) == 1:
+            # Single file - return directly
+            fp = valid_files[0]
+            resp = send_file(fp, as_attachment=True, download_name=os.path.basename(fp))
+            resp.headers["Content-Length"] = str(os.path.getsize(fp))
+            logging.info(f"convert_to_vector: Returning single file {os.path.basename(fp)} ({os.path.getsize(fp)} bytes)")
+            return resp
+        else:
+            # Multiple files - return as ZIP
+            buf = _zip_paths(valid_files)
+            buf.seek(0, os.SEEK_END)
+            length = buf.tell()
+            buf.seek(0)
+            zip_name = f"{os.path.splitext(name)[0]}_{mode}.zip"
+            resp = send_file(buf, mimetype="application/zip", as_attachment=True, download_name=zip_name)
+            resp.headers["Content-Length"] = str(length)
+            logging.info(f"convert_to_vector: Returning ZIP file {zip_name} with {len(valid_files)} files ({length} bytes)")
+            return resp
 
     except Exception as e:
         logging.exception("convert_to_vector: Unexpected error occurred")
         return jsonify({"error": f"internal server error: {str(e)}"}), 500
 
-@app.route('/download_vector/<filename>')
-def download_vector(filename):
-    try:
-        # Input validation and security checks
-        if not filename:
-            logging.warning("download_vector: Empty filename provided")
-            return jsonify({"error": "filename is required"}), 400
-
-        # Sanitize filename to prevent directory traversal attacks
-        safe_filename = secure_filename(filename)
-        if not safe_filename or safe_filename != filename:
-            logging.warning(f"download_vector: Invalid filename '{filename}'")
-            return jsonify({"error": "invalid filename"}), 400
-
-        # Check file extension
-        if not safe_filename.lower().endswith(('.svg', '.ai')):
-            logging.warning(f"download_vector: Unsupported file type '{safe_filename}'")
-            return jsonify({"error": "only SVG and AI files are supported"}), 400
-
-        # Determine file type and set MIME type
-        file_ext = safe_filename.lower().split('.')[-1]
-        if file_ext == 'svg':
-            mimetype = 'image/svg+xml'
-            mode = 'svg'
-        elif file_ext == 'ai':
-            mimetype = 'application/postscript'
-            mode = 'ai'
-        else:
-            logging.warning(f"download_vector: Unknown file extension '{file_ext}'")
-            return jsonify({"error": "unsupported file type"}), 400
-
-        logging.info(f"download_vector: Looking for file '{safe_filename}' with mode '{mode}'")
-
-        # Debug: List all files in OUTPUT_FOLDER
-        all_files = []
-        for root, dirs, files in os.walk(OUTPUT_FOLDER):
-            for file in files:
-                all_files.append(os.path.join(root, file))
-        logging.info(f"download_vector: Available files in OUTPUT_FOLDER: {all_files}")
-
-        # Search for the file in output directories
-        file_path = None
-        
-        # Search in all subdirectories of OUTPUT_FOLDER
-        for root, dirs, files in os.walk(OUTPUT_FOLDER):
-            logging.info(f"download_vector: Searching in directory '{root}', files: {files}")
-            if safe_filename in files:
-                potential_path = os.path.join(root, safe_filename)
-                # Additional security check: ensure the file is within OUTPUT_FOLDER
-                if os.path.commonpath([os.path.abspath(potential_path), os.path.abspath(OUTPUT_FOLDER)]) == os.path.abspath(OUTPUT_FOLDER):
-                    file_path = potential_path
-                    logging.info(f"download_vector: Found file at '{file_path}'")
-                    break
-
-        if not file_path or not os.path.exists(file_path):
-            logging.warning(f"download_vector: File not found '{safe_filename}'. Searched in: {OUTPUT_FOLDER}")
-            # List recent files for debugging
-            recent_files = []
-            for root, dirs, files in os.walk(OUTPUT_FOLDER):
-                for file in files[-10:]:  # Last 10 files
-                    recent_files.append(file)
-            logging.warning(f"download_vector: Recent files in output folder: {recent_files}")
-            return jsonify({"error": "file not found"}), 404
-
-        # Verify file is not empty
-        if os.path.getsize(file_path) == 0:
-            logging.warning(f"download_vector: Empty file '{safe_filename}'")
-            return jsonify({"error": "file is empty"}), 404
-
-        logging.info(f"download_vector: Serving file '{safe_filename}' from '{file_path}' (size: {os.path.getsize(file_path)} bytes)")
-
-        # Serve the file
-        try:
-            response = send_file(
-                file_path,
-                mimetype=mimetype,
-                as_attachment=True,
-                download_name=safe_filename
-            )
-            
-            # Add Content-Length header
-            response.headers["Content-Length"] = str(os.path.getsize(file_path))
-            
-            # Add cache control headers for better performance
-            response.headers["Cache-Control"] = "public, max-age=3600"
-            
-            logging.info(f"download_vector: Successfully served '{safe_filename}'")
-            return response
-            
-        except Exception as e:
-            logging.error(f"download_vector: Failed to serve file '{safe_filename}': {e}")
-            return jsonify({"error": "failed to serve file"}), 500
-
-    except Exception as e:
-        logging.exception(f"download_vector: Unexpected error for filename '{filename}'")
-        return jsonify({"error": f"internal server error: {str(e)}"}), 500
+# /download_vector endpoint removed - no longer needed as /convert_to_vector returns files directly
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
