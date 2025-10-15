@@ -4,7 +4,9 @@ import tempfile
 from werkzeug.utils import secure_filename
 from converters.pdf_to_images import pdf_to_images
 from converters.images_to_pdf import images_to_pdf
-from utils.file_utils import ensure_dirs
+from utils.file_utils import ensure_dirs, zip_paths
+from converters.pdf_to_svg import pdf_to_svgs
+from converters.pdf_to_ai import split_pdf_to_ai_pages, save_pdf_as_ai
 # from pptx import Presentation
 # from pptx.util import Inches
 import io
@@ -1153,159 +1155,50 @@ def index():
 
 @app.route('/convert_to_vector', methods=['POST'])
 def convert_to_vector():
-    """PDF to Vector conversion endpoint"""
-    try:
-        print("PDF to Vector 변환 요청 시작")
-        
-        # Import vector converter
-        from converters.pdf_to_svg import vector_converter
-        
-        # 1단계: 파일 존재 여부 확인
-        if 'file' not in request.files:
-            return jsonify({'success': False, 'message': '파일이 선택되지 않았습니다.'}), 400
-        
-        file = request.files['file']
-        
-        # 2단계: 파일명 확인
-        if not file or file.filename == '' or file.filename is None:
-            return jsonify({'success': False, 'message': '파일이 선택되지 않았습니다.'}), 400
-        
-        # 3단계: 파일 내용 및 크기 확인
-        try:
-            file.seek(0, 2)
-            file_size = file.tell()
-            file.seek(0)
-            
-            if file_size == 0:
-                return jsonify({'success': False, 'message': '업로드된 파일이 비어있습니다.'}), 400
-            
-            if file_size < 100:
-                return jsonify({'success': False, 'message': '파일이 너무 작습니다.'}), 400
-            
-            if file_size > 100 * 1024 * 1024:  # 100MB
-                return jsonify({'success': False, 'message': f'파일 크기가 너무 큽니다. (최대: 100MB)'}), 400
-            
-            # 4단계: PDF 파일 헤더 검증
-            file_content = file.read(10)
-            file.seek(0)
-            
-            if not file_content.startswith(b'%PDF-'):
-                return jsonify({'success': False, 'message': '올바른 PDF 파일이 아닙니다.'}), 400
-                
-        except Exception as e:
-            print(f"파일 검증 중 오류: {str(e)}")
-            return jsonify({'success': False, 'message': '파일을 읽는 중 오류가 발생했습니다.'}), 400
-        
-        # 5단계: 파일 형식 확인 및 처리
-        if file and allowed_file(file.filename):
-            filename = secure_filename(file.filename)
-            
-            if '.' not in filename:
-                return jsonify({'success': False, 'message': '파일 확장자가 없습니다.'}), 400
-            
-            file_ext = filename.rsplit('.', 1)[1].lower()
-            if file_ext != 'pdf':
-                return jsonify({'success': False, 'message': 'PDF 파일만 업로드 가능합니다.'}), 400
-            
-            # 안전한 파일명 생성
-            import time
-            timestamp = str(int(time.time()))
-            safe_filename = f"{timestamp}_{filename}"
-            input_path = os.path.join(UPLOAD_FOLDER, safe_filename)
-            
-            print(f"파일 저장 중 - {input_path}")
-            try:
-                os.makedirs(UPLOAD_FOLDER, exist_ok=True)
-                file.save(input_path)
-                
-                saved_file_size = os.path.getsize(input_path)
-                if saved_file_size == 0:
-                    os.remove(input_path)
-                    return jsonify({'success': False, 'message': '파일 저장 중 오류가 발생했습니다.'}), 500
-                
-                print(f"파일 저장 완료 - 크기: {saved_file_size}바이트")
-            except Exception as e:
-                print(f"파일 저장 오류: {str(e)}")
-                return jsonify({'success': False, 'message': f'파일 저장 중 오류가 발생했습니다: {str(e)}'}), 500
-            
-            # 변환 형식 확인 (기본값: svg)
-            output_format = request.form.get('format', 'svg').lower()
-            if output_format not in ['svg', 'ai']:
-                output_format = 'svg'
-            
-            quality = request.form.get('quality', 'medium')
-            
-            print(f"PDF → {output_format.upper()} 변환 시작 - {input_path}")
-            
-            try:
-                # 벡터 변환 실행
-                result = vector_converter.convert_pdf_to_vectors(
-                    input_path, 
-                    output_format=output_format, 
-                    quality=quality
-                )
-                
-                if result['success']:
-                    print("벡터 변환 성공")
-                    
-                    # 변환된 파일들 정보 준비
-                    converted_files = []
-                    for file_info in result['files']:
-                        converted_path = file_info['converted']
-                        if os.path.exists(converted_path):
-                            file_size = os.path.getsize(converted_path)
-                            converted_files.append({
-                                'filename': os.path.basename(converted_path),
-                                'size': file_size,
-                                'format': file_info['format'],
-                                'page': file_info['original']['page']
-                            })
-                    
-                    # 업로드된 파일 정리
-                    try:
-                        os.remove(input_path)
-                        print("임시 파일 삭제 완료")
-                    except Exception as e:
-                        print(f"임시 파일 삭제 실패 (무시됨): {e}")
-                    
-                    return jsonify({
-                        'success': True,
-                        'message': f'변환이 완료되었습니다! {len(converted_files)}개의 파일이 생성되었습니다.',
-                        'files': converted_files,
-                        'total_converted': len(converted_files)
-                    })
-                else:
-                    print(f"벡터 변환 실패: {result.get('message', '알 수 없는 오류')}")
-                    
-                    # 실패한 파일들 정리
-                    try:
-                        if os.path.exists(input_path):
-                            os.remove(input_path)
-                    except Exception as e:
-                        print(f"파일 정리 실패 (무시됨): {e}")
-                    
-                    return jsonify({
-                        'success': False, 
-                        'message': result.get('message', '벡터 변환에 실패했습니다.')
-                    }), 500
-                    
-            except Exception as e:
-                print(f"변환 중 예외 발생: {str(e)}")
-                
-                # 실패한 파일들 정리
-                try:
-                    if os.path.exists(input_path):
-                        os.remove(input_path)
-                except Exception as cleanup_e:
-                    print(f"파일 정리 실패 (무시됨): {cleanup_e}")
-                
-                return jsonify({'success': False, 'message': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
+    """
+    mode=svg → 페이지별 SVG zip
+    mode=ai → 페이지별 .ai zip (split=false면 단일 .ai)
+    pages="1-3,5" 같은 형식 지원
+    """
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file is required"}), 400
+
+    mode = (request.form.get("mode") or "svg").lower()  # svg | ai
+    pages_spec = request.form.get("pages")
+    text_as_path = (request.form.get("text_as_path") or "false").lower() in ("1","true","yes","y","on")
+    zoom = float(request.form.get("zoom") or 1.0)
+    split = (request.form.get("split") or "true").lower() in ("1","true","yes","y","on")
+
+    base_dir = os.path.dirname(__file__)
+    uploads = os.path.join(base_dir, "uploads")
+    outputs = os.path.join(base_dir, "outputs")
+    ensure_dirs([uploads, outputs])
+
+    name = secure_filename(f.filename)
+    in_pdf = os.path.join(uploads, name)
+    f.save(in_pdf)
+
+    out_dir = os.path.join(outputs, os.path.splitext(name)[0] + f"_{mode}")
+    os.makedirs(out_dir, exist_ok=True)
+
+    if mode == "svg":
+        files = pdf_to_svgs(in_pdf, out_dir, text_as_path=text_as_path, zoom=zoom, pages_spec=pages_spec)
+    elif mode == "ai":
+        if split or pages_spec:
+            files = split_pdf_to_ai_pages(in_pdf, out_dir, pages_spec=pages_spec, prefix="page")
         else:
-            return jsonify({'success': False, 'message': 'PDF 파일만 업로드 가능합니다.'}), 400
-            
-    except Exception as e:
-        print(f"벡터 변환 처리 중 예외 발생: {str(e)}")
-        return jsonify({'success': False, 'message': '파일 처리 중 오류가 발생했습니다.'}), 500
+            out_ai = os.path.join(out_dir, os.path.splitext(name)[0] + ".ai")
+            save_pdf_as_ai(in_pdf, out_ai)
+            files = [out_ai]
+    else:
+        return jsonify({"error": "mode must be svg or ai"}), 400
+
+    if len(files) == 1:
+        return send_file(files[0], as_attachment=True, download_name=os.path.basename(files[0]))
+    buf = zip_paths(files)
+    return send_file(buf, mimetype="application/zip", as_attachment=True,
+                     download_name=f"{os.path.splitext(name)[0]}_{mode}.zip")
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])

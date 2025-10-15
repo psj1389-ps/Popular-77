@@ -1,6 +1,6 @@
 from flask import Flask, render_template, send_from_directory, request, jsonify, send_file
 import os
-from pdf2image import convert_from_bytes
+import fitz  # PyMuPDF
 from PIL import Image
 import io
 import zipfile
@@ -43,9 +43,21 @@ def convert_pdf():
         }
         dpi = dpi_settings.get(quality, 200)
         
-        # PDF를 이미지로 변환
+        # PDF를 이미지로 변환 (PyMuPDF 사용)
         pdf_bytes = file.read()
-        images = convert_from_bytes(pdf_bytes, dpi=dpi, fmt='JPEG')
+        doc = fitz.open(stream=pdf_bytes, filetype="pdf")
+        images = []
+        zoom = dpi / 72.0  # DPI를 zoom factor로 변환
+        mat = fitz.Matrix(zoom, zoom)
+        
+        for page_num in range(doc.page_count):
+            page = doc[page_num]
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("jpeg")
+            img = Image.open(io.BytesIO(img_data))
+            images.append(img)
+        
+        doc.close()
         
         # 디버깅: 이미지 개수 로그 출력
         print(f"DEBUG: 변환된 이미지 개수: {len(images)}")
