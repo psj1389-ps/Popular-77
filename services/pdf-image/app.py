@@ -2,7 +2,6 @@ from flask import Flask, request, render_template, send_file, flash, redirect, u
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from pdf2image import convert_from_path
 from pptx import Presentation
 from pptx.util import Inches
 import io
@@ -19,7 +18,6 @@ import numpy as np
 import fitz  # PyMuPDF
 import re
 from typing import List, Tuple, Dict, Any
-from pdf2docx import Converter
 # Adobe PDF Services SDK 임포트 및 설정
 try:
     # 올바른 Adobe PDF Services SDK import 구문
@@ -112,25 +110,43 @@ def save_debug_image(image, filename_prefix, page_num):
         print(f"디버깅 이미지 저장 오류: {e}")
         return None
 
-def pdf_to_docx_with_pdf2docx(pdf_path, output_path):
-    """pdf2docx 라이브러리를 사용한 PDF → DOCX 변환"""
+def pdf_to_docx_with_pymupdf(pdf_path, output_path):
+    """PyMuPDF를 사용한 PDF → DOCX 변환"""
     try:
-        print("pdf2docx 라이브러리를 사용하여 변환 중...")
+        print("PyMuPDF를 사용하여 변환 중...")
         
-        # Converter 객체 생성
-        cv = Converter(pdf_path)
+        # PyMuPDF로 PDF 열기
+        doc = fitz.open(pdf_path)
         
-        # 변환 실행
-        cv.convert(output_path, start=0, end=None)
+        # 새 DOCX 문서 생성
+        docx_doc = Document()
         
-        # 객체 닫기
-        cv.close()
+        # 각 페이지에서 텍스트 추출
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            text = page.get_text()
+            
+            if text.strip():
+                # 페이지 구분자 추가
+                if page_num > 0:
+                    docx_doc.add_page_break()
+                
+                # 텍스트를 문단으로 추가
+                paragraphs = text.split('\n\n')
+                for para in paragraphs:
+                    if para.strip():
+                        docx_doc.add_paragraph(para.strip())
         
-        print(f"pdf2docx 변환 완료: {output_path}")
+        doc.close()
+        
+        # DOCX 파일 저장
+        docx_doc.save(output_path)
+        
+        print(f"PyMuPDF 변환 완료: {output_path}")
         return True
         
     except Exception as e:
-        print(f"pdf2docx 변환 실패: {e}")
+        print(f"PyMuPDF 변환 실패: {e}")
         return False
 
 def ocr_image_to_blocks(pil_image):
@@ -391,17 +407,17 @@ def pdf_to_docx(pdf_path, output_path, quality='medium'):
         # 파일명에서 확장자 제거하여 디버깅용 prefix 생성
         filename_prefix = os.path.splitext(os.path.basename(pdf_path))[0]
         
-        # 1단계: pdf2docx 라이브러리를 우선적으로 시도
-        print("=== 1단계: pdf2docx 라이브러리 변환 시도 ===")
-        if pdf_to_docx_with_pdf2docx(pdf_path, output_path):
-            print("pdf2docx 변환 성공! Microsoft Word 호환성 확인...")
+        # 1단계: PyMuPDF를 우선적으로 시도
+        print("=== 1단계: PyMuPDF 변환 시도 ===")
+        if pdf_to_docx_with_pymupdf(pdf_path, output_path):
+            print("PyMuPDF 변환 성공! Microsoft Word 호환성 확인...")
             
             # 변환된 파일이 실제로 존재하고 크기가 적절한지 확인
             if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:  # 1KB 이상
                 print(f"변환 완료: {output_path} (크기: {os.path.getsize(output_path)} bytes)")
                 return True
             else:
-                print("pdf2docx 변환 결과가 부적절함. 대체 방법 시도...")
+                print("PyMuPDF 변환 결과가 부적절함. 대체 방법 시도...")
         
         print("=== 2단계: 기존 OCR 방법으로 fallback ===")
         # 품질 설정에 따른 파라미터 설정 (최적화됨)
@@ -449,7 +465,19 @@ def pdf_to_docx(pdf_path, output_path, quality='medium'):
         
         # 기본 방법: PDF를 이미지로 변환 (품질별 최적화)
         print("PDF를 이미지로 변환 중...")
-        images = convert_from_path(pdf_path, dpi=settings['dpi'], fmt=settings['format'])
+        # PyMuPDF를 사용하여 PDF를 이미지로 변환
+        doc = fitz.open(pdf_path)
+        images = []
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            # DPI 설정에 따른 매트릭스 계산
+            zoom = settings['dpi'] / 72.0  # 72 DPI가 기본값
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("PNG")
+            img = Image.open(io.BytesIO(img_data))
+            images.append(img)
+        doc.close()
         
         # 디버깅: 변환된 이미지들을 저장
         print("=== 디버깅: 변환된 이미지 저장 ===")
@@ -728,7 +756,19 @@ def pdf_to_pptx(pdf_path, output_path, quality='medium'):
         
         # 기본 방법: PDF를 이미지로 변환 (품질별 최적화)
         print("PDF를 이미지로 변환 중...")
-        images = convert_from_path(pdf_path, dpi=settings['dpi'], fmt=settings['format'])
+        # PyMuPDF를 사용하여 PDF를 이미지로 변환
+        doc = fitz.open(pdf_path)
+        images = []
+        for page_num in range(len(doc)):
+            page = doc.load_page(page_num)
+            # DPI 설정에 따른 매트릭스 계산
+            zoom = settings['dpi'] / 72.0  # 72 DPI가 기본값
+            mat = fitz.Matrix(zoom, zoom)
+            pix = page.get_pixmap(matrix=mat)
+            img_data = pix.tobytes("PNG")
+            img = Image.open(io.BytesIO(img_data))
+            images.append(img)
+        doc.close()
         
         # 새 PowerPoint 프레젠테이션 생성 (방향에 따른 슬라이드 설정)
         prs = Presentation()
