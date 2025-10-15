@@ -1,0 +1,27 @@
+User-agent: *
+Allow: /
+
+# Sitemap location
+Sitemap: https://77-tools.xyz/sitemap.xml
+
+# Block admin and private areas
+Disallow: /admin/
+Disallow: /private/
+Disallow: /.env
+Disallow: /api/internal/
+
+# Block temporary and cache files
+Disallow: /tmp/
+Disallow: /cache/
+Disallow: /*.tmp$
+Disallow: /*.log$
+
+# Allow important resources for SEO
+Allow: /css/
+Allow: /js/
+Allow: /images/
+Allow: /icons/
+Allow: /assets/
+
+# Crawl delay (optional - 1 second)
+Crawl-delay: 1

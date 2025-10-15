@@ -43,6 +43,3 @@ Icon?
 *.tmp
 *.temp
 .vercel
-
-# robots
-public/robots.txt
