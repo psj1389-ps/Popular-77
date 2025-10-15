@@ -43,3 +43,7 @@ Icon?
 *.tmp
 *.temp
 .vercel
+
+# sitemap & robots
+public/sitemap*.xml
+public/robots.txt
