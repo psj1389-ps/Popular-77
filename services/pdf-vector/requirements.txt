@@ -13,9 +13,12 @@ python-dotenv==1.0.0
 # PDF processing
 PyMuPDF==1.24.14
 
+# Image processing
+Pillow
+
 # Vector graphics processing (핵심 의존성)
 reportlab>=4.4.3,<5
+svglib==1.6.0
 
-# NOTE: svglib==1.6.0 removed due to pycairo dependency conflict on Render
-# The pycairo>=1.20.0 requirement from rlpycairo (svglib dependency) 
-# cannot be satisfied in Render's build environment despite apt.txt configuration
+# NOTE: pdf2image removed - using PyMuPDF+Pillow for better Render compatibility
+# Eliminates poppler binary dependency for serverless deployment

@@ -2,7 +2,9 @@ from flask import Flask, request, render_template, send_file, flash, redirect, u
 import os
 import tempfile
 from werkzeug.utils import secure_filename
-from pdf2image import convert_from_path
+from converters.pdf_to_images import pdf_to_images
+from converters.images_to_pdf import images_to_pdf
+from utils.file_utils import ensure_dirs
 # from pptx import Presentation
 # from pptx.util import Inches
 import io
@@ -449,7 +451,10 @@ def pdf_to_docx(pdf_path, output_path, quality='medium'):
         
         # 기본 방법: PDF를 이미지로 변환 (품질별 최적화)
         print("PDF를 이미지로 변환 중...")
-        images = convert_from_path(pdf_path, dpi=settings['dpi'], fmt=settings['format'])
+        temp_dir = tempfile.mkdtemp()
+        ensure_dirs([temp_dir])
+        image_paths = pdf_to_images(pdf_path, temp_dir, fmt=settings['format'], dpi=settings['dpi'])
+        images = [Image.open(path) for path in image_paths]
         
         # 디버깅: 변환된 이미지들을 저장
         print("=== 디버깅: 변환된 이미지 저장 ===")
@@ -728,7 +733,10 @@ def pdf_to_pptx(pdf_path, output_path, quality='medium'):
         
         # 기본 방법: PDF를 이미지로 변환 (품질별 최적화)
         print("PDF를 이미지로 변환 중...")
-        images = convert_from_path(pdf_path, dpi=settings['dpi'], fmt=settings['format'])
+        temp_dir = tempfile.mkdtemp()
+        ensure_dirs([temp_dir])
+        image_paths = pdf_to_images(pdf_path, temp_dir, fmt=settings['format'], dpi=settings['dpi'])
+        images = [Image.open(path) for path in image_paths]
         
         # 새 PowerPoint 프레젠테이션 생성 (방향에 따른 슬라이드 설정)
         prs = Presentation()
@@ -1134,6 +1142,10 @@ def docx_to_pdf(docx_path, output_path):
 def too_large(e):
     flash('파일 크기가 100MB를 초과합니다. 더 작은 파일을 선택해주세요.')
     return redirect(url_for('index'))
+
+@app.route('/health')
+def health_check():
+    return jsonify({"status": "healthy", "service": "pdf-vector"}), 200
 
 @app.route('/')
 def index():
