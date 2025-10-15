@@ -1,3 +1,9 @@
+# ===================================================
+# ROOT PROJECT REQUIREMENTS - SHARED DEPENDENCIES ONLY
+# Updated: 2024-12-19 16:00 KST
+# NOTE: Each service has its own requirements.txt file
+# ===================================================
+
 # Essential build tools - Python 3.12 compatible
 setuptools>=75.1.0
 wheel>=0.42.0
@@ -12,9 +18,8 @@ Werkzeug==2.3.7
 gunicorn==21.2.0
 python-dotenv==1.0.0
 
-# Document processing - Python 3.12 compatible
+# Basic document processing - Python 3.12 compatible
 openpyxl>=3.1.5
-reportlab==4.0.4
 Pillow>=10.2.0,<11.0.0
 pdfservices-sdk==4.2.0
 pdf2image==1.16.3
@@ -28,3 +33,10 @@ pytesseract==0.3.10
 
 Flask-Cors
 pdf2docx
+
+# ===================================================
+# REMOVED PROBLEMATIC PACKAGES:
+# - reportlab==4.0.4 (causes svglib dependency conflicts)
+# - cairosvg (not needed in root, service-specific)
+# - svglib (version conflicts with reportlab)
+# ===================================================
