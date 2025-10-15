@@ -1,15 +1,17 @@
 from flask import Flask, request, render_template, send_file, flash, redirect, url_for, jsonify
 import os
 import tempfile
+import io
+import zipfile
+import logging
 from werkzeug.utils import secure_filename
 from converters.pdf_to_images import pdf_to_images
 from converters.images_to_pdf import images_to_pdf
-from utils.file_utils import ensure_dirs, zip_paths
+from utils.file_utils import ensure_dirs, zip_paths, parse_pages
 from converters.pdf_to_svg import pdf_to_svgs
 from converters.pdf_to_ai import split_pdf_to_ai_pages, save_pdf_as_ai
 # from pptx import Presentation
 # from pptx.util import Inches
-import io
 from PIL import Image
 import json
 from dotenv import load_dotenv
@@ -1153,52 +1155,72 @@ def health_check():
 def index():
     return render_template('index.html')
 
+def zip_paths(paths):
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in paths:
+            z.write(p, arcname=os.path.basename(p))
+    buf.seek(0)
+    return buf
+
 @app.route('/convert_to_vector', methods=['POST'])
 def convert_to_vector():
-    """
-    mode=svg → 페이지별 SVG zip
-    mode=ai → 페이지별 .ai zip (split=false면 단일 .ai)
-    pages="1-3,5" 같은 형식 지원
-    """
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "file is required"}), 400
 
-    mode = (request.form.get("mode") or "svg").lower()  # svg | ai
-    pages_spec = request.form.get("pages")
+    mode = (request.form.get("mode") or "svg").lower()      # svg | ai
+    pages_spec = request.form.get("pages")                   # "1-3,5" 형식
     text_as_path = (request.form.get("text_as_path") or "false").lower() in ("1","true","yes","y","on")
     zoom = float(request.form.get("zoom") or 1.0)
     split = (request.form.get("split") or "true").lower() in ("1","true","yes","y","on")
 
-    base_dir = os.path.dirname(__file__)
-    uploads = os.path.join(base_dir, "uploads")
-    outputs = os.path.join(base_dir, "outputs")
-    ensure_dirs([uploads, outputs])
-
     name = secure_filename(f.filename)
-    in_pdf = os.path.join(uploads, name)
+    in_pdf = os.path.join(UPLOAD_FOLDER, name)
     f.save(in_pdf)
 
-    out_dir = os.path.join(outputs, os.path.splitext(name)[0] + f"_{mode}")
+    out_dir = os.path.join(OUTPUT_FOLDER, os.path.splitext(name)[0] + f"_{mode}")
     os.makedirs(out_dir, exist_ok=True)
 
-    if mode == "svg":
-        files = pdf_to_svgs(in_pdf, out_dir, text_as_path=text_as_path, zoom=zoom, pages_spec=pages_spec)
-    elif mode == "ai":
-        if split or pages_spec:
-            files = split_pdf_to_ai_pages(in_pdf, out_dir, pages_spec=pages_spec, prefix="page")
+    try:
+        if mode == "svg":
+            files = pdf_to_svgs(in_pdf, out_dir, text_as_path=text_as_path, zoom=zoom, pages_spec=pages_spec)
+        elif mode == "ai":
+            if split or pages_spec:
+                files = split_pdf_to_ai_pages(in_pdf, out_dir, pages_spec=pages_spec, prefix="page")
+            else:
+                out_ai = os.path.join(out_dir, os.path.splitext(name)[0] + ".ai")
+                save_pdf_as_ai(in_pdf, out_ai)
+                files = [out_ai]
         else:
-            out_ai = os.path.join(out_dir, os.path.splitext(name)[0] + ".ai")
-            save_pdf_as_ai(in_pdf, out_ai)
-            files = [out_ai]
-    else:
-        return jsonify({"error": "mode must be svg or ai"}), 400
+            return jsonify({"error": "mode must be svg or ai"}), 400
 
-    if len(files) == 1:
-        return send_file(files[0], as_attachment=True, download_name=os.path.basename(files[0]))
-    buf = zip_paths(files)
-    return send_file(buf, mimetype="application/zip", as_attachment=True,
-                     download_name=f"{os.path.splitext(name)[0]}_{mode}.zip")
+        # 파일 생성 검증
+        files = [p for p in files if os.path.isfile(p) and os.path.getsize(p) > 0]
+        if not files:
+            return jsonify({"error": "no output files generated"}), 500
+
+        # 단일 파일은 바로 전송
+        if len(files) == 1:
+            fp = files[0]
+            resp = send_file(fp, as_attachment=True, download_name=os.path.basename(fp))
+            # Content-Length 명시(어떤 프록시 로그에서 0으로 찍히는 것 방지)
+            resp.headers["Content-Length"] = str(os.path.getsize(fp))
+            return resp
+
+        # 여러 파일 ZIP 스트림 전송
+        buf = zip_paths(files)
+        buf.seek(0, os.SEEK_END)
+        length = buf.tell()
+        buf.seek(0)
+        resp = send_file(buf, mimetype="application/zip", as_attachment=True,
+                         download_name=f"{os.path.splitext(name)[0]}_{mode}.zip")
+        resp.headers["Content-Length"] = str(length)
+        return resp
+
+    except Exception as e:
+        logging.exception("vector conversion failed")
+        return jsonify({"error": str(e)}), 500
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
