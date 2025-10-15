@@ -6,8 +6,6 @@ import io
 from PIL import Image
 import json
 from dotenv import load_dotenv
-from docx import Document
-from docx.shared import Pt, Inches as DocxInches
 import subprocess
 import platform
 import pytesseract
@@ -108,44 +106,7 @@ def save_debug_image(image, filename_prefix, page_num):
         print(f"디버깅 이미지 저장 오류: {e}")
         return None
 
-def pdf_to_docx_with_pymupdf(pdf_path, output_path):
-    """PyMuPDF를 사용한 PDF → DOCX 변환"""
-    try:
-        print("PyMuPDF를 사용하여 변환 중...")
-        
-        # PyMuPDF로 PDF 열기
-        doc = fitz.open(pdf_path)
-        
-        # 새 DOCX 문서 생성
-        docx_doc = Document()
-        
-        # 각 페이지에서 텍스트 추출
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            text = page.get_text()
-            
-            if text.strip():
-                # 페이지 구분자 추가
-                if page_num > 0:
-                    docx_doc.add_page_break()
-                
-                # 텍스트를 문단으로 추가
-                paragraphs = text.split('\n\n')
-                for para in paragraphs:
-                    if para.strip():
-                        docx_doc.add_paragraph(para.strip())
-        
-        doc.close()
-        
-        # DOCX 파일 저장
-        docx_doc.save(output_path)
-        
-        print(f"PyMuPDF 변환 완료: {output_path}")
-        return True
-        
-    except Exception as e:
-        print(f"PyMuPDF 변환 실패: {e}")
-        return False
+# pdf_to_docx_with_pymupdf function removed - docx dependency removed
 
 def ocr_image_to_blocks(pil_image):
     """이미지에서 단어 단위 텍스트와 위치(좌표)를 추출"""
@@ -399,366 +360,9 @@ def extract_pdf_content_with_adobe(pdf_path):
         print(f"일반 오류: {str(e)}")
         return None
 
-def pdf_to_docx(pdf_path, output_path, quality='medium'):
-    """PDF를 DOCX로 변환하는 함수 (하이브리드 접근법: pdf2docx 우선, OCR 보조)"""
-    try:
-        # 파일명에서 확장자 제거하여 디버깅용 prefix 생성
-        filename_prefix = os.path.splitext(os.path.basename(pdf_path))[0]
-        
-        # 1단계: PyMuPDF를 우선적으로 시도
-        print("=== 1단계: PyMuPDF 변환 시도 ===")
-        if pdf_to_docx_with_pymupdf(pdf_path, output_path):
-            print("PyMuPDF 변환 성공! Microsoft Word 호환성 확인...")
-            
-            # 변환된 파일이 실제로 존재하고 크기가 적절한지 확인
-            if os.path.exists(output_path) and os.path.getsize(output_path) > 1024:  # 1KB 이상
-                print(f"변환 완료: {output_path} (크기: {os.path.getsize(output_path)} bytes)")
-                return True
-            else:
-                print("PyMuPDF 변환 결과가 부적절함. 대체 방법 시도...")
-        
-        print("=== 2단계: 기존 OCR 방법으로 fallback ===")
-        # 품질 설정에 따른 파라미터 설정 (최적화됨)
-        quality_settings = {
-            'medium': {
-                'dpi': 120,  # DPI 최적화로 속도 향상
-                'format': 'jpeg',
-                'jpeg_quality': 80,  # 품질과 속도의 균형
-                'max_size': (1600, 1200),  # 적절한 해상도
-                'description': '균형 변환 (최적화된 속도와 품질)'
-            },
-            'high': {
-                'dpi': 180,  # 고품질이지만 속도 고려
-                'format': 'jpeg',  # PNG 대신 JPEG 사용으로 속도 향상
-                'jpeg_quality': 90,
-                'max_size': (2048, 1536),  # 해상도 최적화
-                'description': '고품질 변환 (향상된 속도)'
-            }
-        }
-        
-        settings = quality_settings.get(quality, quality_settings['medium'])
-        print(f"변환 설정: {settings['description']}")
-        
-        # 1단계: 레이아웃 인식을 통한 텍스트 추출 시도
-        print("레이아웃 인식을 통한 텍스트 추출을 시도합니다...")
-        layout_data = extract_text_with_layout_from_pdf(pdf_path)
-        extracted_text = layout_data.get('full_text', '')
-        text_blocks = layout_data.get('text_blocks', [])
-        orientation_info = layout_data.get('orientation_info', {})
-        
-        if extracted_text:
-            print(f"레이아웃 인식으로 텍스트 추출 성공: {len(extracted_text)}자")
-        else:
-            print("레이아웃 인식 실패, Adobe API를 시도합니다...")
-            
-            # 2단계: Adobe API를 사용한 PDF 내용 추출 시도
-            if adobe_available:
-                print("Adobe API를 사용하여 PDF 처리를 시작합니다...")
-                extracted_content = extract_pdf_content_with_adobe(pdf_path)
-                if extracted_content:
-                    extracted_text = str(extracted_content)
-                    print(f"Adobe API에서 텍스트 추출 성공: {len(extracted_text)}자")
-                else:
-                    print("Adobe API 추출 실패, OCR 방법으로 진행합니다.")
-        
-        # 기본 방법: PDF를 이미지로 변환 (품질별 최적화)
-        print("PDF를 이미지로 변환 중...")
-        # PyMuPDF를 사용하여 PDF를 이미지로 변환
-        doc = fitz.open(pdf_path)
-        images = []
-        for page_num in range(len(doc)):
-            page = doc.load_page(page_num)
-            # DPI 설정에 따른 매트릭스 계산
-            zoom = settings['dpi'] / 72.0  # 72 DPI가 기본값
-            mat = fitz.Matrix(zoom, zoom)
-            pix = page.get_pixmap(matrix=mat)
-            img_data = pix.tobytes("PNG")
-            img = Image.open(io.BytesIO(img_data))
-            images.append(img)
-        doc.close()
-        
-        # 디버깅: 변환된 이미지들을 저장
-        print("=== 디버깅: 변환된 이미지 저장 ===")
-        for i, image in enumerate(images):
-            save_debug_image(image, filename_prefix, i+1)
-        
-        # 새 Word 문서 생성 - 호환성 개선 및 방향 자동 감지
-        doc = Document()
-        
-        # 페이지 설정 (문서 방향에 따라 자동 조정)
-        section = doc.sections[0]
-        primary_orientation = orientation_info.get('primary_orientation', 'portrait')
-        
-        if primary_orientation == 'landscape':
-            # 가로형 문서 설정
-            section.page_width = Inches(11)
-            section.page_height = Inches(8.5)
-            section.left_margin = Inches(0.8)
-            section.right_margin = Inches(0.8)
-            section.top_margin = Inches(0.6)
-            section.bottom_margin = Inches(0.6)
-            print("가로형 문서로 설정됨")
-        else:
-            # 세로형 문서 설정
-            section.page_width = Inches(8.5)
-            section.page_height = Inches(11)
-            section.left_margin = Inches(1)
-            section.right_margin = Inches(1)
-            section.top_margin = Inches(1)
-            section.bottom_margin = Inches(1)
-            print("세로형 문서로 설정됨")
-        
-        # 문서 속성 설정 (Microsoft Word 호환성 향상)
-        try:
-            # 안전한 파일명 생성 (특수문자 제거)
-            safe_filename = re.sub(r'[^\w\s-]', '', os.path.splitext(os.path.basename(pdf_path))[0])
-            doc.core_properties.title = safe_filename[:50]  # 제목 길이 제한
-            doc.core_properties.author = "Document Converter"
-            doc.core_properties.subject = "PDF to DOCX Conversion"
-            doc.core_properties.comments = "Converted using advanced OCR and layout recognition"
-        except Exception as e:
-            print(f"문서 속성 설정 중 오류 (무시됨): {e}")
-        
-        all_ocr_text = []
-        
-        print(f"총 {len(images)}페이지 처리 중...")
-        # OCR로 텍스트 추출 (Adobe API가 실패한 경우)
-        if not extracted_text:
-            for i, image in enumerate(images):
-                print(f"페이지 {i+1}/{len(images)} OCR 처리 중...")
-                ocr_text = extract_text_blocks_with_ocr(image)
-                if ocr_text:
-                    all_ocr_text.append(ocr_text)
-        
-        # 편집 가능한 텍스트만 추가 (원본 이미지 제거)
-        final_text = extracted_text if extracted_text else '\n'.join(all_ocr_text)
-        
-        # 디버깅: 추출된 텍스트를 파일로 저장
-        print("=== 디버깅: 추출된 텍스트 저장 ===")
-        if final_text:
-            save_debug_text(final_text, filename_prefix)
-        elif all_ocr_text:
-            combined_ocr_text = '\n'.join(all_ocr_text)
-            save_debug_text(combined_ocr_text, filename_prefix + "_ocr")
-        else:
-            save_debug_text("텍스트 추출 실패", filename_prefix + "_no_text")
-        
-        if final_text or text_blocks:
-            print(f"편집 가능한 텍스트 문서 생성: {len(final_text)}자")
-            
-            # 레이아웃 정보가 있는 경우 페이지별로 구성 (페이지 헤더 제거)
-            if text_blocks:
-                print("레이아웃 정보를 활용하여 텍스트 구조화...")
-                
-                # 페이지별로 텍스트 구성 (페이지 번호 헤더 없이)
-                for page_num in range(len(images)):
-                    if page_num > 0:
-                        doc.add_page_break()
-                    
-                    # 해당 페이지의 텍스트 블록 추가
-                    page_text_blocks = [block for block in text_blocks if block['page'] == page_num]
-                    
-                    if page_text_blocks:
-                        for block in page_text_blocks:
-                            text_paragraph = doc.add_paragraph()
-                            text_run = text_paragraph.add_run(block['text'])
-                            
-                            # 텍스트 정렬 적용 (원본과 동일하게)
-                            if block['alignment'] == 'center':
-                                text_paragraph.alignment = 1  # 중앙 정렬
-                                text_run.bold = True  # 중앙 정렬 텍스트는 굵게
-                            elif block['alignment'] == 'right':
-                                text_paragraph.alignment = 2  # 오른쪽 정렬
-                            else:
-                                text_paragraph.alignment = 0  # 왼쪽 정렬
-                            
-                            # 원본과 동일한 텍스트 스타일 적용 (Microsoft Word 호환성 개선)
-                            try:
-                                # 폰트 설정 (한글 문서에 적합한 폰트)
-                                text_run.font.name = '맑은 고딕'
-                                text_run.font.size = Pt(11)  # 표준 문서 크기
-                                
-                                # 제목 스타일 적용
-                                if len(block['text']) < 50 and block['alignment'] == 'center':
-                                    text_run.font.size = Pt(14)
-                                    text_run.bold = True
-                                elif '제목' in block['text'] or '공문' in block['text']:
-                                    text_run.font.size = Pt(13)
-                                    text_run.bold = True
-                                
-                                # 줄간격 및 단락 간격 설정 (원본과 동일하게)
-                                text_paragraph.paragraph_format.line_spacing = 1.2
-                                text_paragraph.paragraph_format.space_after = Pt(3)
-                                text_paragraph.paragraph_format.space_before = Pt(0)
-                                
-                                # 들여쓰기 설정 (원본 레이아웃 유지)
-                                if block['alignment'] == 'left':
-                                    text_paragraph.paragraph_format.left_indent = Pt(0)
-                                elif block['alignment'] == 'center':
-                                    text_paragraph.paragraph_format.left_indent = Pt(0)
-                                    
-                            except Exception as e:
-                                print(f"텍스트 스타일 설정 중 오류 (무시됨): {e}")
-            else:
-                # 레이아웃 정보가 없는 경우 일반 텍스트로 추가 (Microsoft Word 호환성 개선)
-                clean_final_text = final_text.replace('\x00', '').replace('\ufffd', '').strip()
-                if clean_final_text:
-                    paragraphs = clean_final_text.split('\n\n')
-                    for para_text in paragraphs:
-                        if para_text.strip():
-                            text_paragraph = doc.add_paragraph()
-                            text_run = text_paragraph.add_run(para_text.strip())
-                            
-                            # 일반 텍스트에도 표준 스타일 적용
-                            try:
-                                text_run.font.name = '맑은 고딕'
-                                text_run.font.size = Pt(11)
-                                text_paragraph.paragraph_format.line_spacing = 1.2
-                                text_paragraph.paragraph_format.space_after = Pt(3)
-                                text_paragraph.paragraph_format.space_before = Pt(0)
-                            except Exception as e:
-                                print(f"일반 텍스트 스타일 설정 중 오류 (무시됨): {e}")
-                else:
-                    text_paragraph = doc.add_paragraph()
-                    text_run = text_paragraph.add_run("텍스트를 추출할 수 없었습니다.")
-                    try:
-                        text_run.font.name = '맑은 고딕'
-                        text_run.font.size = Pt(11)
-                    except Exception as e:
-                        print(f"오류 메시지 스타일 설정 중 오류 (무시됨): {e}")
-            
-            print("편집 가능한 텍스트 문서가 생성되었습니다.")
-        else:
-            print("추출할 수 있는 텍스트가 없습니다. 이미지 기반 문서를 생성합니다.")
-            
-            # 텍스트가 없는 경우에만 이미지 추가
-            for i, image in enumerate(images):
-                print(f"페이지 {i+1}/{len(images)} 처리 중...")
-                
-                # 이미지 크기 최적화 (원본 문서와 동일한 크기 유지)
-                original_width, original_height = image.size
-                
-                # 문서 방향에 따른 이미지 크기 조정
-                if primary_orientation == 'landscape':
-                    # 가로형 문서: 최대 너비 10인치
-                    target_width = min(10, original_width / 72)  # 72 DPI 기준
-                    aspect_ratio = original_height / original_width
-                    target_height = target_width * aspect_ratio
-                else:
-                    # 세로형 문서: 최대 너비 6.5인치
-                    target_width = min(6.5, original_width / 72)  # 72 DPI 기준
-                    aspect_ratio = original_height / original_width
-                    target_height = target_width * aspect_ratio
-                
-                # 이미지를 임시 파일로 저장 (JPEG 최적화)
-                temp_img_path = None
-                try:
-                    with tempfile.NamedTemporaryFile(suffix='.jpg', delete=False) as temp_img:
-                        temp_img_path = temp_img.name
-                        # JPEG로 저장 (품질별 압축, 빠른 처리)
-                        image.save(temp_img_path, 'JPEG', quality=settings['jpeg_quality'], optimize=True)
-                    
-                    # 문서에 이미지 추가 (원본 비율 유지)
-                    doc.add_picture(temp_img_path, width=DocxInches(target_width))
-                    
-                    # 페이지 구분을 위한 페이지 브레이크 추가 (마지막 페이지 제외)
-                    if i < len(images) - 1:
-                        doc.add_page_break()
-                    
-                finally:
-                    # 임시 파일 삭제 (빠른 처리)
-                    if temp_img_path and os.path.exists(temp_img_path):
-                        try:
-                            os.unlink(temp_img_path)
-                        except (OSError, PermissionError) as e:
-                            print(f"임시 파일 삭제 실패 (무시됨): {e}")
-        
-        # DOCX 파일 저장 (Microsoft Word 호환성 최적화)
-        try:
-            # 임시 파일로 먼저 저장 후 이동 (안전한 저장)
-            temp_output = output_path + '.tmp'
-            doc.save(temp_output)
-            
-            # 기존 파일이 있으면 삭제
-            if os.path.exists(output_path):
-                os.remove(output_path)
-            
-            # 임시 파일을 최종 파일로 이동
-            os.rename(temp_output, output_path)
-            
-            print(f"DOCX 파일 저장 완료: {output_path}")
-            print("Microsoft Word 호환성이 개선된 문서가 생성되었습니다.")
-            return True
-            
-        except Exception as save_error:
-            print(f"DOCX 파일 저장 중 오류: {save_error}")
-            # 임시 파일 정리
-            temp_output = output_path + '.tmp'
-            if os.path.exists(temp_output):
-                try:
-                    os.remove(temp_output)
-                except:
-                    pass
-            return False
-        
-    except Exception as e:
-        print(f"변환 중 오류 발생: {str(e)}")
-        return False
+# pdf_to_docx function removed - docx dependency removed
 
-# pdf_to_pptx 함수 제거됨 - pptx 관련 기능 제거
-
-def docx_to_pdf(docx_path, output_path):
-    """DOCX를 PDF로 변환하는 함수"""
-    try:
-        # Windows에서 LibreOffice 사용
-        if platform.system() == "Windows":
-            # LibreOffice 경로 찾기
-            libreoffice_paths = [
-                r"C:\Program Files\LibreOffice\program\soffice.exe",
-                r"C:\Program Files (x86)\LibreOffice\program\soffice.exe",
-                "soffice"  # PATH에 있는 경우
-            ]
-            
-            libreoffice_path = None
-            for path in libreoffice_paths:
-                if os.path.exists(path) or path == "soffice":
-                    libreoffice_path = path
-                    break
-            
-            if libreoffice_path:
-                # LibreOffice를 사용하여 변환
-                output_dir = os.path.dirname(output_path)
-                cmd = [
-                    libreoffice_path,
-                    "--headless",
-                    "--convert-to", "pdf",
-                    "--outdir", output_dir,
-                    docx_path
-                ]
-                
-                result = subprocess.run(cmd, capture_output=True, text=True)
-                if result.returncode == 0:
-                    # 생성된 PDF 파일명 확인 및 이동
-                    base_name = os.path.splitext(os.path.basename(docx_path))[0]
-                    generated_pdf = os.path.join(output_dir, base_name + ".pdf")
-                    
-                    if os.path.exists(generated_pdf) and generated_pdf != output_path:
-                        os.rename(generated_pdf, output_path)
-                    
-                    return os.path.exists(output_path)
-                else:
-                    print(f"LibreOffice 변환 실패: {result.stderr}")
-                    return False
-            else:
-                print("LibreOffice를 찾을 수 없습니다.")
-                return False
-        else:
-            print("현재 Linux/Mac에서의 DOCX → PDF 변환은 지원되지 않습니다.")
-            return False
-            
-    except Exception as e:
-        print(f"DOCX → PDF 변환 중 오류: {str(e)}")
-        return False
+# docx_to_pdf function removed - docx dependency removed
 
 # 파일 크기 초과 오류 처리
 @app.errorhandler(413)
@@ -868,35 +472,14 @@ def upload_file():
             output_path = None
             
             if file_ext == 'pdf':
-                # PDF → DOCX 변환
-                # 파일명에서 확장자 제거 (안전하게)
-                base_filename = filename.rsplit('.', 1)[0] if '.' in filename else filename
-                output_filename = base_filename + '.docx'
-                output_path = os.path.join(OUTPUT_FOLDER, output_filename)
-                
-                quality = request.form.get('quality', 'medium')
-                print(f"PDF → DOCX 변환 시작 - {input_path} -> {output_path}")
-                
-                try:
-                    conversion_success = pdf_to_docx(input_path, output_path, quality)
-                except Exception as e:
-                    print(f"변환 중 예외 발생: {str(e)}")
-                    flash(f'변환 중 오류가 발생했습니다: {str(e)}')
+                # PDF → 이미지 변환만 지원 (docx 기능 제거됨)
+                flash('현재 PDF → 이미지 변환만 지원됩니다.')
+                return redirect(url_for('index'))
                     
             elif file_ext == 'docx':
-                # DOCX → PDF 변환
-                # 파일명에서 확장자 제거 (안전하게)
-                base_filename = filename.rsplit('.', 1)[0] if '.' in filename else filename
-                output_filename = base_filename + '.pdf'
-                output_path = os.path.join(OUTPUT_FOLDER, output_filename)
-                
-                print(f"DOCX → PDF 변환 시작 - {input_path} -> {output_path}")
-                
-                try:
-                    conversion_success = docx_to_pdf(input_path, output_path)
-                except Exception as e:
-                    print(f"변환 중 예외 발생: {str(e)}")
-                    flash(f'변환 중 오류가 발생했습니다: {str(e)}')
+                # DOCX 기능 제거됨
+                flash('DOCX 파일 처리는 현재 지원되지 않습니다.')
+                return redirect(url_for('index'))
             
             # 변환 결과 처리
             if conversion_success:
@@ -931,7 +514,7 @@ def upload_file():
                 
                 return redirect(url_for('index'))
         else:
-            flash('PDF 또는 DOCX 파일만 업로드 가능합니다.')
+            flash('PDF 파일만 업로드 가능합니다.')
             return redirect(url_for('index'))
             
     except Exception as e:
