@@ -1,3 +1,8 @@
+# Build tools
+setuptools>=65.0.0
+wheel>=0.37.0
+pip>=25.2
+
 Flask==2.3.3
 Werkzeug==2.3.7
 PyMuPDF==1.24.14
