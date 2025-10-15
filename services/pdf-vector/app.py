@@ -1165,62 +1165,118 @@ def zip_paths(paths):
 
 @app.route('/convert_to_vector', methods=['POST'])
 def convert_to_vector():
-    f = request.files.get("file")
-    if not f:
-        return jsonify({"error": "file is required"}), 400
-
-    mode = (request.form.get("mode") or "svg").lower()      # svg | ai
-    pages_spec = request.form.get("pages")                   # "1-3,5" 형식
-    text_as_path = (request.form.get("text_as_path") or "false").lower() in ("1","true","yes","y","on")
-    zoom = float(request.form.get("zoom") or 1.0)
-    split = (request.form.get("split") or "true").lower() in ("1","true","yes","y","on")
-
-    name = secure_filename(f.filename)
-    in_pdf = os.path.join(UPLOAD_FOLDER, name)
-    f.save(in_pdf)
-
-    out_dir = os.path.join(OUTPUT_FOLDER, os.path.splitext(name)[0] + f"_{mode}")
-    os.makedirs(out_dir, exist_ok=True)
-
     try:
-        if mode == "svg":
-            files = pdf_to_svgs(in_pdf, out_dir, text_as_path=text_as_path, zoom=zoom, pages_spec=pages_spec)
-        elif mode == "ai":
-            if split or pages_spec:
-                files = split_pdf_to_ai_pages(in_pdf, out_dir, pages_spec=pages_spec, prefix="page")
-            else:
-                out_ai = os.path.join(out_dir, os.path.splitext(name)[0] + ".ai")
-                save_pdf_as_ai(in_pdf, out_ai)
-                files = [out_ai]
-        else:
+        # Input validation
+        f = request.files.get("file")
+        if not f:
+            logging.warning("convert_to_vector: No file provided")
+            return jsonify({"error": "file is required"}), 400
+
+        if not f.filename:
+            logging.warning("convert_to_vector: Empty filename")
+            return jsonify({"error": "filename is required"}), 400
+
+        # Parameter validation
+        mode = (request.form.get("mode") or "svg").lower()
+        if mode not in ["svg", "ai"]:
+            logging.warning(f"convert_to_vector: Invalid mode '{mode}'")
             return jsonify({"error": "mode must be svg or ai"}), 400
 
-        # 파일 생성 검증
-        files = [p for p in files if os.path.isfile(p) and os.path.getsize(p) > 0]
-        if not files:
+        pages_spec = request.form.get("pages")
+        text_as_path = (request.form.get("text_as_path") or "false").lower() in ("1","true","yes","y","on")
+        
+        try:
+            zoom = float(request.form.get("zoom") or 1.0)
+            if zoom <= 0:
+                raise ValueError("zoom must be positive")
+        except (ValueError, TypeError) as e:
+            logging.warning(f"convert_to_vector: Invalid zoom value: {e}")
+            return jsonify({"error": "zoom must be a positive number"}), 400
+
+        split = (request.form.get("split") or "true").lower() in ("1","true","yes","y","on")
+
+        # File handling
+        name = secure_filename(f.filename)
+        if not name:
+            logging.warning("convert_to_vector: Invalid filename after sanitization")
+            return jsonify({"error": "invalid filename"}), 400
+
+        in_pdf = os.path.join(UPLOAD_FOLDER, name)
+        
+        try:
+            f.save(in_pdf)
+            logging.info(f"convert_to_vector: Saved input file to {in_pdf}")
+        except Exception as e:
+            logging.error(f"convert_to_vector: Failed to save input file: {e}")
+            return jsonify({"error": "failed to save input file"}), 500
+
+        # Verify PDF file
+        if not os.path.exists(in_pdf) or os.path.getsize(in_pdf) == 0:
+            logging.error(f"convert_to_vector: Input file is empty or missing: {in_pdf}")
+            return jsonify({"error": "input file is empty or corrupted"}), 500
+
+        out_dir = os.path.join(OUTPUT_FOLDER, os.path.splitext(name)[0] + f"_{mode}")
+        try:
+            os.makedirs(out_dir, exist_ok=True)
+            logging.info(f"convert_to_vector: Created output directory {out_dir}")
+        except Exception as e:
+            logging.error(f"convert_to_vector: Failed to create output directory: {e}")
+            return jsonify({"error": "failed to create output directory"}), 500
+
+        # Conversion
+        files = []
+        try:
+            if mode == "svg":
+                logging.info(f"convert_to_vector: Converting to SVG with zoom={zoom}, text_as_path={text_as_path}, pages={pages_spec}")
+                files = pdf_to_svgs(in_pdf, out_dir, text_as_path=text_as_path, zoom=zoom, pages_spec=pages_spec)
+            elif mode == "ai":
+                logging.info(f"convert_to_vector: Converting to AI with split={split}, pages={pages_spec}")
+                if split or pages_spec:
+                    files = split_pdf_to_ai_pages(in_pdf, out_dir, pages_spec=pages_spec, prefix="page")
+                else:
+                    out_ai = os.path.join(out_dir, os.path.splitext(name)[0] + ".ai")
+                    save_pdf_as_ai(in_pdf, out_ai)
+                    files = [out_ai]
+        except Exception as e:
+            logging.error(f"convert_to_vector: Conversion failed for mode '{mode}': {e}")
+            return jsonify({"error": f"conversion failed: {str(e)}"}), 500
+
+        # File validation
+        valid_files = []
+        for file_path in files:
+            if os.path.isfile(file_path) and os.path.getsize(file_path) > 0:
+                valid_files.append(file_path)
+            else:
+                logging.warning(f"convert_to_vector: Invalid output file: {file_path}")
+
+        if not valid_files:
+            logging.error("convert_to_vector: No valid output files generated")
             return jsonify({"error": "no output files generated"}), 500
 
-        # 단일 파일은 바로 전송
-        if len(files) == 1:
-            fp = files[0]
-            resp = send_file(fp, as_attachment=True, download_name=os.path.basename(fp))
-            # Content-Length 명시(어떤 프록시 로그에서 0으로 찍히는 것 방지)
-            resp.headers["Content-Length"] = str(os.path.getsize(fp))
-            return resp
+        logging.info(f"convert_to_vector: Successfully generated {len(valid_files)} files")
 
-        # 여러 파일 ZIP 스트림 전송
-        buf = zip_paths(files)
-        buf.seek(0, os.SEEK_END)
-        length = buf.tell()
-        buf.seek(0)
-        resp = send_file(buf, mimetype="application/zip", as_attachment=True,
-                         download_name=f"{os.path.splitext(name)[0]}_{mode}.zip")
-        resp.headers["Content-Length"] = str(length)
-        return resp
+        # Return JSON response with file information
+        file_info = []
+        for file_path in valid_files:
+            file_info.append({
+                "filename": os.path.basename(file_path),
+                "size": os.path.getsize(file_path),
+                "path": file_path
+            })
+
+        response_data = {
+            "success": True,
+            "mode": mode,
+            "files": file_info,
+            "total_files": len(valid_files)
+        }
+
+        logging.info(f"convert_to_vector: Returning JSON response with {len(valid_files)} files")
+        return jsonify(response_data), 200
 
     except Exception as e:
-        logging.exception("vector conversion failed")
-        return jsonify({"error": str(e)}), 500
+        logging.exception("convert_to_vector: Unexpected error occurred")
+        return jsonify({"error": f"internal server error: {str(e)}"}), 500
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
