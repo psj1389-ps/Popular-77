@@ -1311,20 +1311,35 @@ def download_vector(filename):
 
         logging.info(f"download_vector: Looking for file '{safe_filename}' with mode '{mode}'")
 
+        # Debug: List all files in OUTPUT_FOLDER
+        all_files = []
+        for root, dirs, files in os.walk(OUTPUT_FOLDER):
+            for file in files:
+                all_files.append(os.path.join(root, file))
+        logging.info(f"download_vector: Available files in OUTPUT_FOLDER: {all_files}")
+
         # Search for the file in output directories
         file_path = None
         
         # Search in all subdirectories of OUTPUT_FOLDER
         for root, dirs, files in os.walk(OUTPUT_FOLDER):
+            logging.info(f"download_vector: Searching in directory '{root}', files: {files}")
             if safe_filename in files:
                 potential_path = os.path.join(root, safe_filename)
                 # Additional security check: ensure the file is within OUTPUT_FOLDER
                 if os.path.commonpath([os.path.abspath(potential_path), os.path.abspath(OUTPUT_FOLDER)]) == os.path.abspath(OUTPUT_FOLDER):
                     file_path = potential_path
+                    logging.info(f"download_vector: Found file at '{file_path}'")
                     break
 
         if not file_path or not os.path.exists(file_path):
-            logging.warning(f"download_vector: File not found '{safe_filename}'")
+            logging.warning(f"download_vector: File not found '{safe_filename}'. Searched in: {OUTPUT_FOLDER}")
+            # List recent files for debugging
+            recent_files = []
+            for root, dirs, files in os.walk(OUTPUT_FOLDER):
+                for file in files[-10:]:  # Last 10 files
+                    recent_files.append(file)
+            logging.warning(f"download_vector: Recent files in output folder: {recent_files}")
             return jsonify({"error": "file not found"}), 404
 
         # Verify file is not empty
