@@ -8,7 +8,6 @@ import json
 from dotenv import load_dotenv
 import subprocess
 import platform
-import pytesseract
 import cv2
 import numpy as np
 import fitz  # PyMuPDF
@@ -108,41 +107,14 @@ def save_debug_image(image, filename_prefix, page_num):
 
 # pdf_to_docx_with_pymupdf function removed - docx dependency removed
 
+# OCR 기능이 제거되었습니다 - pytesseract 의존성 제거로 인해
+# def ocr_image_to_blocks(pil_image):
+#     """이미지에서 단어 단위 텍스트와 위치(좌표)를 추출"""
+#     OCR 기능이 제거되어 빈 리스트를 반환합니다.
 def ocr_image_to_blocks(pil_image):
-    """이미지에서 단어 단위 텍스트와 위치(좌표)를 추출"""
-    try:
-        img = cv2.cvtColor(np.array(pil_image), cv2.COLOR_RGB2BGR)
-        gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
-        gray = cv2.medianBlur(gray, 3)
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        gray = clahe.apply(gray)
-
-        config = r"--oem 3 --psm 6 -l kor+eng"
-        data = pytesseract.image_to_data(gray, config=config,
-                                         output_type=pytesseract.Output.DICT)
-        blocks = []
-        n = len(data["text"])
-        for i in range(n):
-            text = data["text"][i].strip()
-            conf_val = data["conf"][i]
-            if isinstance(conf_val, (int, float)):
-                conf = int(conf_val)
-            elif isinstance(conf_val, str) and conf_val.replace('.', '').replace('-', '').isdigit():
-                conf = int(float(conf_val))
-            else:
-                conf = 0
-            
-            if conf > 30 and len(text) > 0:
-                x, y, w, h = data["left"][i], data["top"][i], data["width"][i], data["height"][i]
-                blocks.append({
-                    "text": text,
-                    "bbox": (x, y, x + w, y + h),
-                    "confidence": conf
-                })
-        return blocks
-    except Exception as e:
-        print(f"OCR 처리 중 오류: {e}")
-        return []
+    """OCR 기능이 제거되었습니다 - pytesseract 의존성 제거"""
+    print("OCR 기능이 제거되었습니다. PDF to image 변환만 지원됩니다.")
+    return []
 
 def clean_special_characters(text: str) -> str:
     """특수 문자 처리 개선 - PDF에서 잘못 추출되는 문자들을 올바르게 복구"""
@@ -293,39 +265,9 @@ def extract_text_with_layout_from_pdf(pdf_path: str) -> Dict[str, Any]:
         return {'text_blocks': [], 'full_text': ''}
 
 def extract_text_blocks_with_ocr(image):
-    """OCR을 사용하여 이미지에서 텍스트 블록 추출 (개선된 버전)"""
-    try:
-        # 이미지 전처리로 OCR 정확도 향상
-        img_array = np.array(image)
-        
-        # 그레이스케일 변환
-        if len(img_array.shape) == 3:
-            gray = cv2.cvtColor(img_array, cv2.COLOR_RGB2GRAY)
-        else:
-            gray = img_array
-        
-        # 노이즈 제거
-        denoised = cv2.medianBlur(gray, 3)
-        
-        # 대비 향상
-        clahe = cv2.createCLAHE(clipLimit=2.0, tileGridSize=(8, 8))
-        enhanced = clahe.apply(denoised)
-        
-        # OCR 수행
-        config = r"--oem 3 --psm 6 -l kor+eng"
-        text = pytesseract.image_to_string(enhanced, config=config)
-        
-        if text.strip():
-            cleaned_text = clean_special_characters(text.strip())
-            print(f"  - OCR 텍스트 추출됨: {len(cleaned_text)}자")
-            return cleaned_text
-        else:
-            print("  - OCR에서 텍스트를 찾을 수 없음")
-            return ""
-            
-    except Exception as e:
-        print(f"  - OCR 처리 중 오류: {e}")
-        return ""
+    """OCR 기능이 제거되었습니다 - pytesseract 의존성 제거"""
+    print("OCR 기능이 제거되었습니다. PDF to image 변환만 지원됩니다.")
+    return ""
 
 def extract_pdf_content_with_adobe(pdf_path):
     """Adobe PDF Services API를 사용하여 PDF 내용을 추출하는 함수"""
@@ -472,9 +414,52 @@ def upload_file():
             output_path = None
             
             if file_ext == 'pdf':
-                # PDF → 이미지 변환만 지원 (docx 기능 제거됨)
-                flash('현재 PDF → 이미지 변환만 지원됩니다.')
-                return redirect(url_for('index'))
+                # PDF → 이미지 변환 (PyMuPDF 사용)
+                try:
+                    from converters.pdf_to_images import pdf_to_images
+                    
+                    # 출력 디렉토리 생성
+                    output_dir = os.path.join(OUTPUT_FOLDER, f"{timestamp}_images")
+                    os.makedirs(output_dir, exist_ok=True)
+                    
+                    # PDF를 이미지로 변환
+                    image_paths = pdf_to_images(input_path, output_dir, fmt="png", dpi=150)
+                    
+                    if image_paths:
+                        # ZIP 파일로 압축
+                        import zipfile
+                        zip_filename = f"{timestamp}_pdf_images.zip"
+                        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+                        
+                        with zipfile.ZipFile(zip_path, 'w') as zipf:
+                            for img_path in image_paths:
+                                zipf.write(img_path, os.path.basename(img_path))
+                        
+                        # 임시 이미지 파일들 정리
+                        for img_path in image_paths:
+                            try:
+                                os.remove(img_path)
+                            except:
+                                pass
+                        
+                        # 임시 디렉토리 정리
+                        try:
+                            os.rmdir(output_dir)
+                        except:
+                            pass
+                        
+                        conversion_success = True
+                        output_path = zip_path
+                        output_filename = zip_filename
+                        
+                    else:
+                        flash('PDF 변환에 실패했습니다.')
+                        return redirect(url_for('index'))
+                        
+                except Exception as e:
+                    print(f"PDF 변환 오류: {str(e)}")
+                    flash(f'PDF 변환 중 오류가 발생했습니다: {str(e)}')
+                    return redirect(url_for('index'))
                     
             elif file_ext == 'docx':
                 # DOCX 기능 제거됨
