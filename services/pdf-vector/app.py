@@ -3,23 +3,23 @@ import os
 import tempfile
 from werkzeug.utils import secure_filename
 from pdf2image import convert_from_path
-from pptx import Presentation
-from pptx.util import Inches
+# from pptx import Presentation
+# from pptx.util import Inches
 import io
 from PIL import Image
 import json
 from dotenv import load_dotenv
-from docx import Document
-from docx.shared import Pt, Inches as DocxInches
+# from docx import Document
+# from docx.shared import Pt, Inches as DocxInches
 import subprocess
 import platform
-import pytesseract
-import cv2
-import numpy as np
+# import pytesseract
+# import cv2
+# import numpy as np
 import fitz  # PyMuPDF
 import re
 from typing import List, Tuple, Dict, Any
-from pdf2docx import Converter
+# from pdf2docx import Converter
 # Adobe PDF Services SDK 임포트 및 설정
 try:
     # 올바른 Adobe PDF Services SDK import 구문
@@ -845,11 +845,12 @@ def pdf_to_pptx(pdf_path, output_path, quality='medium'):
                             
                             # 텍스트 크기 조정
                             try:
-                                from docx.shared import Pt
-                                if len(block['text']) < 50 and block['alignment'] == 'center':
-                                    p.font.size = Pt(18)  # 제목용 크기
-                                else:
-                                    p.font.size = Pt(14)  # 본문용 크기
+                                # from docx.shared import Pt
+                                # if len(block['text']) < 50 and block['alignment'] == 'center':
+                                #     p.font.size = Pt(18)  # 제목용 크기
+                                # else:
+                                #     p.font.size = Pt(14)  # 본문용 크기
+                                pass
                             except (ImportError, AttributeError):
                                 pass
                                 
