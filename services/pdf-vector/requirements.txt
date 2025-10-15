@@ -1,7 +1,8 @@
 # ===================================================
 # PDF-VECTOR SERVICE REQUIREMENTS
-# Updated: 2024-12-19 16:20 KST
+# Updated: 2024-12-19 17:30 KST
 # For PDF to Vector conversion service
+# Pure Python wheels only - no system dependencies
 # ===================================================
 
 # Core web framework
@@ -13,12 +14,13 @@ python-dotenv==1.0.0
 # PDF processing
 PyMuPDF==1.24.14
 
-# Image processing
-Pillow
-
 # Vector graphics processing (핵심 의존성)
 reportlab>=4.4.3,<5
 svglib==1.6.0
 
-# NOTE: pdf2image removed - using PyMuPDF+Pillow for better Render compatibility
-# Eliminates poppler binary dependency for serverless deployment
+# Image processing
+Pillow>=10.2.0
+
+# NOTE: Cairo dependencies (rlpycairo, pycairo, cairosvg) removed
+# Using svglib+reportlab for pure Python vector processing
+# Eliminates system library dependencies for Render compatibility
