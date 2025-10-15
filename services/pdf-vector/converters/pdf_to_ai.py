@@ -1,7 +1,7 @@
 import os
 from PIL import Image
 from pdf2image import convert_from_path
-from reportlab.graphics import renderSVG
+# from reportlab.graphics import renderSVG  # Removed to avoid Cairo dependencies
 from reportlab.lib.pagesizes import letter
 from reportlab.pdfgen import canvas
 from reportlab.graphics.shapes import Drawing, Rect, String
