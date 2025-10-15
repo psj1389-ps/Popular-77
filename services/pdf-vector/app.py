@@ -1278,6 +1278,88 @@ def convert_to_vector():
         logging.exception("convert_to_vector: Unexpected error occurred")
         return jsonify({"error": f"internal server error: {str(e)}"}), 500
 
+@app.route('/download_vector/<filename>')
+def download_vector(filename):
+    try:
+        # Input validation and security checks
+        if not filename:
+            logging.warning("download_vector: Empty filename provided")
+            return jsonify({"error": "filename is required"}), 400
+
+        # Sanitize filename to prevent directory traversal attacks
+        safe_filename = secure_filename(filename)
+        if not safe_filename or safe_filename != filename:
+            logging.warning(f"download_vector: Invalid filename '{filename}'")
+            return jsonify({"error": "invalid filename"}), 400
+
+        # Check file extension
+        if not safe_filename.lower().endswith(('.svg', '.ai')):
+            logging.warning(f"download_vector: Unsupported file type '{safe_filename}'")
+            return jsonify({"error": "only SVG and AI files are supported"}), 400
+
+        # Determine file type and set MIME type
+        file_ext = safe_filename.lower().split('.')[-1]
+        if file_ext == 'svg':
+            mimetype = 'image/svg+xml'
+            mode = 'svg'
+        elif file_ext == 'ai':
+            mimetype = 'application/postscript'
+            mode = 'ai'
+        else:
+            logging.warning(f"download_vector: Unknown file extension '{file_ext}'")
+            return jsonify({"error": "unsupported file type"}), 400
+
+        logging.info(f"download_vector: Looking for file '{safe_filename}' with mode '{mode}'")
+
+        # Search for the file in output directories
+        file_path = None
+        
+        # Search in all subdirectories of OUTPUT_FOLDER
+        for root, dirs, files in os.walk(OUTPUT_FOLDER):
+            if safe_filename in files:
+                potential_path = os.path.join(root, safe_filename)
+                # Additional security check: ensure the file is within OUTPUT_FOLDER
+                if os.path.commonpath([os.path.abspath(potential_path), os.path.abspath(OUTPUT_FOLDER)]) == os.path.abspath(OUTPUT_FOLDER):
+                    file_path = potential_path
+                    break
+
+        if not file_path or not os.path.exists(file_path):
+            logging.warning(f"download_vector: File not found '{safe_filename}'")
+            return jsonify({"error": "file not found"}), 404
+
+        # Verify file is not empty
+        if os.path.getsize(file_path) == 0:
+            logging.warning(f"download_vector: Empty file '{safe_filename}'")
+            return jsonify({"error": "file is empty"}), 404
+
+        logging.info(f"download_vector: Serving file '{safe_filename}' from '{file_path}' (size: {os.path.getsize(file_path)} bytes)")
+
+        # Serve the file
+        try:
+            response = send_file(
+                file_path,
+                mimetype=mimetype,
+                as_attachment=True,
+                download_name=safe_filename
+            )
+            
+            # Add Content-Length header
+            response.headers["Content-Length"] = str(os.path.getsize(file_path))
+            
+            # Add cache control headers for better performance
+            response.headers["Cache-Control"] = "public, max-age=3600"
+            
+            logging.info(f"download_vector: Successfully served '{safe_filename}'")
+            return response
+            
+        except Exception as e:
+            logging.error(f"download_vector: Failed to serve file '{safe_filename}': {e}")
+            return jsonify({"error": "failed to serve file"}), 500
+
+    except Exception as e:
+        logging.exception(f"download_vector: Unexpected error for filename '{filename}'")
+        return jsonify({"error": f"internal server error: {str(e)}"}), 500
+
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
 def upload_file():
