@@ -173,10 +173,7 @@ const PdfVectorPage: React.FC = () => {
 
   return (
     <>
-      <PageTitle 
-        title="PDF → Vector 변환기 - 77tools.xyz" 
-        description="PDF 파일을 벡터 형식(SVG, AI)으로 변환하는 무료 온라인 도구입니다. 고품질 벡터 변환을 지원합니다."
-      />
+      <PageTitle suffix="PDF → Vector" />
       
       {/* 히어로 섹션 */}
       <div className="relative min-h-[400px] bg-gradient-to-br from-purple-600 via-blue-600 to-indigo-700 text-white overflow-hidden">
