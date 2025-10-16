@@ -427,39 +427,83 @@ def upload_file():
                 try:
                     from converters.pdf_to_images import pdf_to_images
                     
+                    # 프론트엔드에서 전송된 파라미터 받기
+                    format_param = request.form.get('format', 'png').lower()
+                    quality_param = request.form.get('quality', 'medium')
+                    scale_param = float(request.form.get('scale', '0.5'))
+                    transparent_param = request.form.get('transparent', '0')
+                    
+                    # 품질을 DPI로 변환
+                    quality_to_dpi = {'low': 96, 'medium': 144, 'high': 300}
+                    dpi = quality_to_dpi.get(quality_param, 144)
+                    
+                    # 스케일을 DPI에 적용
+                    final_dpi = int(dpi * scale_param)
+                    
                     # 출력 디렉토리 생성
                     output_dir = os.path.join(OUTPUT_FOLDER, f"{timestamp}_images")
                     os.makedirs(output_dir, exist_ok=True)
                     
                     # PDF를 이미지로 변환
-                    image_paths = pdf_to_images(input_path, output_dir, fmt="png", dpi=150)
+                    image_paths = pdf_to_images(input_path, output_dir, fmt=format_param, dpi=final_dpi)
                     
                     if image_paths:
-                        # ZIP 파일로 압축
-                        import zipfile
-                        zip_filename = f"{timestamp}_pdf_images.zip"
-                        zip_path = os.path.join(OUTPUT_FOLDER, zip_filename)
+                        # 원본 파일명에서 확장자 제거 (한글 파일명 보존)
+                        original_name = file.filename
+                        if '.' in original_name:
+                            base_name = original_name.rsplit('.', 1)[0]
+                        else:
+                            base_name = original_name
                         
-                        with zipfile.ZipFile(zip_path, 'w') as zipf:
+                        # 단일 페이지인 경우 개별 파일로 반환
+                        if len(image_paths) == 1:
+                            single_image_path = image_paths[0]
+                            # 한글 파일명으로 새 파일 생성
+                            output_filename = f"{base_name}.{format_param}"
+                            final_output_path = os.path.join(OUTPUT_FOLDER, f"{timestamp}_{output_filename}")
+                            
+                            # 파일 복사
+                            import shutil
+                            shutil.copy2(single_image_path, final_output_path)
+                            
+                            # 임시 파일들 정리
                             for img_path in image_paths:
-                                zipf.write(img_path, os.path.basename(img_path))
-                        
-                        # 임시 이미지 파일들 정리
-                        for img_path in image_paths:
-                            try:
-                                os.remove(img_path)
-                            except:
-                                pass
+                                try:
+                                    os.remove(img_path)
+                                except:
+                                    pass
+                            
+                            conversion_success = True
+                            output_path = final_output_path
+                            output_filename = output_filename
+                        else:
+                            # 다중 페이지인 경우 ZIP 파일로 압축
+                            import zipfile
+                            zip_filename = f"{base_name}_images.zip"
+                            zip_path = os.path.join(OUTPUT_FOLDER, f"{timestamp}_{zip_filename}")
+                            
+                            with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                                for i, img_path in enumerate(image_paths, 1):
+                                    # ZIP 내부 파일명도 한글로 설정
+                                    internal_name = f"{base_name}_page{i}.{format_param}"
+                                    zipf.write(img_path, internal_name)
+                            
+                            # 임시 이미지 파일들 정리
+                            for img_path in image_paths:
+                                try:
+                                    os.remove(img_path)
+                                except:
+                                    pass
+                            
+                            conversion_success = True
+                            output_path = zip_path
+                            output_filename = zip_filename
                         
                         # 임시 디렉토리 정리
                         try:
                             os.rmdir(output_dir)
                         except:
                             pass
-                        
-                        conversion_success = True
-                        output_path = zip_path
-                        output_filename = zip_filename
                         
                     else:
                         flash('PDF 변환에 실패했습니다.')

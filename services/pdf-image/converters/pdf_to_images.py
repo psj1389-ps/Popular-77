@@ -53,6 +53,10 @@ def pdf_to_images(pdf_path: str, out_dir: str, fmt: str = "png", dpi: int = 144,
                     img.save(out_path, "WEBP", quality=quality, method=6)
                 elif fmt in ("tif", "tiff"):
                     img.save(out_path, "TIFF", compression="tiff_lzw")
+                elif fmt == "gif":
+                    img.save(out_path, "GIF", optimize=True)
+                elif fmt == "bmp":
+                    img.save(out_path, "BMP")
                 else:
                     img.save(out_path, fmt.upper())
             out_paths.append(out_path)
