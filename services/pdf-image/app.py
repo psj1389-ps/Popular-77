@@ -85,5 +85,10 @@ def api_pdf_to_images():
 def compat_convert_to_images():
     return api_pdf_to_images()
 
+# 추가 호환 라우트: /convert_to_images 경로 지원
+@app.route("/convert_to_images", methods=["POST"])
+def convert_to_images():
+    return api_pdf_to_images()
+
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

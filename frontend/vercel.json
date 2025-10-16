@@ -17,11 +17,7 @@
       ]
     }
   ],
-  "functions": {
-    "api/rss.ts": {
-      "runtime": "nodejs18.x"
-    }
-  },
+
   "rewrites": [
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/api/pdf-vector/(.*)", "destination": "https://pdf-vector.onrender.com/$1" },
