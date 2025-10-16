@@ -326,6 +326,7 @@ def index():
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
+@app.route('/convert_to_images', methods=['POST'])
 def upload_file():
     try:
         print("파일 업로드 요청 시작")

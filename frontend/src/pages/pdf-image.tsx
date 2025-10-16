@@ -283,7 +283,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">📷 JPG (JPEG) - 일반적인 사진 형식</span>
+                              <span className="font-medium">📷 JPG (JPEG) - 일반 사진용 (작은 파일 크기)</span>
                             </div>
                           </label>
                           
@@ -311,7 +311,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">🎬 GIF - 웹용 간단한 이미지</span>
+                              <span className="font-medium">🎬 GIF - 애니메이션 지원</span>
                             </div>
                           </label>
                           
@@ -325,7 +325,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">🖥️ BMP - Windows 비트맵</span>
+                              <span className="font-medium">💾 BMP - 무손실 압축</span>
                             </div>
                           </label>
                           
@@ -340,8 +340,7 @@ const PdfImagePage: React.FC = () => {
                             />
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">🌐 WEBP - 웹 최적화 형식</span>
-                                <span className="text-blue-600">🔍</span>
+                                <span className="font-medium">🔍 WEBP - 웹 최적화 형식</span>
                               </div>
                             </div>
                           </label>
