@@ -44,6 +44,7 @@ def api_pdf_to_images():
     transparent_color = request.form.get("transparentColor")   # 예: ffffff, #fff
     tolerance = int(request.form.get("tolerance") or 8)
     webp_lossless = _flag(request.form.get("webpLossless"), True)
+    white_threshold = int(request.form.get("whiteThreshold") or 250)  # PDF-PNG 방식 밝기 임계값
 
     name = secure_filename(f.filename)
     in_path = os.path.join(UPLOAD_DIR, name)
@@ -56,7 +57,8 @@ def api_pdf_to_images():
         in_path, out_dir,
         fmt=fmt, dpi=dpi, quality=quality, pages_spec=pages_spec,
         transparent_bg=transparent_bg, transparent_color=transparent_color,
-        tolerance=tolerance, webp_lossless=webp_lossless
+        tolerance=tolerance, webp_lossless=webp_lossless,
+        white_threshold=white_threshold
     )
 
     if not out_files:
