@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>PDF → Vector 변환기</title>
+    <title>PDF → Image 변환기</title>
     <style>
         body{font-family:Arial;background:#f5f5f5;margin:0;padding:0}
         
@@ -363,8 +363,8 @@
                         <a href="#" class="nav-icon" title="도움말">❓</a>
                         <a href="#uploadArea" class="nav-icon" title="파일 업로드">📤</a>
                     </div>
-                    <h1 class="header-title">PDF → Vector 변환기</h1>
-                    <p class="header-subtitle">AI 기반 지능형 PDF to Vector 변환 서비스로 각 페이지를 다양한 이미지 형식으로 쉽게 변환하세요.</p>
+                    <h1 class="header-title">PDF → Image 변환기</h1>
+                    <p class="header-subtitle">AI 기반 지능형 PDF to Image 변환 서비스로 각 페이지를 다양한 이미지 형식으로 쉽게 변환하세요.</p>
                 </div>
             </div>
             
@@ -384,8 +384,8 @@
     <!-- 메인 컨텐츠 -->
     <div class="container">
         <div class="header">
-            <h2>PDF → Vector 변환기</h2>
-            <h4>이미지 및 벡터 변환 (AI/SVG)</h4>
+            <h2>PDF → Image 변환기</h2>
+            <h4>6가지 이미지 형식으로 고품질 변환 (JPG/PNG/TIFF/GIF/BMP/WEBP)</h4>
         </div>
         
         <form id="uploadForm" enctype="multipart/form-data">
@@ -402,38 +402,62 @@
             <div id="fileName"></div>
             <div id="fileSize"></div>
             
-            <!-- 변환 형식 선택 -->
             <div class="format-options" id="formatOptions" style="margin: 15px 0; display: none;">
-                <h4>변환 형식 선택:</h4>
-                <label><input type="radio" name="format" value="svg" checked> 🎨 SVG (벡터)</label>
-                <label><input type="radio" name="format" value="ai"> 🎯 AI (Adobe Illustrator)</label>
+                <h4>파일 형식:</h4>
+                <select name="format" id="formatSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
+                    <option value="jpg">📷 JPG (JPEG) - 일반적인 사진 형식</option>
+                    <option value="png">🖼️ PNG - 투명 배경 지원</option>
+                    <option value="tiff">📄 TIFF - 고품질 인쇄용</option>
+                    <option value="gif">🎞️ GIF - 웹용 간단한 이미지</option>
+                    <option value="bmp">🖥️ BMP - Windows 비트맵</option>
+                    <option value="webp">🌐 WEBP - 웹 최적화 형식</option>
+                  
+                </select>
+                <p style="font-size: 12px; color: #666; margin-top: 5px;">
+                    <strong>래스터 형식:</strong><br>
+                    JPG/JPEG: 일반 사진용 (작은 파일 크기)<br>
+                    PNG: 투명 배경 지원 (웹 그래픽용) 🔍<br>
+                    TIFF: 고품질 인쇄용<br>
+                    GIF: 애니메이션 지원<br>
+                    BMP: 무손실 압축<br>
+                    WEBP: 웹 최적화 형식 🔍<br>
+                    <small>🔍 = 투명 배경 지원</small>
+                </p>
             </div>
             
-            <!-- 고급 옵션 -->
-            <div class="advanced-options" id="advancedOptions" style="margin: 20px 0; padding: 15px; border: 1px solid #ddd; border-radius: 8px; background: #f9f9f9; display: none;">
-                <h4 style="margin-top: 0; color: #333;">고급 옵션</h4>
-                
-                <!-- 크기 조절 -->
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">크기 x</label>
-                    <div style="display: flex; align-items: center; gap: 10px;">
-                        <input type="range" id="sizeSlider" min="0.1" max="2.0" step="0.1" value="1.0" style="flex: 1; height: 6px; background: #ddd; border-radius: 3px;">
-                        <span id="sizeValue" style="min-width: 30px; font-weight: normal;">1.0</span>
-                    </div>
-                    <div style="font-size: 12px; color: #666; margin-top: 2px;">443×591 px</div>
+            <!-- 크기 조절 섹션 -->
+            <div class="size-options" id="sizeOptions" style="margin: 15px 0; display: none;">
+                <h4>크기 x</h4>
+                <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+                    <input type="range" id="sizeSlider" min="0.1" max="3.0" step="0.1" value="1.0" style="flex: 1; height: 8px; background: #ddd; border-radius: 5px; outline: none;">
+                    <input type="text" id="sizeValue" value="1.0" readonly style="width: 50px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: center; background: #f9f9f9;">
                 </div>
-                
-                <!-- 투명 배경 옵션 -->
-                <div style="margin-bottom: 15px;">
-                    <label style="display: block; margin-bottom: 8px; font-weight: bold;">투명 배경:</label>
-                    <div style="margin-bottom: 8px;">
-                        <label style="margin-right: 15px;"><input type="radio" name="transparent" value="disabled" checked> 사용 안함</label>
-                        <label><input type="radio" name="transparent" value="enabled"> 사용</label>
-                    </div>
-                    <div style="font-size: 12px; color: #666; line-height: 1.4;">
-                        <div>• SVG : 확대 가능한 벡터 그래픽</div>
-                        <div>• AI : Adobe Illustrator 호환 형식</div>
-                    </div>
+                <div id="currentSize" style="font-size: 12px; color: #666; margin-top: 5px;">443×591 px</div>
+            </div>
+            
+            <div class="quality-options" id="qualityOptions">
+                <h4>변환 품질 선택:</h4>
+                <label><input type="radio" name="quality" value="low"> 저품질 (품질이 낮고 파일이 더 컴팩트함)</label>
+                <label><input type="radio" name="quality" value="medium" checked> 중간 품질 (중간 품질 및 파일 크기)</label>
+                <label><input type="radio" name="quality" value="high"> 고품질 (더 높은 품질, 더 큰 파일 크기)</label>
+            </div>
+            
+            <!-- 투명 배경 옵션 -->
+            <div class="transparent-bg-options" id="transparentBgOptions" style="margin: 15px 0; display: none;">
+                <h4>투명 배경: <span style="color: #666; font-size: 14px; font-weight: normal;">(PNG, WEBP에서 지원)</span></h4>
+                <div style="margin: 10px 0;">
+                    <label style="display: flex; align-items: center; gap: 8px; margin-bottom: 8px; cursor: pointer;">
+                        <input type="radio" name="transparentBg" value="false" checked style="margin: 0;">
+                        <span>사용 안함</span>
+                    </label>
+                    <label style="display: flex; align-items: center; gap: 8px; cursor: pointer;">
+                        <input type="radio" name="transparentBg" value="true" style="margin: 0;">
+                        <span>사용</span>
+                    </label>
+                </div>
+                <div style="font-size: 12px; color: #666; margin-top: 10px; padding: 8px; background: #f8f9fa; border-radius: 4px;">
+                    <div style="margin-bottom: 5px;">💡 <strong>투명 배경 지원:</strong> PNG, WEBP 형식</div>
+                    <div><strong>흰색 배경 변환:</strong> JPG, JPEG, TIFF, GIF, BMP</div>
                 </div>
             </div>
             
@@ -528,13 +552,18 @@
                 document.getElementById('fileSize').textContent = `크기: ${(file.size/1024/1024).toFixed(2)}MB`;
                 document.getElementById('fileInfo').style.display = 'block';
                 
-                // PDF 파일인 경우에만 변환 옵션 표시
+                // PDF 파일인 경우에만 형식 및 품질 옵션 표시
                 if (file.name.toLowerCase().endsWith('.pdf')) {
                     document.getElementById('formatOptions').style.display = 'block';
-                    document.getElementById('advancedOptions').style.display = 'block';
+                    document.getElementById('sizeOptions').style.display = 'block';
+                    document.getElementById('qualityOptions').style.display = 'block';
+                    document.getElementById('transparentBgOptions').style.display = 'block';
+                    updateCurrentSize(); // 현재 크기 업데이트
                 } else {
                     document.getElementById('formatOptions').style.display = 'none';
-                    document.getElementById('advancedOptions').style.display = 'none';
+                    document.getElementById('sizeOptions').style.display = 'none';
+                    document.getElementById('qualityOptions').style.display = 'none';
+                    document.getElementById('transparentBgOptions').style.display = 'none';
                 }
                 
                 hideMessages();
@@ -547,13 +576,17 @@
             const formData = new FormData();
             formData.append('file', selectedFile);
             
-            // 변환 형식 및 고급 옵션 설정 추가
-            const format = document.querySelector('input[name="format"]:checked')?.value || 'svg';
-            const size = document.getElementById('sizeSlider').value;
-            const transparent = document.querySelector('input[name="transparent"]:checked')?.value || 'disabled';
+            // 품질 설정 추가
+            const quality = document.querySelector('input[name="quality"]:checked')?.value || 'medium';
+            formData.append('quality', quality);
+            
+            // 파일 형식 설정 추가
+            const format = document.getElementById('formatSelect')?.value || 'jpg';
             formData.append('format', format);
-            formData.append('size', size);
-            formData.append('transparent', transparent);
+            
+            // 투명 배경 옵션 추가
+            const transparentBg = document.getElementById('transparentBg')?.checked || false;
+            formData.append('transparentBg', transparentBg);
             
             // UI 업데이트
             document.getElementById('convertBtn').disabled = true;
@@ -561,56 +594,52 @@
             document.getElementById('loading').style.display = 'block';
             hideMessages();
             
-            console.log('변환 요청 시작:', selectedFile.name, '형식:', format, '크기:', size, '투명배경:', transparent);
+            console.log('변환 요청 시작:', selectedFile.name, '품질:', quality, '형식:', format);
             
-            // 벡터 형식 전용 API 사용
-            const endpoint = '/convert_to_vector';
-            
-            fetch(endpoint, {
+            fetch('/convert', {
                     method: 'POST',
                     body: formData
                 })
                 .then(response => {
                     if (!response.ok) {
-                        return response.json().then(data => {
-                            throw new Error(data.error || `HTTP ${response.status}: ${response.statusText}`);
-                        });
+                        throw new Error(`HTTP ${response.status}: ${response.statusText}`);
                     }
                     
-                    // 벡터 변환 JSON 응답 처리
-                    return response.json();
-                })
-                .then((result) => {
-                    // 벡터 변환 결과 처리
-                    if (result.success) {
-                        // 즉시 다운로드 실행
-                        if (result.download_url) {
-                            // 다운로드 링크 생성 및 자동 클릭
-                            const downloadLink = document.createElement('a');
-                            downloadLink.href = result.download_url;
-                            downloadLink.download = result.filename;
-                            downloadLink.style.display = 'none';
-                            document.body.appendChild(downloadLink);
-                            downloadLink.click();
-                            document.body.removeChild(downloadLink);
-                            
-                            if (result.is_zip) {
-                                showSuccess(`변환 완료! ${result.total_files}개 파일이 ${result.filename} 압축파일로 다운로드됩니다.`);
-                            } else {
-                                showSuccess(`변환 완료! ${result.filename} 파일이 다운로드됩니다.`);
-                            }
+                    // 서버 응답에서 파일 이름 정보(헤더)를 추출
+                    const disposition = response.headers.get('Content-Disposition');
+                    let filename = `converted.${format}`; // 선택된 형식에 따른 기본값
+                    if (disposition && disposition.indexOf('attachment') !== -1) {
+                        // filename*=UTF-8'' 형식 처리 (RFC 5987)
+                        const filenameStarRegex = /filename\*=UTF-8''([^;\n]*)/;
+                        const starMatches = filenameStarRegex.exec(disposition);
+                        if (starMatches != null && starMatches[1]) {
+                            filename = decodeURIComponent(starMatches[1]);
                         } else {
-                            // 기존 방식 (호환성)
-                            let downloadLinks = '';
-                            result.files.forEach(file => {
-                                downloadLinks += `<a href="/download_vector/${file.filename}" download="${file.filename}" style="display: inline-block; margin: 5px; padding: 8px 12px; background: #007bff; color: white; text-decoration: none; border-radius: 4px;">📥 ${file.filename}</a>`;
-                            });
-                            
-                            showSuccess(`벡터 변환 완료! ${result.total_files}개 파일이 생성되었습니다.<br>${downloadLinks}`);
+                            // 일반 filename 형식 처리
+                            const filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+                            const matches = filenameRegex.exec(disposition);
+                            if (matches != null && matches[1]) {
+                                filename = matches[1].replace(/['"]/g, '');
+                            }
                         }
-                    } else {
-                        throw new Error(result.error || '벡터 변환에 실패했습니다.');
                     }
+                    return response.blob().then(blob => ({ blob, filename }));
+                })
+                .then(({ blob, filename }) => {
+                    // 파일 다운로드
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.href = url;
+                    // 수정: 서버가 알려준 파일명(filename)을 그대로 사용
+                    link.download = filename;
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    
+                    URL.revokeObjectURL(url);
+                    
+                    // 수정: 메시지에도 올바른 파일명을 표시
+                    showSuccess(`변환 완료! ${filename} 파일이 다운로드됩니다.`);
                 })
                 .catch(error => {
                     console.error('변환 오류:', error);
@@ -629,16 +658,20 @@
             document.getElementById('fileInput').value = '';
             document.getElementById('fileInfo').style.display = 'none';
             document.getElementById('formatOptions').style.display = 'none';
+            document.getElementById('qualityOptions').style.display = 'none';
             document.getElementById('advancedOptions').style.display = 'none';
             document.getElementById('loading').style.display = 'none';
             document.getElementById('convertBtn').disabled = false;
             document.getElementById('convertBtn').textContent = '변환하기';
             
-            // 형식 및 고급 옵션 설정 초기화
-            document.querySelector('input[name="format"][value="svg"]').checked = true;
-            document.querySelector('input[name="transparent"][value="disabled"]').checked = true;
-            document.getElementById('sizeSlider').value = '1.0';
-            document.getElementById('sizeValue').textContent = '1.0';
+            // 품질 및 형식 설정 초기화
+            document.querySelector('input[name="quality"][value="medium"]').checked = true;
+            document.getElementById('formatSelect').value = 'jpg';
+            document.getElementById('transparentBg').checked = false;
+            
+            // 고급 옵션 접기
+            document.getElementById('advancedContent').style.display = 'none';
+            document.getElementById('advancedToggleIcon').textContent = '▶';
             
             hideMessages();
         }
@@ -652,7 +685,7 @@
 
         function showSuccess(msg) {
             const successDiv = document.getElementById('successMsg');
-            successDiv.innerHTML = msg; // HTML 지원을 위해 innerHTML 사용
+            successDiv.textContent = msg;
             successDiv.style.display = 'block';
             document.getElementById('errorMsg').style.display = 'none';
         }
@@ -662,23 +695,51 @@
             document.getElementById('successMsg').style.display = 'none';
         }
         
-        // 크기 슬라이더 이벤트 리스너 추가
-        document.getElementById('sizeSlider').addEventListener('input', function(e) {
-            const value = e.target.value;
-            document.getElementById('sizeValue').textContent = value;
+        function toggleAdvancedOptions() {
+            const content = document.getElementById('advancedContent');
+            const icon = document.getElementById('advancedToggleIcon');
             
-            // 기본 크기 443×591 px에 비례하여 계산
+            if (content.style.display === 'none' || content.style.display === '') {
+                content.style.display = 'block';
+                icon.textContent = '▼';
+            } else {
+                content.style.display = 'none';
+                icon.textContent = '▶';
+            }
+        }
+        
+        // 크기 슬라이더 기능
+        function updateSizeSlider(value) {
+            document.getElementById('sizeValue').value = value;
+            updateCurrentSize();
+        }
+        
+        function updateCurrentSize() {
+            const sizeMultiplier = parseFloat(document.getElementById('sizeSlider').value);
             const baseWidth = 443;
             const baseHeight = 591;
-            const newWidth = Math.round(baseWidth * value);
-            const newHeight = Math.round(baseHeight * value);
-            
-            // 픽셀 크기 업데이트
-            const pixelDisplay = document.querySelector('#advancedOptions .advanced-options div:first-child div:last-child');
-            if (pixelDisplay) {
-                pixelDisplay.textContent = `${newWidth}×${newHeight} px`;
+            const newWidth = Math.round(baseWidth * sizeMultiplier);
+            const newHeight = Math.round(baseHeight * sizeMultiplier);
+            document.getElementById('currentSize').textContent = `${newWidth}×${newHeight} px`;
+        }
+        
+        // 슬라이더 이벤트 리스너 추가
+        document.addEventListener('DOMContentLoaded', function() {
+            const sizeSlider = document.getElementById('sizeSlider');
+            if (sizeSlider) {
+                sizeSlider.addEventListener('input', function() {
+                    updateSizeSlider(this.value);
+                });
+                // 초기값 설정
+                updateSizeSlider(sizeSlider.value);
             }
         });
+        
+        // 투명 배경 라디오 버튼 기능
+        function updateTransparentBg(value) {
+            // 라디오 버튼 값에 따른 추가 처리가 필요한 경우 여기에 구현
+            console.log('투명 배경 설정:', value);
+        }
     </script>
 </body>
 </html>
