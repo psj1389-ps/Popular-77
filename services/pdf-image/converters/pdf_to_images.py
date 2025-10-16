@@ -23,8 +23,7 @@ def _apply_colorkey_rgba(img: Image.Image, key_rgb=(255, 255, 255), tol=10):
     return img
 
 def _remove_white_to_alpha(rgba: Image.Image, white_threshold: int = 250) -> Image.Image:
-    """PDF-PNG 방식의 밝기 기반 투명 처리 - 더 효과적인 배경 제거"""
-    # 밝은 영역(종이 배경)을 투명으로 처리
+    # 밝은 영역(종이 배경)을 투명으로
     gray = rgba.convert("L")
     alpha_mask = gray.point(lambda p: 0 if p >= white_threshold else 255)
     out = rgba.copy()
@@ -63,7 +62,7 @@ def pdf_to_images(
     for pno in pages:
         page = doc[pno - 1]
         use_alpha = transparent_bg and fmt in ("png", "webp")
-        pix = page.get_pixmap(matrix=mat, alpha=use_alpha)
+        pix = page.get_pixmap(matrix=mat, alpha=True if use_alpha else False)
 
         out_path = os.path.join(out_dir, f"page-{pno}.{fmt}")
 
@@ -72,10 +71,10 @@ def pdf_to_images(
                 # PyMuPDF 알파 렌더링 + 향상된 투명 처리
                 img = Image.frombytes("RGBA", [pix.width, pix.height], pix.samples)
                 
-                # PDF-PNG 방식의 밝기 기반 투명 처리 (더 효과적)
-                if transparent_color or white_threshold < 255:
+                # PDF-PNG 방식의 밝기 기반 투명 처리 우선 적용
+                if white_threshold < 255:
                     img = _remove_white_to_alpha(img, white_threshold)
-                else:
+                elif transparent_color:
                     # 기존 컬러키 방식도 유지 (호환성)
                     img = _apply_colorkey_rgba(img, _parse_hex_color(transparent_color), tolerance)
                 
@@ -86,15 +85,17 @@ def pdf_to_images(
             img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
             img.save(out_path, "JPEG", quality=q, optimize=True)
         elif fmt == "webp":
-            mode = "RGBA" if use_alpha else "RGB"
-            img = Image.frombytes(mode, [pix.width, pix.height], pix.samples)
             if use_alpha:
-                img = img.convert("RGBA")
-                
-                # PDF-PNG 방식의 밝기 기반 투명 처리 (더 효과적)
-                if transparent_color or white_threshold < 255:
+                # 투명 처리를 위해 RGBA 모드로 렌더링
+                img = Image.frombytes("RGBA", [pix.width, pix.height], pix.samples)
+            else:
+                img = Image.frombytes("RGB", [pix.width, pix.height], pix.samples)
+            
+            if use_alpha:
+                # PDF-PNG 방식의 밝기 기반 투명 처리 우선 적용
+                if white_threshold < 255:
                     img = _remove_white_to_alpha(img, white_threshold)
-                else:
+                elif transparent_color:
                     # 기존 컬러키 방식도 유지 (호환성)
                     img = _apply_colorkey_rgba(img, _parse_hex_color(transparent_color), tolerance)
                 
