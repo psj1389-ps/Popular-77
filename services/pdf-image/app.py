@@ -462,9 +462,16 @@ def upload_file():
                             output_filename = f"{base_name}.{format_param}"
                             final_output_path = os.path.join(OUTPUT_FOLDER, f"{timestamp}_{output_filename}")
                             
-                            # 파일 복사
+                            # 파일 복사 (파일이 존재하는지 확인)
                             import shutil
-                            shutil.copy2(single_image_path, final_output_path)
+                            if os.path.exists(single_image_path):
+                                shutil.copy2(single_image_path, final_output_path)
+                                print(f"단일 파일 복사 완료: {single_image_path} -> {final_output_path}")
+                                print(f"복사된 파일 크기: {os.path.getsize(final_output_path)} bytes")
+                            else:
+                                print(f"원본 파일이 존재하지 않음: {single_image_path}")
+                                flash('변환된 이미지 파일을 찾을 수 없습니다.')
+                                return redirect(url_for('index'))
                             
                             # 임시 파일들 정리
                             for img_path in image_paths:
@@ -479,7 +486,7 @@ def upload_file():
                         else:
                             # 다중 페이지인 경우 ZIP 파일로 압축
                             import zipfile
-                            zip_filename = f"{base_name}_images.zip"
+                            zip_filename = f"{base_name}_{format_param}.zip"
                             zip_path = os.path.join(OUTPUT_FOLDER, f"{timestamp}_{zip_filename}")
                             
                             with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
