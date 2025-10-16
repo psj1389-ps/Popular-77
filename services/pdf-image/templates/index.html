@@ -585,7 +585,7 @@
             formData.append('format', format);
             
             // 투명 배경 옵션 추가
-            const transparentBg = document.getElementById('transparentBg')?.checked || false;
+            const transparentBg = document.querySelector('input[name="transparentBg"]:checked')?.value || 'false';
             formData.append('transparentBg', transparentBg);
             
             // UI 업데이트
@@ -667,7 +667,7 @@
             // 품질 및 형식 설정 초기화
             document.querySelector('input[name="quality"][value="medium"]').checked = true;
             document.getElementById('formatSelect').value = 'jpg';
-            document.getElementById('transparentBg').checked = false;
+            document.querySelector('input[name="transparentBg"][value="false"]').checked = true;
             
             // 고급 옵션 접기
             document.getElementById('advancedContent').style.display = 'none';

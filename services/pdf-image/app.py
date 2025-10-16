@@ -422,7 +422,7 @@ def upload_file():
                     format_param = request.form.get('format', 'png').lower()
                     quality_param = request.form.get('quality', 'medium')
                     scale_param = float(request.form.get('scale', '0.5'))
-                    transparent_param = request.form.get('transparent', '0')
+                    transparent_param = request.form.get('transparentBg', 'false')
                     
                     # 품질을 DPI로 변환
                     quality_to_dpi = {'low': 96, 'medium': 144, 'high': 300}
@@ -435,8 +435,11 @@ def upload_file():
                     output_dir = os.path.join(OUTPUT_FOLDER, f"{timestamp}_images")
                     os.makedirs(output_dir, exist_ok=True)
                     
+                    # 투명 배경 옵션 처리
+                    transparent_bg = transparent_param.lower() == 'true'
+                    
                     # PDF를 이미지로 변환
-                    image_paths = pdf_to_images(input_path, output_dir, fmt=format_param, dpi=final_dpi)
+                    image_paths = pdf_to_images(input_path, output_dir, fmt=format_param, dpi=final_dpi, transparent=transparent_bg)
                     
                     if image_paths:
                         # 원본 파일명에서 확장자 제거 (한글 파일명 보존)
