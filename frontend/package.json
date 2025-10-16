@@ -6,7 +6,8 @@
   "proxy": "http://localhost:5000",
   "scripts": {
     "dev": "vite",
-    "build": "node ./scripts/generate-rss.js && tsc -b && vite build",
+    "prebuild": "node ./scripts/generate-rss.js",
+    "build": "tsc -b && vite build",
     "lint": "eslint .",
     "preview": "vite preview",
     "check": "tsc -b --noEmit"

@@ -1,12 +1,8 @@
 {
   "rewrites": [
-    {
-      "source": "/rss.xml",
-      "destination": "/api/rss"
-    },
-    {
-      "source": "/:path((?!api/|sitemap\\.xml).*)",
-      "destination": "/index.html"
-    }
+    { "source": "/rss.xml", "destination": "/rss.xml" },
+    { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/:path((?!api/|rss\\.xml|sitemap\\.xml).*)", "destination": "/index.html" }
   ]
 }

@@ -1,144 +1,125 @@
-<?xml version="1.0" encoding="utf-8"?>
-<rss version="2.0" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:content="http://purl.org/rss/1.0/modules/content/">
-    <channel>
-        <title>77-tools - PDF 변환 및 이미지 도구</title>
-        <link>https://77-tools.xyz</link>
-        <description>다양한 PDF 변환 도구와 이미지 편집 도구를 제공합니다. PDF를 이미지, 문서, 벡터 형식으로 변환하고 이미지를 편집할 수 있는 온라인 도구 모음입니다.</description>
-        <lastBuildDate>Thu, 16 Oct 2025 15:29:40 GMT</lastBuildDate>
-        <docs>https://validator.w3.org/feed/docs/rss2.html</docs>
-        <generator>77-tools RSS Generator</generator>
-        <language>ko</language>
-        <image>
-            <title>77-tools - PDF 변환 및 이미지 도구</title>
-            <url>https://77-tools.xyz/icons/77-popular-tools.svg</url>
-            <link>https://77-tools.xyz</link>
-        </image>
-        <copyright>All rights reserved 2025, 77-tools</copyright>
-        <item>
-            <title><![CDATA[PDF to PNG 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-png</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-png</guid>
-            <pubDate>Wed, 15 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 고품질 PNG 이미지로 변환합니다. 투명 배경 지원으로 더욱 깔끔한 결과물을 얻을 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 고품질 PNG 이미지로 변환합니다. 투명 배경 지원으로 더욱 깔끔한 결과물을 얻을 수 있습니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-png">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to JPG 변환기]]></title>
-            <link>https://77-tools.xyz/tool/pdf-to-jpg</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tool/pdf-to-jpg</guid>
-            <pubDate>Tue, 14 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 고품질 JPG 이미지로 변환합니다. 빠르고 안정적인 변환 서비스를 제공합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 고품질 JPG 이미지로 변환합니다. 빠르고 안정적인 변환 서비스를 제공합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tool/pdf-to-jpg">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to DOC 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-to-doc</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-to-doc</guid>
-            <pubDate>Mon, 13 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 Word 문서(DOC/DOCX)로 변환합니다. 편집 가능한 문서 형태로 변환하여 작업 효율성을 높입니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 Word 문서(DOC/DOCX)로 변환합니다. 편집 가능한 문서 형태로 변환하여 작업 효율성을 높입니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-to-doc">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to Excel 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-xls</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-xls</guid>
-            <pubDate>Sun, 12 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 Excel 스프레드시트로 변환합니다. 표 데이터를 정확하게 추출하여 분석 작업에 활용할 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 Excel 스프레드시트로 변환합니다. 표 데이터를 정확하게 추출하여 분석 작업에 활용할 수 있습니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-xls">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to PPTX 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-pptx</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-pptx</guid>
-            <pubDate>Sat, 11 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 PowerPoint 프레젠테이션으로 변환합니다. 프레젠테이션 자료 제작에 유용합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 PowerPoint 프레젠테이션으로 변환합니다. 프레젠테이션 자료 제작에 유용합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-pptx">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to SVG 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-svg</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-svg</guid>
-            <pubDate>Fri, 10 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 고품질 SVG 벡터 이미지로 변환합니다. 확대해도 깨지지 않는 벡터 형식으로 변환합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 고품질 SVG 벡터 이미지로 변환합니다. 확대해도 깨지지 않는 벡터 형식으로 변환합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-svg">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to AI 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-ai</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-ai</guid>
-            <pubDate>Thu, 09 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 Adobe Illustrator AI 파일로 변환합니다. 디자인 작업에 최적화된 형식으로 변환합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 Adobe Illustrator AI 파일로 변환합니다. 디자인 작업에 최적화된 형식으로 변환합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-ai">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to BMP 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-bmp</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-bmp</guid>
-            <pubDate>Wed, 08 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 고품질 BMP 이미지로 변환합니다. 무손실 이미지 형식으로 변환하여 품질을 보장합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 고품질 BMP 이미지로 변환합니다. 무손실 이미지 형식으로 변환하여 품질을 보장합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-bmp">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to TIFF 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-tiff</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-tiff</guid>
-            <pubDate>Tue, 07 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 고품질 TIFF 이미지로 변환합니다. 인쇄용 고품질 이미지 형식으로 변환합니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 고품질 TIFF 이미지로 변환합니다. 인쇄용 고품질 이미지 형식으로 변환합니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-tiff">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to GIF 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-gif</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-gif</guid>
-            <pubDate>Mon, 06 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 GIF 애니메이션으로 변환합니다. 다중 페이지 PDF를 애니메이션으로 표현할 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 GIF 애니메이션으로 변환합니다. 다중 페이지 PDF를 애니메이션으로 표현할 수 있습니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-gif">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to Image 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-image</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-image</guid>
-            <pubDate>Sun, 05 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 다양한 이미지 형식으로 변환합니다. PNG, JPG, BMP, TIFF, GIF 등 원하는 형식을 선택할 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 다양한 이미지 형식으로 변환합니다. PNG, JPG, BMP, TIFF, GIF 등 원하는 형식을 선택할 수 있습니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-image">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[PDF to Vector 변환기]]></title>
-            <link>https://77-tools.xyz/tools/pdf-vector</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/pdf-vector</guid>
-            <pubDate>Sat, 04 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[PDF 파일을 다양한 벡터 형식으로 변환합니다. SVG, AI 등 벡터 형식으로 변환하여 디자인 작업에 활용할 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>PDF 파일을 다양한 벡터 형식으로 변환합니다. SVG, AI 등 벡터 형식으로 변환하여 디자인 작업에 활용할 수 있습니다.</p><p>카테고리: PDF 변환</p><p><a href="https://77-tools.xyz/tools/pdf-vector">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">PDF 변환</category>
-        </item>
-        <item>
-            <title><![CDATA[이미지 리사이저]]></title>
-            <link>https://77-tools.xyz/tools/image-resizer</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/image-resizer</guid>
-            <pubDate>Fri, 03 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[이미지 크기를 조정하고 최적화합니다. 다양한 크기로 일괄 변환하여 웹사이트나 앱에 최적화된 이미지를 생성할 수 있습니다.]]></description>
-            <content:encoded><![CDATA[<p>이미지 크기를 조정하고 최적화합니다. 다양한 크기로 일괄 변환하여 웹사이트나 앱에 최적화된 이미지를 생성할 수 있습니다.</p><p>카테고리: 이미지 도구</p><p><a href="https://77-tools.xyz/tools/image-resizer">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">이미지 도구</category>
-        </item>
-        <item>
-            <title><![CDATA[배경 제거 도구]]></title>
-            <link>https://77-tools.xyz/tools/background-remover</link>
-            <guid isPermaLink="false">https://77-tools.xyz/tools/background-remover</guid>
-            <pubDate>Thu, 02 Jan 2025 00:00:00 GMT</pubDate>
-            <description><![CDATA[이미지에서 배경을 자동으로 제거합니다. AI 기술을 활용하여 정확하고 깔끔한 배경 제거 결과를 제공합니다.]]></description>
-            <content:encoded><![CDATA[<p>이미지에서 배경을 자동으로 제거합니다. AI 기술을 활용하여 정확하고 깔끔한 배경 제거 결과를 제공합니다.</p><p>카테고리: 이미지 도구</p><p><a href="https://77-tools.xyz/tools/background-remover">지금 사용해보기 →</a></p>]]></content:encoded>
-            <category domain="https://77-tools.xyz">이미지 도구</category>
-        </item>
-    </channel>
+<?xml version="1.0" encoding="UTF-8"?>
+<rss version="2.0">
+  <channel>
+    <title>77-tools</title>
+    <link>https://77-tools.xyz/</link>
+    <description>가장 많이 사용되는 온라인 도구와 AI</description>
+    <language>ko</language>
+    <lastBuildDate>Wed, 16 Oct 2025 16:53:00 GMT</lastBuildDate>
+    <generator>77-tools RSS Generator</generator>
+    <copyright>© 2025 77-tools.xyz</copyright>
+    <image>
+      <url>https://77-tools.xyz/icons/icon-192x192.png</url>
+      <title>77-tools</title>
+      <link>https://77-tools.xyz/</link>
+    </image>
+    
+    <item>
+      <title>PDF to DOCX 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-docx</link>
+      <guid>https://77-tools.xyz/tools/pdf-docx</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 DOCX 문서로 변환합니다. 빠르고 정확한 변환으로 편집 가능한 워드 문서를 만들어보세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to PPTX 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-pptx</link>
+      <guid>https://77-tools.xyz/tools/pdf-pptx</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 PPTX 프레젠테이션으로 변환합니다. 슬라이드 편집이 가능한 파워포인트 파일로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to Excel 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-excel</link>
+      <guid>https://77-tools.xyz/tools/pdf-excel</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 Excel 스프레드시트로 변환합니다. 표와 데이터를 편집 가능한 엑셀 파일로 만들어보세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to JPG 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-jpg</link>
+      <guid>https://77-tools.xyz/tools/pdf-jpg</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 JPG 이미지로 변환합니다. 고품질 이미지로 변환하여 웹이나 문서에 활용하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to PNG 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-png</link>
+      <guid>https://77-tools.xyz/tools/pdf-png</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 PNG 이미지로 변환합니다. 투명 배경 지원으로 다양한 용도로 활용 가능합니다.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to SVG 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-svg</link>
+      <guid>https://77-tools.xyz/tools/pdf-svg</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 SVG 벡터 이미지로 변환합니다. 확대해도 깨지지 않는 벡터 그래픽으로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to TIFF 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-tiff</link>
+      <guid>https://77-tools.xyz/tools/pdf-tiff</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 TIFF 이미지로 변환합니다. 고품질 인쇄용 이미지 포맷으로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to BMP 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-bmp</link>
+      <guid>https://77-tools.xyz/tools/pdf-bmp</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 BMP 이미지로 변환합니다. 무손실 비트맵 이미지 포맷으로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to GIF 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-gif</link>
+      <guid>https://77-tools.xyz/tools/pdf-gif</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 GIF 애니메이션으로 변환합니다. 여러 페이지를 애니메이션으로 만들어보세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to AI 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-ai</link>
+      <guid>https://77-tools.xyz/tools/pdf-ai</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 AI(일러스트레이터) 형식으로 변환합니다. 벡터 편집이 가능한 AI 파일로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to Image 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-image</link>
+      <guid>https://77-tools.xyz/tools/pdf-image</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 다양한 이미지 형식으로 변환합니다. PNG, JPG, WebP 등 원하는 형식을 선택하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+    
+    <item>
+      <title>PDF to Vector 변환기</title>
+      <link>https://77-tools.xyz/tools/pdf-vector</link>
+      <guid>https://77-tools.xyz/tools/pdf-vector</guid>
+      <pubDate>Wed, 16 Oct 2025 16:53:00 GMT</pubDate>
+      <description><![CDATA[PDF 파일을 다양한 벡터 형식으로 변환합니다. SVG, AI, EPS 등 벡터 그래픽으로 변환하세요.]]></description>
+      <category>PDF 변환</category>
+    </item>
+  </channel>
 </rss>
