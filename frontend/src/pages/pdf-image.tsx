@@ -250,6 +250,7 @@ const PdfImagePage: React.FC = () => {
                   <h3 className="font-semibold text-gray-800 mb-3">파일 형식:</h3>
                   <div className="bg-gray-50 p-4 rounded-lg">
                     <div className="grid grid-cols-1 gap-3">
+                      {/* PNG - 별도 표시 */}
                       <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
                         <input 
                           type="radio" 
@@ -268,85 +269,84 @@ const PdfImagePage: React.FC = () => {
                         </div>
                       </label>
                       
-                      <div className="text-sm text-gray-700 font-bold mb-2">래스터 형식:</div>
-                      
-                      <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                        <input 
-                          type="radio" 
-                          name="format" 
-                          value="jpg" 
-                          checked={format === 'jpg'} 
-                          onChange={(e) => setFormat(e.target.value as any)} 
-                          className="w-4 h-4 text-blue-600 mr-3" 
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium">JPG/JPEG:</span>
-                          <span className="text-sm text-gray-600 ml-2">일반 사진용 (작은 파일 크기)</span>
+                      {/* 래스터 형식 섹션 */}
+                      <div className="mt-4">
+                        <div className="text-sm text-gray-700 font-bold mb-3">래스터 형식:</div>
+                        <div className="space-y-2">
+                          <label className="flex items-center p-2 border rounded cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                              type="radio" 
+                              name="format" 
+                              value="jpg" 
+                              checked={format === 'jpg'} 
+                              onChange={(e) => setFormat(e.target.value as any)} 
+                              className="w-4 h-4 text-blue-600 mr-3" 
+                            />
+                            <div className="flex-1">
+                              <span className="font-medium">📷 JPG (JPEG) - 일반적인 사진 형식</span>
+                            </div>
+                          </label>
+                          
+                          <label className="flex items-center p-2 border rounded cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                              type="radio" 
+                              name="format" 
+                              value="tiff" 
+                              checked={format === 'tiff'} 
+                              onChange={(e) => setFormat(e.target.value as any)} 
+                              className="w-4 h-4 text-blue-600 mr-3" 
+                            />
+                            <div className="flex-1">
+                              <span className="font-medium">🖨️ TIFF - 고품질 인쇄용</span>
+                            </div>
+                          </label>
+                          
+                          <label className="flex items-center p-2 border rounded cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                              type="radio" 
+                              name="format" 
+                              value="gif" 
+                              checked={format === 'gif'} 
+                              onChange={(e) => setFormat(e.target.value as any)} 
+                              className="w-4 h-4 text-blue-600 mr-3" 
+                            />
+                            <div className="flex-1">
+                              <span className="font-medium">🎬 GIF - 웹용 간단한 이미지</span>
+                            </div>
+                          </label>
+                          
+                          <label className="flex items-center p-2 border rounded cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                              type="radio" 
+                              name="format" 
+                              value="bmp" 
+                              checked={format === 'bmp'} 
+                              onChange={(e) => setFormat(e.target.value as any)} 
+                              className="w-4 h-4 text-blue-600 mr-3" 
+                            />
+                            <div className="flex-1">
+                              <span className="font-medium">🖥️ BMP - Windows 비트맵</span>
+                            </div>
+                          </label>
+                          
+                          <label className="flex items-center p-2 border rounded cursor-pointer hover:bg-white transition-colors">
+                            <input 
+                              type="radio" 
+                              name="format" 
+                              value="webp" 
+                              checked={format === 'webp'} 
+                              onChange={(e) => setFormat(e.target.value as any)} 
+                              className="w-4 h-4 text-blue-600 mr-3" 
+                            />
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2">
+                                <span className="font-medium">🌐 WEBP - 웹 최적화 형식</span>
+                                <span className="text-blue-600">🔍</span>
+                              </div>
+                            </div>
+                          </label>
                         </div>
-                      </label>
-                      
-                      <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                        <input 
-                          type="radio" 
-                          name="format" 
-                          value="tiff" 
-                          checked={format === 'tiff'} 
-                          onChange={(e) => setFormat(e.target.value as any)} 
-                          className="w-4 h-4 text-blue-600 mr-3" 
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium">TIFF:</span>
-                          <span className="text-sm text-gray-600 ml-2">고품질 인쇄용</span>
-                        </div>
-                      </label>
-                      
-                      <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                        <input 
-                          type="radio" 
-                          name="format" 
-                          value="gif" 
-                          checked={format === 'gif'} 
-                          onChange={(e) => setFormat(e.target.value as any)} 
-                          className="w-4 h-4 text-blue-600 mr-3" 
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium">GIF:</span>
-                          <span className="text-sm text-gray-600 ml-2">애니메이션 지원</span>
-                        </div>
-                      </label>
-                      
-                      <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                        <input 
-                          type="radio" 
-                          name="format" 
-                          value="bmp" 
-                          checked={format === 'bmp'} 
-                          onChange={(e) => setFormat(e.target.value as any)} 
-                          className="w-4 h-4 text-blue-600 mr-3" 
-                        />
-                        <div className="flex-1">
-                          <span className="font-medium">BMP:</span>
-                          <span className="text-sm text-gray-600 ml-2">무손실 압축</span>
-                        </div>
-                      </label>
-                      
-                      <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
-                        <input 
-                          type="radio" 
-                          name="format" 
-                          value="webp" 
-                          checked={format === 'webp'} 
-                          onChange={(e) => setFormat(e.target.value as any)} 
-                          className="w-4 h-4 text-blue-600 mr-3" 
-                        />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">WEBP:</span>
-                            <span className="text-blue-600">🔍</span>
-                          </div>
-                          <p className="text-sm text-gray-600">웹 최적화 형식</p>
-                        </div>
-                      </label>
+                      </div>
                     </div>
                     
                     <div className="mt-3 text-xs text-gray-500">
