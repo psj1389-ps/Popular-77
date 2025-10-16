@@ -261,11 +261,7 @@ const PdfImagePage: React.FC = () => {
                           className="w-4 h-4 text-blue-600 mr-3" 
                         />
                         <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <span className="font-medium">🖼️ PNG</span>
-                            <span className="text-blue-600">🔍</span>
-                          </div>
-                          <p className="text-sm text-gray-600">투명 배경 지원 (웹 그래픽용)</p>
+                          <span className="font-medium">🖼️ PNG - 투명 배경 지원, 무손실 압축</span>
                         </div>
                       </label>
                       
@@ -283,7 +279,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">📷 JPG (JPEG) - 일반 사진용 (작은 파일 크기)</span>
+                              <span className="font-medium">📷 JPG/JPEG - 일반 사진용, 작은 파일 크기</span>
                             </div>
                           </label>
                           
@@ -297,7 +293,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">🖨️ TIFF - 고품질 인쇄용</span>
+                              <span className="font-medium">🖨️ TIFF - 고품질 인쇄용, 무손실 압축</span>
                             </div>
                           </label>
                           
@@ -311,7 +307,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">🎬 GIF - 애니메이션 지원</span>
+                              <span className="font-medium">🎬 GIF - 애니메이션 지원, 투명 배경 지원</span>
                             </div>
                           </label>
                           
@@ -325,7 +321,7 @@ const PdfImagePage: React.FC = () => {
                               className="w-4 h-4 text-blue-600 mr-3" 
                             />
                             <div className="flex-1">
-                              <span className="font-medium">💾 BMP - 무손실 압축</span>
+                              <span className="font-medium">💾 BMP - 무손실 압축, 큰 파일 크기</span>
                             </div>
                           </label>
                           
@@ -340,7 +336,7 @@ const PdfImagePage: React.FC = () => {
                             />
                             <div className="flex-1">
                               <div className="flex items-center gap-2">
-                                <span className="font-medium">🔍 WEBP - 웹 최적화 형식</span>
+                                <span className="font-medium">🌐 WEBP - 웹 최적화, 투명 배경 지원</span>
                               </div>
                             </div>
                           </label>
@@ -349,7 +345,7 @@ const PdfImagePage: React.FC = () => {
                     </div>
                     
                     <div className="mt-3 text-xs text-gray-500">
-                      🔍 = 투명 배경 지원
+                      💡 투명 배경 지원: PNG, GIF, WEBP | 무손실 압축: PNG, TIFF, BMP
                     </div>
                   </div>
                 </div>
