@@ -1,5 +1,8 @@
 // Vercel Serverless Function for RSS Feed
 export default function handler(req, res) {
+  // Add console log to track function execution
+  console.log("[RSS] handler called", new Date().toISOString());
+  
   // Set CORS headers
   res.setHeader('Access-Control-Allow-Origin', '*');
   res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
