@@ -333,15 +333,13 @@ def upload_file():
         
         # 1단계: 파일 존재 여부 확인
         if 'file' not in request.files:
-            flash('파일이 선택되지 않았습니다.')
-            return redirect(url_for('index'))
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
         
         file = request.files['file']
         
         # 2단계: 파일명 확인
         if not file or file.filename == '' or file.filename is None:
-            flash('파일이 선택되지 않았습니다.')
-            return redirect(url_for('index'))
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
         
         # 3단계: 파일 내용 및 크기 확인 (강화된 검증)
         try:
@@ -352,17 +350,14 @@ def upload_file():
             
             # 파일 크기가 0인 경우 처리
             if file_size == 0:
-                flash('업로드된 파일이 비어있습니다. 올바른 PDF 파일을 선택해주세요.')
-                return redirect(url_for('index'))
+                return jsonify({'error': '업로드된 파일이 비어있습니다. 올바른 PDF 파일을 선택해주세요.'}), 400
             
             # 최소 파일 크기 확인 (PDF 헤더 최소 크기)
             if file_size < 100:  # 100바이트 미만은 유효한 PDF가 아님
-                flash('파일이 너무 작습니다. 올바른 PDF 파일을 선택해주세요.')
-                return redirect(url_for('index'))
+                return jsonify({'error': '파일이 너무 작습니다. 올바른 PDF 파일을 선택해주세요.'}), 400
             
             if file_size > 100 * 1024 * 1024:  # 100MB
-                flash(f'파일 크기가 너무 큽니다. (현재: {file_size // (1024*1024)}MB, 최대: 100MB)')
-                return redirect(url_for('index'))
+                return jsonify({'error': f'파일 크기가 너무 큽니다. (현재: {file_size // (1024*1024)}MB, 최대: 100MB)'}), 400
             
             print(f"파일 크기: {file_size // (1024*1024) if file_size >= 1024*1024 else file_size // 1024}{'MB' if file_size >= 1024*1024 else 'KB'}")
             
@@ -371,27 +366,25 @@ def upload_file():
             file.seek(0)  # 다시 처음으로 이동
             
             if not file_content.startswith(b'%PDF-'):
-                flash('올바른 PDF 파일이 아닙니다. PDF 파일을 선택해주세요.')
-                return redirect(url_for('index'))
+                return jsonify({'error': '올바른 PDF 파일이 아닙니다. PDF 파일을 선택해주세요.'}), 400
                 
         except Exception as e:
             print(f"파일 검증 중 오류: {str(e)}")
-            flash('파일을 읽는 중 오류가 발생했습니다. 다른 파일을 시도해주세요.')
-            return redirect(url_for('index'))
+            return jsonify({'error': '파일을 읽는 중 오류가 발생했습니다. 다른 파일을 시도해주세요.'}), 400
         
         # 5단계: 파일 형식 확인 및 처리 (강화된 검증)
         if file and allowed_file(file.filename):
+            # 원본 파일명 보존 (한글 파일명 지원)
+            original_filename = file.filename
             filename = secure_filename(file.filename)
             
             # 파일 확장자 안전하게 추출 (list index out of range 오류 방지)
-            if '.' not in filename:
-                flash('파일 확장자가 없습니다. PDF 파일을 선택해주세요.')
-                return redirect(url_for('index'))
+            if '.' not in original_filename:
+                return jsonify({'error': '파일 확장자가 없습니다. PDF 파일을 선택해주세요.'}), 400
             
-            file_ext = filename.rsplit('.', 1)[1].lower()
+            file_ext = original_filename.rsplit('.', 1)[1].lower()
             if file_ext != 'pdf':
-                flash('PDF 파일만 업로드 가능합니다.')
-                return redirect(url_for('index'))
+                return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
             
             # 안전한 파일명 생성 (타임스탬프 추가로 중복 방지)
             import time
@@ -409,14 +402,12 @@ def upload_file():
                 saved_file_size = os.path.getsize(input_path)
                 if saved_file_size == 0:
                     os.remove(input_path)
-                    flash('파일 저장 중 오류가 발생했습니다. 다시 시도해주세요.')
-                    return redirect(url_for('index'))
+                    return jsonify({'error': '파일 저장 중 오류가 발생했습니다. 다시 시도해주세요.'}), 500
                 
                 print(f"파일 저장 완료 - 크기: {saved_file_size}바이트")
             except Exception as e:
                 print(f"파일 저장 오류: {str(e)}")
-                flash(f'파일 저장 중 오류가 발생했습니다: {str(e)}')
-                return redirect(url_for('index'))
+                return jsonify({'error': f'파일 저장 중 오류가 발생했습니다: {str(e)}'}), 500
             
             # 변환 처리
             conversion_success = False
@@ -449,11 +440,10 @@ def upload_file():
                     
                     if image_paths:
                         # 원본 파일명에서 확장자 제거 (한글 파일명 보존)
-                        original_name = file.filename
-                        if '.' in original_name:
-                            base_name = original_name.rsplit('.', 1)[0]
+                        if '.' in original_filename:
+                            base_name = original_filename.rsplit('.', 1)[0]
                         else:
-                            base_name = original_name
+                            base_name = original_filename
                         
                         # 단일 페이지인 경우 개별 파일로 반환
                         if len(image_paths) == 1:
@@ -470,8 +460,7 @@ def upload_file():
                                 print(f"복사된 파일 크기: {os.path.getsize(final_output_path)} bytes")
                             else:
                                 print(f"원본 파일이 존재하지 않음: {single_image_path}")
-                                flash('변환된 이미지 파일을 찾을 수 없습니다.')
-                                return redirect(url_for('index'))
+                                return jsonify({'error': '변환된 이미지 파일을 찾을 수 없습니다.'}), 500
                             
                             # 임시 파일들 정리
                             for img_path in image_paths:
@@ -513,8 +502,7 @@ def upload_file():
                             pass
                         
                     else:
-                        flash('PDF 변환에 실패했습니다.')
-                        return redirect(url_for('index'))
+                        return jsonify({'error': 'PDF 변환에 실패했습니다.'}), 500
                         
                 except Exception as e:
                     error_msg = str(e)
@@ -522,20 +510,17 @@ def upload_file():
                     
                     # 사용자 친화적인 오류 메시지 제공
                     if "암호로 보호" in error_msg or "encrypted" in error_msg.lower():
-                        flash('PDF 파일이 암호로 보호되어 있습니다. 암호가 없는 PDF 파일을 사용해주세요.')
+                        return jsonify({'error': 'PDF 파일이 암호로 보호되어 있습니다. 암호가 없는 PDF 파일을 사용해주세요.'}), 400
                     elif "손상" in error_msg or "지원되지 않는" in error_msg:
-                        flash('PDF 파일을 열 수 없습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.')
+                        return jsonify({'error': 'PDF 파일을 열 수 없습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.'}), 400
                     elif "페이지가 없습니다" in error_msg:
-                        flash('PDF 파일에 페이지가 없습니다. 올바른 PDF 파일을 업로드해주세요.')
+                        return jsonify({'error': 'PDF 파일에 페이지가 없습니다. 올바른 PDF 파일을 업로드해주세요.'}), 400
                     else:
-                        flash(f'PDF 변환 중 오류가 발생했습니다: {error_msg}')
-                    
-                    return redirect(url_for('index'))
+                        return jsonify({'error': f'PDF 변환 중 오류가 발생했습니다: {error_msg}'}), 500
                     
             elif file_ext == 'docx':
                 # DOCX 기능 제거됨
-                flash('DOCX 파일 처리는 현재 지원되지 않습니다.')
-                return redirect(url_for('index'))
+                return jsonify({'error': 'DOCX 파일 처리는 현재 지원되지 않습니다.'}), 400
             
             # 변환 결과 처리
             if conversion_success:
@@ -550,15 +535,59 @@ def upload_file():
                 
                 # 파일 다운로드 제공
                 try:
-                    print("파일 다운로드 시작")
-                    return send_file(output_path, as_attachment=True, download_name=output_filename)
+                    print(f"파일 다운로드 시작: {output_path}")
+                    print(f"다운로드 파일명: {output_filename}")
+                    print(f"파일 존재 여부: {os.path.exists(output_path)}")
+                    print(f"파일 크기: {os.path.getsize(output_path) if os.path.exists(output_path) else 'N/A'} bytes")
+                    
+                    # 파일이 존재하는지 확인
+                    if not os.path.exists(output_path):
+                        raise Exception(f"변환된 파일을 찾을 수 없습니다: {output_path}")
+                    
+                    # 파일 크기가 0인지 확인
+                    if os.path.getsize(output_path) == 0:
+                        raise Exception("변환된 파일이 비어있습니다.")
+                    
+                    # 한글 파일명을 위한 적절한 헤더 설정
+                    from flask import Response
+                    import urllib.parse
+                    
+                    # UTF-8로 인코딩된 파일명 생성
+                    encoded_filename = urllib.parse.quote(output_filename.encode('utf-8'))
+                    
+                    # 파일 읽기 및 응답 생성
+                    with open(output_path, 'rb') as f:
+                        file_data = f.read()
+                    
+                    # MIME 타입 결정
+                    if output_filename.lower().endswith('.zip'):
+                        mimetype = 'application/zip'
+                    elif output_filename.lower().endswith(('.png', '.jpg', '.jpeg', '.gif', '.bmp', '.tiff', '.webp')):
+                        mimetype = 'image/octet-stream'
+                    else:
+                        mimetype = 'application/octet-stream'
+                    
+                    # ASCII 안전한 파일명 생성 (한글 파일명 문제 해결)
+                    ascii_filename = f"converted_file.{format_param}"
+                    
+                    response = Response(
+                        file_data,
+                        mimetype=mimetype,
+                        headers={
+                            'Content-Disposition': f'attachment; filename="{ascii_filename}"; filename*=UTF-8\'\'{encoded_filename}',
+                            'Content-Length': str(len(file_data)),
+                            'Cache-Control': 'no-cache'
+                        }
+                    )
+                    
+                    print("파일 다운로드 응답 생성 완료")
+                    return response
+                    
                 except Exception as e:
                     print(f"파일 다운로드 오류: {str(e)}")
-                    flash(f'파일 다운로드 중 오류가 발생했습니다: {str(e)}')
-                    return redirect(url_for('index'))
+                    return jsonify({'error': f'파일 다운로드 중 오류가 발생했습니다: {str(e)}'}), 500
             else:
                 print("변환 실패 - 정리 작업")
-                flash('파일 변환에 실패했습니다. 다시 시도해주세요.')
                 
                 # 실패한 파일들 정리
                 for cleanup_path in [input_path, output_path]:
@@ -568,15 +597,13 @@ def upload_file():
                     except Exception as e:
                         print(f"파일 정리 실패 (무시됨): {e}")
                 
-                return redirect(url_for('index'))
+                return jsonify({'error': '파일 변환에 실패했습니다. 다시 시도해주세요.'}), 500
         else:
-            flash('PDF 파일만 업로드 가능합니다.')
-            return redirect(url_for('index'))
+            return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
             
     except Exception as e:
         print(f"업로드 처리 중 예외 발생: {str(e)}")
-        flash('파일 처리 중 오류가 발생했습니다.')
-        return redirect(url_for('index'))
+        return jsonify({'error': '파일 처리 중 오류가 발생했습니다.'}), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)

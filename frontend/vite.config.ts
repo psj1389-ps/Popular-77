@@ -53,6 +53,11 @@ export default defineConfig({
         target: "http://localhost:5009",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/pdf-png/, "")
+      },
+      "/api/pdf-image": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-image/, "")
       }
     }
   }
