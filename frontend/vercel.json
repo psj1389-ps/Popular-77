@@ -17,7 +17,13 @@
       ]
     }
   ],
+  "functions": {
+    "api/rss.ts": {
+      "runtime": "nodejs18.x"
+    }
+  },
   "rewrites": [
+    { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/api/pdf-vector/(.*)", "destination": "https://pdf-vector.onrender.com/$1" },
     { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
     { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-jh3s.onrender.com/$1" },
