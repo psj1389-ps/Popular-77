@@ -324,6 +324,89 @@ def too_large(e):
 def index():
     return render_template('index.html')
 
+def _flag(v, default=False):
+    """문자열을 불린 값으로 변환하는 헬퍼 함수"""
+    if v is None:
+        return default
+    return str(v).strip().lower() in ("1", "true", "yes", "y", "on")
+
+def _zip_paths(paths):
+    """파일 경로들을 ZIP으로 압축하는 헬퍼 함수"""
+    import zipfile
+    import io
+    buf = io.BytesIO()
+    with zipfile.ZipFile(buf, "w", zipfile.ZIP_DEFLATED) as z:
+        for p in paths:
+            z.write(p, arcname=os.path.basename(p))
+    buf.seek(0)
+    return buf
+
+@app.post("/api/pdf-to-images")
+def api_pdf_to_images():
+    """새로운 API 엔드포인트 - 향상된 투명 배경 지원"""
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file is required"}), 400
+
+    fmt = (request.form.get("format") or "png").lower()    # png|jpg|webp|tiff|bmp|gif
+    dpi = int(request.form.get("dpi") or 144)
+    quality = request.form.get("quality")                  # 75~100 또는 low/medium/high
+    pages_spec = request.form.get("pages")                 # "1-3,5"
+
+    transparent_bg = _flag(request.form.get("transparentBg"), False)
+    transparent_color = request.form.get("transparentColor")   # 예: ffffff, #fff
+    tolerance = int(request.form.get("tolerance") or 8)
+    webp_lossless = _flag(request.form.get("webpLossless"), True)
+
+    name = secure_filename(f.filename)
+    in_path = os.path.join(UPLOAD_FOLDER, name)
+    f.save(in_path)
+
+    out_dir = os.path.join(OUTPUT_FOLDER, os.path.splitext(name)[0])
+    os.makedirs(out_dir, exist_ok=True)
+
+    try:
+        from converters.pdf_to_images import pdf_to_images
+        
+        out_files = pdf_to_images(
+            in_path, out_dir,
+            fmt=fmt, dpi=dpi, quality=quality,
+            pages_spec=pages_spec,
+            transparent_bg=transparent_bg,
+            transparent_color=transparent_color,
+            tolerance=tolerance,
+            webp_lossless=webp_lossless
+        )
+
+        if len(out_files) == 1:
+            # 단일 파일 반환
+            return send_file(out_files[0], as_attachment=True)
+        else:
+            # 다중 파일을 ZIP으로 압축하여 반환
+            zip_buffer = _zip_paths(out_files)
+            return send_file(
+                zip_buffer,
+                mimetype='application/zip',
+                as_attachment=True,
+                download_name=f"{os.path.splitext(name)[0]}.zip"
+            )
+    except Exception as e:
+        return jsonify({"error": str(e)}), 500
+    finally:
+        # 임시 파일 정리
+        try:
+            os.remove(in_path)
+            for f in out_files:
+                if os.path.exists(f):
+                    os.remove(f)
+        except:
+            pass
+
+@app.post("/api/pdf-image/convert_to_images")
+def api_pdf_image_convert_to_images():
+    """호환성을 위한 추가 엔드포인트"""
+    return api_pdf_to_images()
+
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
 @app.route('/convert_to_images', methods=['POST'])
@@ -438,8 +521,21 @@ def upload_file():
                     # 투명 배경 옵션 처리
                     transparent_bg = transparent_param.lower() == 'true'
                     
-                    # PDF를 이미지로 변환
-                    image_paths = pdf_to_images(input_path, output_dir, fmt=format_param, dpi=final_dpi, transparent=transparent_bg)
+                    # 추가 투명 배경 파라미터들
+                    transparent_color = request.form.get('transparentColor')
+                    tolerance = int(request.form.get('tolerance', 8))
+                    webp_lossless = request.form.get('webpLossless', 'true').lower() == 'true'
+                    
+                    # PDF를 이미지로 변환 (새로운 파라미터 포함)
+                    image_paths = pdf_to_images(
+                        input_path, output_dir, 
+                        fmt=format_param, 
+                        dpi=final_dpi, 
+                        transparent_bg=transparent_bg,
+                        transparent_color=transparent_color,
+                        tolerance=tolerance,
+                        webp_lossless=webp_lossless
+                    )
                     
                     if image_paths:
                         # 원본 파일명에서 확장자 제거 (한글 파일명 보존)
