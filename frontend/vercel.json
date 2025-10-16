@@ -14,6 +14,7 @@
     { "source": "/api/pdf-xls/(.*)", "destination": "https://pdf-xls.onrender.com/$1" },
     { "source": "/api/pdf-pptx/(.*)", "destination": "https://pdf-pptx.onrender.com/$1" },
     { "source": "/api/pdf-tiff/(.*)", "destination": "https://pdf-tiff.onrender.com/$1" },
+    { "source": "/api/pdf-image/(.*)", "destination": "https://pdf-image-00tt.onrender.com/$1" },
     { "source": "/tools/(.*)", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]

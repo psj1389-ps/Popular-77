@@ -13,6 +13,7 @@ import PdfToSvgPage from "@/pages/pdf-to-svg";
 import PdfToTiffPage from "@/pages/pdf-to-tiff";
 import PdfToXlsPage from "@/pages/pdf-to-xls";
 import PdfVectorPage from "@/pages/pdf-vector";
+import PdfImagePage from "@/pages/pdf-image";
 import MainLayout from '@/components/MainLayout';
 
 function App() {
@@ -112,6 +113,14 @@ function App() {
           element={
             <MainLayout>
               <PdfVectorPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/pdf-image"
+          element={
+            <MainLayout>
+              <PdfImagePage />
             </MainLayout>
           }
         />
