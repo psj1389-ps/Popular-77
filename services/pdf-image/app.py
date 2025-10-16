@@ -465,8 +465,19 @@ def upload_file():
                         return redirect(url_for('index'))
                         
                 except Exception as e:
-                    print(f"PDF 변환 오류: {str(e)}")
-                    flash(f'PDF 변환 중 오류가 발생했습니다: {str(e)}')
+                    error_msg = str(e)
+                    print(f"PDF 변환 오류: {error_msg}")
+                    
+                    # 사용자 친화적인 오류 메시지 제공
+                    if "암호로 보호" in error_msg or "encrypted" in error_msg.lower():
+                        flash('PDF 파일이 암호로 보호되어 있습니다. 암호가 없는 PDF 파일을 사용해주세요.')
+                    elif "손상" in error_msg or "지원되지 않는" in error_msg:
+                        flash('PDF 파일을 열 수 없습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.')
+                    elif "페이지가 없습니다" in error_msg:
+                        flash('PDF 파일에 페이지가 없습니다. 올바른 PDF 파일을 업로드해주세요.')
+                    else:
+                        flash(f'PDF 변환 중 오류가 발생했습니다: {error_msg}')
+                    
                     return redirect(url_for('index'))
                     
             elif file_ext == 'docx':

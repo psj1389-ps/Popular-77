@@ -268,7 +268,7 @@ const PdfImagePage: React.FC = () => {
                         </div>
                       </label>
                       
-                      <div className="text-sm text-gray-700 font-medium mb-2">래스터 형식:</div>
+                      <div className="text-sm text-gray-700 font-bold mb-2">래스터 형식:</div>
                       
                       <label className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-white transition-colors">
                         <input 
