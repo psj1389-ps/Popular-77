@@ -12,6 +12,38 @@ OUTPUT_DIR = os.path.join(BASE, "outputs")
 app = Flask(__name__)
 ensure_dirs([UPLOAD_DIR, OUTPUT_DIR])
 
+@app.route("/", methods=["GET"])
+def root():
+    return jsonify({
+        "service": "PDF-Image Converter",
+        "version": "1.0.0",
+        "status": "running",
+        "endpoints": {
+            "health": "/health",
+            "convert": "/api/pdf-to-images",
+            "convert_compat": [
+                "/api/pdf-image/convert_to_images",
+                "/convert_to_images"
+            ]
+        },
+        "usage": {
+            "method": "POST",
+            "endpoint": "/api/pdf-to-images",
+            "parameters": {
+                "file": "PDF file (required)",
+                "format": "Output format (png|jpg|webp|tiff|bmp|gif, default: png)",
+                "dpi": "Resolution (default: 144)",
+                "quality": "Quality (75-100 or low/medium/high)",
+                "pages": "Page range (e.g., '1-3,5')",
+                "transparentBg": "Transparent background (true/false)",
+                "transparentColor": "Color to make transparent (hex)",
+                "tolerance": "Color tolerance (default: 8)",
+                "webpLossless": "WebP lossless mode (true/false)",
+                "whiteThreshold": "White threshold (default: 250)"
+            }
+        }
+    })
+
 @app.route("/health", methods=["GET", "HEAD"])
 def health():
     return jsonify({"ok": True})
@@ -89,6 +121,33 @@ def compat_convert_to_images():
 @app.route("/convert_to_images", methods=["POST"])
 def convert_to_images():
     return api_pdf_to_images()
+
+# 404 에러 핸들러
+@app.errorhandler(404)
+def not_found(error):
+    return jsonify({
+        "error": "Not Found",
+        "message": "The requested endpoint was not found.",
+        "available_endpoints": {
+            "service_info": "GET /",
+            "health_check": "GET /health",
+            "pdf_conversion": "POST /api/pdf-to-images",
+            "compatibility_routes": [
+                "POST /api/pdf-image/convert_to_images",
+                "POST /convert_to_images"
+            ]
+        },
+        "documentation": "Visit GET / for detailed API documentation"
+    }), 404
+
+# 500 에러 핸들러
+@app.errorhandler(500)
+def internal_error(error):
+    return jsonify({
+        "error": "Internal Server Error",
+        "message": "An unexpected error occurred while processing your request.",
+        "support": "Please check your request parameters and try again."
+    }), 500
 
 if __name__ == '__main__':
     app.run(debug=True, host='0.0.0.0', port=5000)
