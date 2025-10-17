@@ -31,23 +31,91 @@ export default async function handler(req, res) {
     // Render 서비스 URL
     const renderServiceUrl = 'https://pdf-image-00tt.onrender.com/api/pdf-to-images';
     
-    // formidable을 사용하여 multipart/form-data 파싱
+    // 새로운 접근 방식: 직접 multipart 파싱 시도
+    console.log('[PDF-Image] Attempting direct multipart parsing...');
+    
+    // formidable 설정 최적화
     const form = formidable({
       maxFileSize: 100 * 1024 * 1024, // 100MB
       keepExtensions: true,
       multiples: false,
-      uploadDir: '/tmp', // Vercel의 임시 디렉토리 명시적 설정
+      allowEmptyFiles: false,
+      minFileSize: 1,
     });
 
-    console.log('[PDF-Image] Parsing form data...');
+    console.log('[PDF-Image] Parsing form data with optimized settings...');
     
     let fields, files;
     try {
-      [fields, files] = await form.parse(req);
+      // Promise 기반 파싱 대신 콜백 방식 시도
+      const parseResult = await new Promise((resolve, reject) => {
+        form.parse(req, (err, fields, files) => {
+          if (err) {
+            console.error('[PDF-Image] Callback parse error:', err);
+            reject(err);
+          } else {
+            console.log('[PDF-Image] Callback parse success');
+            resolve({ fields, files });
+          }
+        });
+      });
+      
+      fields = parseResult.fields;
+      files = parseResult.files;
+      
       console.log('[PDF-Image] Form parsing completed successfully');
     } catch (parseError) {
       console.error('[PDF-Image] Form parsing error:', parseError);
       console.error('[PDF-Image] Parse error stack:', parseError.stack);
+      
+      // 대안: 원시 바이너리 데이터 처리 시도
+      console.log('[PDF-Image] Attempting raw binary processing...');
+      try {
+        const chunks = [];
+        req.on('data', chunk => chunks.push(chunk));
+        await new Promise((resolve, reject) => {
+          req.on('end', resolve);
+          req.on('error', reject);
+        });
+        
+        const buffer = Buffer.concat(chunks);
+        console.log('[PDF-Image] Raw buffer size:', buffer.length);
+        
+        if (buffer.length > 0) {
+          // 직접 FormData로 전송
+          const formData = new FormData();
+          formData.append('file', buffer, {
+            filename: 'uploaded.pdf',
+            contentType: 'application/pdf'
+          });
+          
+          // 기본 파라미터 추가
+          formData.append('format', 'png');
+          formData.append('dpi', '144');
+          
+          console.log('[PDF-Image] Sending raw buffer to Render service...');
+          const response = await fetch(renderServiceUrl, {
+            method: 'POST',
+            body: formData,
+            headers: formData.getHeaders()
+          });
+          
+          console.log('[PDF-Image] Raw buffer response status:', response.status);
+          
+          if (response.ok) {
+            const resultBuffer = await response.arrayBuffer();
+            res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
+            res.status(200).send(Buffer.from(resultBuffer));
+            return;
+          } else {
+            const errorText = await response.text();
+            console.error('[PDF-Image] Raw buffer error:', errorText);
+          }
+        }
+      } catch (rawError) {
+        console.error('[PDF-Image] Raw processing error:', rawError);
+      }
+      
       return res.status(400).json({ 
         error: 'Failed to parse form data',
         details: parseError.message,
