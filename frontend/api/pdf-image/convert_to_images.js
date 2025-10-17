@@ -26,6 +26,7 @@ export default async function handler(req, res) {
     console.log('[PDF-Image] Starting request processing');
     console.log('[PDF-Image] Content-Type:', req.headers['content-type']);
     console.log('[PDF-Image] Request method:', req.method);
+    console.log('[PDF-Image] Request URL:', req.url);
     
     // Render 서비스 URL
     const renderServiceUrl = 'https://pdf-image-00tt.onrender.com/api/pdf-to-images';
@@ -34,13 +35,35 @@ export default async function handler(req, res) {
     const form = formidable({
       maxFileSize: 100 * 1024 * 1024, // 100MB
       keepExtensions: true,
+      multiples: false,
     });
 
     console.log('[PDF-Image] Parsing form data...');
-    const [fields, files] = await form.parse(req);
+    
+    let fields, files;
+    try {
+      [fields, files] = await form.parse(req);
+    } catch (parseError) {
+      console.error('[PDF-Image] Form parsing error:', parseError);
+      return res.status(400).json({ 
+        error: 'Failed to parse form data',
+        details: parseError.message,
+        contentType: req.headers['content-type']
+      });
+    }
     
     console.log('[PDF-Image] Parsed fields:', Object.keys(fields));
     console.log('[PDF-Image] Parsed files:', Object.keys(files));
+    console.log('[PDF-Image] Files details:', Object.keys(files).map(key => {
+      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
+      return {
+        key,
+        originalFilename: file?.originalFilename,
+        mimetype: file?.mimetype,
+        size: file?.size,
+        hasFilepath: !!file?.filepath
+      };
+    }));
     
     // 파일이 있는지 확인
     if (!files || Object.keys(files).length === 0) {
@@ -50,7 +73,8 @@ export default async function handler(req, res) {
         debug: {
           fieldsKeys: Object.keys(fields),
           filesKeys: Object.keys(files),
-          contentType: req.headers['content-type']
+          contentType: req.headers['content-type'],
+          requestBody: 'Cannot display binary data'
         }
       });
     }
@@ -69,21 +93,30 @@ export default async function handler(req, res) {
     let fileAdded = false;
     Object.keys(files).forEach(key => {
       const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-      if (file && file.filepath) {
+      if (file && file.filepath && fs.existsSync(file.filepath)) {
         console.log(`[PDF-Image] Adding file: ${key} -> file`);
         console.log(`[PDF-Image] File details:`, {
           originalFilename: file.originalFilename,
           mimetype: file.mimetype,
           size: file.size,
-          filepath: file.filepath
+          filepath: file.filepath,
+          fileExists: fs.existsSync(file.filepath)
         });
         
         // 항상 'file' 필드명으로 추가 (Flask 서비스가 기대하는 필드명)
-        formData.append('file', fs.createReadStream(file.filepath), {
+        const fileStream = fs.createReadStream(file.filepath);
+        formData.append('file', fileStream, {
           filename: file.originalFilename || 'file.pdf',
           contentType: file.mimetype || 'application/pdf'
         });
         fileAdded = true;
+      } else {
+        console.error(`[PDF-Image] Invalid file object:`, {
+          key,
+          hasFile: !!file,
+          hasFilepath: !!file?.filepath,
+          fileExists: file?.filepath ? fs.existsSync(file.filepath) : false
+        });
       }
     });
     
@@ -98,7 +131,8 @@ export default async function handler(req, res) {
               key,
               hasFilepath: !!file?.filepath,
               originalFilename: file?.originalFilename,
-              size: file?.size
+              size: file?.size,
+              fileExists: file?.filepath ? fs.existsSync(file.filepath) : false
             };
           })
         }
@@ -106,6 +140,7 @@ export default async function handler(req, res) {
     }
 
     console.log('[PDF-Image] Sending request to Render service...');
+    console.log('[PDF-Image] FormData headers:', formData.getHeaders());
     
     // Render 서비스로 요청 전송
     const response = await fetch(renderServiceUrl, {
