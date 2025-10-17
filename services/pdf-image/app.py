@@ -115,17 +115,30 @@ def api_pdf_to_images():
     # 1개면 단일 파일, 2개 이상이면 ZIP
     if len(out_files) == 1:
         fp = out_files[0]
-        resp = send_file(fp, as_attachment=True, download_name=os.path.basename(fp))
+        # 단일 페이지: 1장.확장자 형식으로 파일명 설정
+        korean_filename = f"1장.{fmt}"
+        resp = send_file(fp, as_attachment=True, download_name=korean_filename)
         resp.headers["Content-Length"] = str(os.path.getsize(fp))
+        # UTF-8 인코딩을 위한 Content-Disposition 헤더 설정 (URL 인코딩)
+        import urllib.parse
+        encoded_filename = urllib.parse.quote(korean_filename)
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
         return resp
 
     buf = _zip_paths(out_files)
     buf.seek(0, os.SEEK_END)
     length = buf.tell()
     buf.seek(0)
+    # 다중 페이지: 원본파일명_images.zip 형식으로 파일명 설정
+    base_name = os.path.splitext(name)[0]
+    korean_zip_filename = f"{base_name}_images.zip"
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
-                     download_name=f"{os.path.splitext(name)[0]}_{fmt}.zip")
+                     download_name=korean_zip_filename)
     resp.headers["Content-Length"] = str(length)
+    # UTF-8 인코딩을 위한 Content-Disposition 헤더 설정 (URL 인코딩)
+    import urllib.parse
+    encoded_zip_filename = urllib.parse.quote(korean_zip_filename)
+    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_zip_filename}"
     return resp
 
 # 호환 라우트: 당신의 테스트 URL대로도 동작합니다.

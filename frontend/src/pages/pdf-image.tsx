@@ -151,9 +151,12 @@ const PdfImagePage: React.FC = () => {
       // 파일명 결정
       let downloadFilename: string;
       if (contentType.includes('application/zip')) {
-        downloadFilename = safeGetFilename(response, selectedFile.name.replace(/\.[^/.]+$/, "") + "_images.zip");
+        // 다중 페이지: 원본 파일명_images.zip 형식
+        const baseName = selectedFile.name.replace(/\.[^/.]+$/, "");
+        downloadFilename = safeGetFilename(response, `${baseName}_images.zip`);
       } else {
-        downloadFilename = safeGetFilename(response, selectedFile.name.replace(/\.[^/.]+$/, "") + "." + format);
+        // 단일 페이지: 1장.확장자 형식
+        downloadFilename = safeGetFilename(response, `1장.${format}`);
       }
       
       // 성공 메시지 표시
