@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, jsonify, render_template
+from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
 import os, io, zipfile
 
@@ -52,6 +52,15 @@ def root():
 @app.route("/health", methods=["GET", "HEAD"])
 def health():
     return jsonify({"ok": True})
+
+@app.route('/favicon.ico')
+def favicon():
+    return send_from_directory(app.static_folder, 'favicon.ico', mimetype='image/vnd.microsoft.icon')
+
+@app.route('/@vite/client')
+def vite_client():
+    # Vite 개발 서버 관련 요청 무시
+    return '', 404
 
 def _zip_paths(paths):
     buf = io.BytesIO()
@@ -125,6 +134,11 @@ def compat_convert_to_images():
 # 추가 호환 라우트: /convert_to_images 경로 지원
 @app.route("/convert_to_images", methods=["POST"])
 def convert_to_images():
+    return api_pdf_to_images()
+
+# 웹 인터페이스용 /convert 라우트 추가
+@app.route("/convert", methods=["POST"])
+def convert():
     return api_pdf_to_images()
 
 # 404 에러 핸들러
