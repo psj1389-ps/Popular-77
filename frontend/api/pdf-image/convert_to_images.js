@@ -1,5 +1,9 @@
 // Vercel Serverless Function for PDF to Image conversion
 // Proxy to Render service
+import formidable from 'formidable';
+import FormData from 'form-data';
+import fs from 'fs';
+
 export default async function handler(req, res) {
   // CORS 헤더 설정
   res.setHeader('Access-Control-Allow-Origin', '*');
@@ -24,17 +28,40 @@ export default async function handler(req, res) {
     // Render 서비스 URL
     const renderServiceUrl = 'https://pdf-image-00tt.onrender.com/api/pdf-to-images';
     
-    // FormData를 그대로 전달하기 위해 fetch 사용
+    // formidable을 사용하여 multipart/form-data 파싱
+    const form = formidable({
+      maxFileSize: 100 * 1024 * 1024, // 100MB
+      keepExtensions: true,
+    });
+
+    const [fields, files] = await form.parse(req);
+    
+    // 새로운 FormData 생성
+    const formData = new FormData();
+    
+    // 필드 추가
+    Object.keys(fields).forEach(key => {
+      const value = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
+      formData.append(key, value);
+    });
+    
+    // 파일 추가
+    Object.keys(files).forEach(key => {
+      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
+      if (file && file.filepath) {
+        formData.append(key, fs.createReadStream(file.filepath), {
+          filename: file.originalFilename || 'file.pdf',
+          contentType: file.mimetype || 'application/pdf'
+        });
+      }
+    });
+
+    // Render 서비스로 요청 전송
     const response = await fetch(renderServiceUrl, {
       method: 'POST',
-      body: req.body,
+      body: formData,
       headers: {
-        // Content-Type은 자동으로 설정되도록 제거
-        ...req.headers,
-        host: undefined, // host 헤더 제거
-        'x-forwarded-for': undefined,
-        'x-forwarded-proto': undefined,
-        'x-vercel-id': undefined
+        ...formData.getHeaders(),
       }
     });
 
@@ -56,11 +83,24 @@ export default async function handler(req, res) {
     const buffer = await response.arrayBuffer();
     res.send(Buffer.from(buffer));
 
+    // 임시 파일 정리
+    Object.keys(files).forEach(key => {
+      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
+      if (file && file.filepath) {
+        try {
+          fs.unlinkSync(file.filepath);
+        } catch (e) {
+          console.warn('Failed to cleanup temp file:', e);
+        }
+      }
+    });
+
   } catch (error) {
     console.error('[PDF-Image] Proxy error:', error);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: 'Failed to proxy request to PDF conversion service'
+      message: 'Failed to proxy request to PDF conversion service',
+      details: error.message
     });
   }
 }
@@ -68,8 +108,6 @@ export default async function handler(req, res) {
 // Vercel 설정
 export const config = {
   api: {
-    bodyParser: {
-      sizeLimit: '100mb',
-    },
+    bodyParser: false, // formidable이 직접 파싱하도록 설정
   },
 }
