@@ -2,41 +2,69 @@
 // Proxy to Render service - Native multipart parsing approach
 import FormData from 'form-data';
 
-// Native multipart parser without formidable
+// Enhanced native multipart parser
 function parseMultipartData(buffer, boundary) {
-  const boundaryBuffer = Buffer.from(`--${boundary}`);
-  const parts = [];
-  let start = 0;
+  console.log('[PDF-Image] Starting multipart parsing with boundary:', boundary);
+  console.log('[PDF-Image] Buffer size:', buffer.length);
   
-  while (true) {
-    const boundaryIndex = buffer.indexOf(boundaryBuffer, start);
-    if (boundaryIndex === -1) break;
+  // Create boundary patterns
+  const startBoundary = `--${boundary}`;
+  const endBoundary = `--${boundary}--`;
+  
+  console.log('[PDF-Image] Looking for start boundary:', startBoundary);
+  
+  const parts = [];
+  const bufferStr = buffer.toString('binary');
+  
+  // Split by boundary
+  const sections = bufferStr.split(startBoundary);
+  console.log('[PDF-Image] Found sections:', sections.length);
+  
+  for (let i = 1; i < sections.length; i++) { // Skip first empty section
+    const section = sections[i];
+    if (section.startsWith('--')) continue; // Skip end boundary
     
-    if (start > 0) {
-      const partData = buffer.slice(start, boundaryIndex);
-      const headerEndIndex = partData.indexOf('\r\n\r\n');
-      
-      if (headerEndIndex !== -1) {
-        const headers = partData.slice(0, headerEndIndex).toString();
-        const content = partData.slice(headerEndIndex + 4, partData.length - 2); // Remove trailing \r\n
-        
-        const nameMatch = headers.match(/name="([^"]+)"/);
-        const filenameMatch = headers.match(/filename="([^"]+)"/);
-        
-        if (nameMatch) {
-          parts.push({
-            name: nameMatch[1],
-            filename: filenameMatch ? filenameMatch[1] : null,
-            content: content,
-            headers: headers
-          });
-        }
-      }
+    console.log(`[PDF-Image] Processing section ${i}, length:`, section.length);
+    
+    // Find header/body separator
+    const headerEndIndex = section.indexOf('\r\n\r\n');
+    if (headerEndIndex === -1) {
+      console.log(`[PDF-Image] No header separator found in section ${i}`);
+      continue;
     }
     
-    start = boundaryIndex + boundaryBuffer.length;
+    const headers = section.substring(0, headerEndIndex);
+    const content = section.substring(headerEndIndex + 4);
+    
+    console.log(`[PDF-Image] Section ${i} headers:`, headers);
+    console.log(`[PDF-Image] Section ${i} content length:`, content.length);
+    
+    // Parse headers
+    const nameMatch = headers.match(/name="([^"]+)"/);
+    const filenameMatch = headers.match(/filename="([^"]+)"/);
+    
+    if (nameMatch) {
+      // Convert content back to buffer, removing trailing \r\n
+      let contentBuffer;
+      if (content.endsWith('\r\n')) {
+        contentBuffer = Buffer.from(content.substring(0, content.length - 2), 'binary');
+      } else {
+        contentBuffer = Buffer.from(content, 'binary');
+      }
+      
+      const part = {
+        name: nameMatch[1],
+        filename: filenameMatch ? filenameMatch[1] : null,
+        content: contentBuffer,
+        headers: headers
+      };
+      
+      parts.push(part);
+      console.log(`[PDF-Image] Added part: name="${part.name}", filename="${part.filename}", size=${part.content.length}`);
+    }
   }
   
+  console.log('[PDF-Image] Total parts parsed:', parts.length);
   return parts;
 }
 
@@ -59,10 +87,11 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('[PDF-Image] Starting native multipart processing');
+    console.log('[PDF-Image] Starting enhanced native multipart processing');
     console.log('[PDF-Image] Content-Type:', req.headers['content-type']);
     console.log('[PDF-Image] Request method:', req.method);
     console.log('[PDF-Image] Request URL:', req.url);
+    console.log('[PDF-Image] All headers:', JSON.stringify(req.headers, null, 2));
     
     // Render 서비스 URL
     const renderServiceUrl = 'https://pdf-image-00tt.onrender.com/api/pdf-to-images';
@@ -106,21 +135,21 @@ export default async function handler(req, res) {
       return;
     }
     
-    // Native multipart 파싱
+    // Debug: Show first 500 characters of buffer
+    console.log('[PDF-Image] Buffer preview (first 500 chars):', buffer.toString('utf8', 0, Math.min(500, buffer.length)));
+    
+    // Enhanced multipart 파싱
     console.log('[PDF-Image] Parsing multipart data...');
     const parts = parseMultipartData(buffer, boundary);
     console.log('[PDF-Image] Parsed parts count:', parts.length);
-    
-    // 파트 정보 로깅
-    parts.forEach((part, index) => {
-      console.log(`[PDF-Image] Part ${index}: name="${part.name}", filename="${part.filename}", size=${part.content.length}`);
-    });
     
     // 파일과 필드 분리
     let fileData = null;
     const fields = {};
     
-    parts.forEach(part => {
+    parts.forEach((part, index) => {
+      console.log(`[PDF-Image] Processing part ${index}: name="${part.name}", filename="${part.filename}", size=${part.content.length}`);
+      
       if (part.filename) {
         // 파일 데이터
         fileData = {
@@ -129,6 +158,11 @@ export default async function handler(req, res) {
           name: part.name
         };
         console.log('[PDF-Image] Found file:', part.filename, 'size:', part.content.length);
+        
+        // Debug: Show file content type detection
+        const fileStart = part.content.slice(0, 10);
+        console.log('[PDF-Image] File starts with:', fileStart);
+        console.log('[PDF-Image] File header hex:', fileStart.toString('hex'));
       } else {
         // 필드 데이터
         fields[part.name] = part.content.toString();
@@ -138,7 +172,14 @@ export default async function handler(req, res) {
     
     if (!fileData) {
       console.error('[PDF-Image] No file found in multipart data');
-      res.status(400).json({ error: 'file is required' });
+      console.error('[PDF-Image] Available parts:', parts.map(p => ({ name: p.name, filename: p.filename, size: p.content.length })));
+      res.status(400).json({ 
+        error: 'file is required',
+        debug: {
+          partsCount: parts.length,
+          parts: parts.map(p => ({ name: p.name, filename: p.filename, size: p.content.length }))
+        }
+      });
       return;
     }
     
