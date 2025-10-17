@@ -26,6 +26,7 @@ def root():
         "endpoints": {
             "health": "/health",
             "convert": "/api/pdf-to-images",
+            "web_convert": "/convert",
             "convert_compat": [
                 "/api/pdf-image/convert_to_images",
                 "/convert_to_images"
@@ -151,6 +152,7 @@ def not_found(error):
             "service_info": "GET /",
             "health_check": "GET /health",
             "pdf_conversion": "POST /api/pdf-to-images",
+            "web_interface": "POST /convert",
             "compatibility_routes": [
                 "POST /api/pdf-image/convert_to_images",
                 "POST /convert_to_images"
