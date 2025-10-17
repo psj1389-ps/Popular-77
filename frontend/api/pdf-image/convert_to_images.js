@@ -36,6 +36,7 @@ export default async function handler(req, res) {
       maxFileSize: 100 * 1024 * 1024, // 100MB
       keepExtensions: true,
       multiples: false,
+      uploadDir: '/tmp', // Vercel의 임시 디렉토리 명시적 설정
     });
 
     console.log('[PDF-Image] Parsing form data...');
@@ -43,27 +44,34 @@ export default async function handler(req, res) {
     let fields, files;
     try {
       [fields, files] = await form.parse(req);
+      console.log('[PDF-Image] Form parsing completed successfully');
     } catch (parseError) {
       console.error('[PDF-Image] Form parsing error:', parseError);
+      console.error('[PDF-Image] Parse error stack:', parseError.stack);
       return res.status(400).json({ 
         error: 'Failed to parse form data',
         details: parseError.message,
-        contentType: req.headers['content-type']
+        contentType: req.headers['content-type'],
+        stack: parseError.stack
       });
     }
     
     console.log('[PDF-Image] Parsed fields:', Object.keys(fields));
     console.log('[PDF-Image] Parsed files:', Object.keys(files));
-    console.log('[PDF-Image] Files details:', Object.keys(files).map(key => {
+    
+    // 파일 상세 정보 로깅
+    const fileDetails = Object.keys(files).map(key => {
       const file = Array.isArray(files[key]) ? files[key][0] : files[key];
       return {
         key,
         originalFilename: file?.originalFilename,
         mimetype: file?.mimetype,
         size: file?.size,
-        hasFilepath: !!file?.filepath
+        hasFilepath: !!file?.filepath,
+        filepath: file?.filepath
       };
-    }));
+    });
+    console.log('[PDF-Image] Files details:', JSON.stringify(fileDetails, null, 2));
     
     // 파일이 있는지 확인
     if (!files || Object.keys(files).length === 0) {
@@ -74,7 +82,7 @@ export default async function handler(req, res) {
           fieldsKeys: Object.keys(fields),
           filesKeys: Object.keys(files),
           contentType: req.headers['content-type'],
-          requestBody: 'Cannot display binary data'
+          requestHeaders: req.headers
         }
       });
     }
@@ -93,8 +101,8 @@ export default async function handler(req, res) {
     let fileAdded = false;
     Object.keys(files).forEach(key => {
       const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-      if (file && file.filepath && fs.existsSync(file.filepath)) {
-        console.log(`[PDF-Image] Adding file: ${key} -> file`);
+      if (file && file.filepath) {
+        console.log(`[PDF-Image] Processing file: ${key}`);
         console.log(`[PDF-Image] File details:`, {
           originalFilename: file.originalFilename,
           mimetype: file.mimetype,
@@ -103,19 +111,36 @@ export default async function handler(req, res) {
           fileExists: fs.existsSync(file.filepath)
         });
         
-        // 항상 'file' 필드명으로 추가 (Flask 서비스가 기대하는 필드명)
-        const fileStream = fs.createReadStream(file.filepath);
-        formData.append('file', fileStream, {
-          filename: file.originalFilename || 'file.pdf',
-          contentType: file.mimetype || 'application/pdf'
-        });
-        fileAdded = true;
+        if (fs.existsSync(file.filepath)) {
+          // 파일 크기 확인
+          const stats = fs.statSync(file.filepath);
+          console.log(`[PDF-Image] File stats:`, {
+            size: stats.size,
+            isFile: stats.isFile(),
+            mtime: stats.mtime
+          });
+          
+          // 항상 'file' 필드명으로 추가 (Flask 서비스가 기대하는 필드명)
+          const fileStream = fs.createReadStream(file.filepath);
+          formData.append('file', fileStream, {
+            filename: file.originalFilename || 'file.pdf',
+            contentType: file.mimetype || 'application/pdf'
+          });
+          fileAdded = true;
+          console.log(`[PDF-Image] File added successfully: ${file.originalFilename}`);
+        } else {
+          console.error(`[PDF-Image] File does not exist at path: ${file.filepath}`);
+        }
       } else {
         console.error(`[PDF-Image] Invalid file object:`, {
           key,
           hasFile: !!file,
           hasFilepath: !!file?.filepath,
-          fileExists: file?.filepath ? fs.existsSync(file.filepath) : false
+          file: file ? {
+            originalFilename: file.originalFilename,
+            size: file.size,
+            mimetype: file.mimetype
+          } : null
         });
       }
     });
@@ -132,6 +157,7 @@ export default async function handler(req, res) {
               hasFilepath: !!file?.filepath,
               originalFilename: file?.originalFilename,
               size: file?.size,
+              filepath: file?.filepath,
               fileExists: file?.filepath ? fs.existsSync(file.filepath) : false
             };
           })
@@ -200,7 +226,8 @@ export default async function handler(req, res) {
     res.status(500).json({ 
       error: 'Internal server error',
       message: 'Failed to proxy request to PDF conversion service',
-      details: error.message
+      details: error.message,
+      stack: error.stack
     });
   }
 }
