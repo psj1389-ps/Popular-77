@@ -1,8 +1,44 @@
 // Vercel Serverless Function for PDF to Image conversion
-// Proxy to Render service
-import formidable from 'formidable';
+// Proxy to Render service - Native multipart parsing approach
 import FormData from 'form-data';
-import fs from 'fs';
+
+// Native multipart parser without formidable
+function parseMultipartData(buffer, boundary) {
+  const boundaryBuffer = Buffer.from(`--${boundary}`);
+  const parts = [];
+  let start = 0;
+  
+  while (true) {
+    const boundaryIndex = buffer.indexOf(boundaryBuffer, start);
+    if (boundaryIndex === -1) break;
+    
+    if (start > 0) {
+      const partData = buffer.slice(start, boundaryIndex);
+      const headerEndIndex = partData.indexOf('\r\n\r\n');
+      
+      if (headerEndIndex !== -1) {
+        const headers = partData.slice(0, headerEndIndex).toString();
+        const content = partData.slice(headerEndIndex + 4, partData.length - 2); // Remove trailing \r\n
+        
+        const nameMatch = headers.match(/name="([^"]+)"/);
+        const filenameMatch = headers.match(/filename="([^"]+)"/);
+        
+        if (nameMatch) {
+          parts.push({
+            name: nameMatch[1],
+            filename: filenameMatch ? filenameMatch[1] : null,
+            content: content,
+            headers: headers
+          });
+        }
+      }
+    }
+    
+    start = boundaryIndex + boundaryBuffer.length;
+  }
+  
+  return parts;
+}
 
 export default async function handler(req, res) {
   // CORS 헤더 설정
@@ -23,7 +59,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    console.log('[PDF-Image] Starting request processing');
+    console.log('[PDF-Image] Starting native multipart processing');
     console.log('[PDF-Image] Content-Type:', req.headers['content-type']);
     console.log('[PDF-Image] Request method:', req.method);
     console.log('[PDF-Image] Request URL:', req.url);
@@ -31,279 +67,147 @@ export default async function handler(req, res) {
     // Render 서비스 URL
     const renderServiceUrl = 'https://pdf-image-00tt.onrender.com/api/pdf-to-images';
     
-    // 새로운 접근 방식: 직접 multipart 파싱 시도
-    console.log('[PDF-Image] Attempting direct multipart parsing...');
+    // Content-Type에서 boundary 추출
+    const contentType = req.headers['content-type'];
+    if (!contentType || !contentType.includes('multipart/form-data')) {
+      console.error('[PDF-Image] Invalid content type:', contentType);
+      res.status(400).json({ error: 'Content-Type must be multipart/form-data' });
+      return;
+    }
     
-    // formidable 설정 최적화
-    const form = formidable({
-      maxFileSize: 100 * 1024 * 1024, // 100MB
-      keepExtensions: true,
-      multiples: false,
-      allowEmptyFiles: false,
-      minFileSize: 1,
+    const boundaryMatch = contentType.match(/boundary=([^;]+)/);
+    if (!boundaryMatch) {
+      console.error('[PDF-Image] No boundary found in content-type');
+      res.status(400).json({ error: 'No boundary found in Content-Type' });
+      return;
+    }
+    
+    const boundary = boundaryMatch[1];
+    console.log('[PDF-Image] Extracted boundary:', boundary);
+    
+    // 요청 본문 읽기
+    const chunks = [];
+    req.on('data', chunk => {
+      console.log('[PDF-Image] Received chunk of size:', chunk.length);
+      chunks.push(chunk);
     });
-
-    console.log('[PDF-Image] Parsing form data with optimized settings...');
     
-    let fields, files;
-    try {
-      // Promise 기반 파싱 대신 콜백 방식 시도
-      const parseResult = await new Promise((resolve, reject) => {
-        form.parse(req, (err, fields, files) => {
-          if (err) {
-            console.error('[PDF-Image] Callback parse error:', err);
-            reject(err);
-          } else {
-            console.log('[PDF-Image] Callback parse success');
-            resolve({ fields, files });
-          }
-        });
-      });
-      
-      fields = parseResult.fields;
-      files = parseResult.files;
-      
-      console.log('[PDF-Image] Form parsing completed successfully');
-    } catch (parseError) {
-      console.error('[PDF-Image] Form parsing error:', parseError);
-      console.error('[PDF-Image] Parse error stack:', parseError.stack);
-      
-      // 대안: 원시 바이너리 데이터 처리 시도
-      console.log('[PDF-Image] Attempting raw binary processing...');
-      try {
-        const chunks = [];
-        req.on('data', chunk => chunks.push(chunk));
-        await new Promise((resolve, reject) => {
-          req.on('end', resolve);
-          req.on('error', reject);
-        });
-        
-        const buffer = Buffer.concat(chunks);
-        console.log('[PDF-Image] Raw buffer size:', buffer.length);
-        
-        if (buffer.length > 0) {
-          // 직접 FormData로 전송
-          const formData = new FormData();
-          formData.append('file', buffer, {
-            filename: 'uploaded.pdf',
-            contentType: 'application/pdf'
-          });
-          
-          // 기본 파라미터 추가
-          formData.append('format', 'png');
-          formData.append('dpi', '144');
-          
-          console.log('[PDF-Image] Sending raw buffer to Render service...');
-          const response = await fetch(renderServiceUrl, {
-            method: 'POST',
-            body: formData,
-            headers: formData.getHeaders()
-          });
-          
-          console.log('[PDF-Image] Raw buffer response status:', response.status);
-          
-          if (response.ok) {
-            const resultBuffer = await response.arrayBuffer();
-            res.setHeader('Content-Type', response.headers.get('content-type') || 'image/png');
-            res.status(200).send(Buffer.from(resultBuffer));
-            return;
-          } else {
-            const errorText = await response.text();
-            console.error('[PDF-Image] Raw buffer error:', errorText);
-          }
-        }
-      } catch (rawError) {
-        console.error('[PDF-Image] Raw processing error:', rawError);
+    await new Promise((resolve, reject) => {
+      req.on('end', resolve);
+      req.on('error', reject);
+    });
+    
+    const buffer = Buffer.concat(chunks);
+    console.log('[PDF-Image] Total buffer size:', buffer.length);
+    
+    if (buffer.length === 0) {
+      console.error('[PDF-Image] Empty request body');
+      res.status(400).json({ error: 'Empty request body' });
+      return;
+    }
+    
+    // Native multipart 파싱
+    console.log('[PDF-Image] Parsing multipart data...');
+    const parts = parseMultipartData(buffer, boundary);
+    console.log('[PDF-Image] Parsed parts count:', parts.length);
+    
+    // 파트 정보 로깅
+    parts.forEach((part, index) => {
+      console.log(`[PDF-Image] Part ${index}: name="${part.name}", filename="${part.filename}", size=${part.content.length}`);
+    });
+    
+    // 파일과 필드 분리
+    let fileData = null;
+    const fields = {};
+    
+    parts.forEach(part => {
+      if (part.filename) {
+        // 파일 데이터
+        fileData = {
+          buffer: part.content,
+          filename: part.filename,
+          name: part.name
+        };
+        console.log('[PDF-Image] Found file:', part.filename, 'size:', part.content.length);
+      } else {
+        // 필드 데이터
+        fields[part.name] = part.content.toString();
+        console.log('[PDF-Image] Found field:', part.name, '=', part.content.toString());
       }
-      
-      return res.status(400).json({ 
-        error: 'Failed to parse form data',
-        details: parseError.message,
-        contentType: req.headers['content-type'],
-        stack: parseError.stack
-      });
-    }
-    
-    console.log('[PDF-Image] Parsed fields:', Object.keys(fields));
-    console.log('[PDF-Image] Parsed files:', Object.keys(files));
-    
-    // 파일 상세 정보 로깅
-    const fileDetails = Object.keys(files).map(key => {
-      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-      return {
-        key,
-        originalFilename: file?.originalFilename,
-        mimetype: file?.mimetype,
-        size: file?.size,
-        hasFilepath: !!file?.filepath,
-        filepath: file?.filepath
-      };
     });
-    console.log('[PDF-Image] Files details:', JSON.stringify(fileDetails, null, 2));
     
-    // 파일이 있는지 확인
-    if (!files || Object.keys(files).length === 0) {
-      console.error('[PDF-Image] No files found in request');
-      return res.status(400).json({ 
-        error: 'No files uploaded',
-        debug: {
-          fieldsKeys: Object.keys(fields),
-          filesKeys: Object.keys(files),
-          contentType: req.headers['content-type'],
-          requestHeaders: req.headers
-        }
-      });
+    if (!fileData) {
+      console.error('[PDF-Image] No file found in multipart data');
+      res.status(400).json({ error: 'file is required' });
+      return;
     }
     
-    // 새로운 FormData 생성
+    // Render 서비스로 전송할 FormData 생성
+    console.log('[PDF-Image] Creating FormData for Render service...');
     const formData = new FormData();
     
-    // 필드 추가
-    Object.keys(fields).forEach(key => {
-      const value = Array.isArray(fields[key]) ? fields[key][0] : fields[key];
-      console.log(`[PDF-Image] Adding field: ${key} = ${value}`);
-      formData.append(key, value);
+    // 파일 추가
+    formData.append('file', fileData.buffer, {
+      filename: fileData.filename,
+      contentType: 'application/pdf'
     });
     
-    // 파일 추가 - 'file' 필드명으로 통일
-    let fileAdded = false;
-    Object.keys(files).forEach(key => {
-      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-      if (file && file.filepath) {
-        console.log(`[PDF-Image] Processing file: ${key}`);
-        console.log(`[PDF-Image] File details:`, {
-          originalFilename: file.originalFilename,
-          mimetype: file.mimetype,
-          size: file.size,
-          filepath: file.filepath,
-          fileExists: fs.existsSync(file.filepath)
-        });
-        
-        if (fs.existsSync(file.filepath)) {
-          // 파일 크기 확인
-          const stats = fs.statSync(file.filepath);
-          console.log(`[PDF-Image] File stats:`, {
-            size: stats.size,
-            isFile: stats.isFile(),
-            mtime: stats.mtime
-          });
-          
-          // 항상 'file' 필드명으로 추가 (Flask 서비스가 기대하는 필드명)
-          const fileStream = fs.createReadStream(file.filepath);
-          formData.append('file', fileStream, {
-            filename: file.originalFilename || 'file.pdf',
-            contentType: file.mimetype || 'application/pdf'
-          });
-          fileAdded = true;
-          console.log(`[PDF-Image] File added successfully: ${file.originalFilename}`);
-        } else {
-          console.error(`[PDF-Image] File does not exist at path: ${file.filepath}`);
-        }
-      } else {
-        console.error(`[PDF-Image] Invalid file object:`, {
-          key,
-          hasFile: !!file,
-          hasFilepath: !!file?.filepath,
-          file: file ? {
-            originalFilename: file.originalFilename,
-            size: file.size,
-            mimetype: file.mimetype
-          } : null
-        });
-      }
-    });
+    // 필드 추가 (기본값 포함)
+    formData.append('format', fields.format || 'png');
+    formData.append('dpi', fields.dpi || '144');
     
-    if (!fileAdded) {
-      console.error('[PDF-Image] No valid files found to forward');
-      return res.status(400).json({ 
-        error: 'No valid files found',
-        debug: {
-          filesInfo: Object.keys(files).map(key => {
-            const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-            return {
-              key,
-              hasFilepath: !!file?.filepath,
-              originalFilename: file?.originalFilename,
-              size: file?.size,
-              filepath: file?.filepath,
-              fileExists: file?.filepath ? fs.existsSync(file.filepath) : false
-            };
-          })
-        }
-      });
-    }
-
     console.log('[PDF-Image] Sending request to Render service...');
-    console.log('[PDF-Image] FormData headers:', formData.getHeaders());
+    console.log('[PDF-Image] File size:', fileData.buffer.length);
+    console.log('[PDF-Image] Format:', fields.format || 'png');
+    console.log('[PDF-Image] DPI:', fields.dpi || '144');
     
-    // Render 서비스로 요청 전송
     const response = await fetch(renderServiceUrl, {
       method: 'POST',
       body: formData,
-      headers: {
-        ...formData.getHeaders(),
-      }
+      headers: formData.getHeaders()
     });
-
-    console.log('[PDF-Image] Render service response status:', response.status);
-    console.log('[PDF-Image] Render service response headers:', Object.fromEntries(response.headers.entries()));
-
-    // 응답 헤더 복사
-    const contentType = response.headers.get('content-type');
-    const contentDisposition = response.headers.get('content-disposition');
     
-    if (contentType) {
-      res.setHeader('Content-Type', contentType);
-    }
-    if (contentDisposition) {
-      res.setHeader('Content-Disposition', contentDisposition);
-    }
-
-    // 응답 상태 코드 설정
-    res.status(response.status);
-
-    // 응답 데이터 처리
+    console.log('[PDF-Image] Response status:', response.status);
+    console.log('[PDF-Image] Response headers:', Object.fromEntries(response.headers.entries()));
+    
     if (response.ok) {
-      // 성공적인 응답 - 바이너리 데이터 스트리밍
-      const buffer = await response.arrayBuffer();
-      console.log('[PDF-Image] Sending successful response, size:', buffer.byteLength);
-      res.send(Buffer.from(buffer));
+      const contentType = response.headers.get('content-type');
+      console.log('[PDF-Image] Success! Content-Type:', contentType);
+      
+      if (contentType && contentType.startsWith('image/')) {
+        // 이미지 응답
+        const resultBuffer = await response.arrayBuffer();
+        res.setHeader('Content-Type', contentType);
+        res.status(200).send(Buffer.from(resultBuffer));
+      } else {
+        // JSON 응답 (다중 이미지 등)
+        const result = await response.json();
+        res.status(200).json(result);
+      }
     } else {
-      // 에러 응답 - JSON으로 처리
       const errorText = await response.text();
       console.error('[PDF-Image] Render service error:', errorText);
-      res.send(errorText);
+      res.status(response.status).json({ 
+        error: 'Render service error', 
+        details: errorText,
+        status: response.status
+      });
     }
-
-    // 임시 파일 정리
-    Object.keys(files).forEach(key => {
-      const file = Array.isArray(files[key]) ? files[key][0] : files[key];
-      if (file && file.filepath) {
-        try {
-          fs.unlinkSync(file.filepath);
-          console.log('[PDF-Image] Cleaned up temp file:', file.filepath);
-        } catch (e) {
-          console.warn('[PDF-Image] Failed to cleanup temp file:', e.message);
-        }
-      }
-    });
-
+    
   } catch (error) {
-    console.error('[PDF-Image] Proxy error:', error);
+    console.error('[PDF-Image] Handler error:', error);
     console.error('[PDF-Image] Error stack:', error.stack);
     res.status(500).json({ 
       error: 'Internal server error',
-      message: 'Failed to proxy request to PDF conversion service',
-      details: error.message,
-      stack: error.stack
+      message: error.message,
+      stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
     });
   }
 }
 
-// Vercel 설정
 export const config = {
   api: {
-    bodyParser: false, // formidable이 직접 파싱하도록 설정
+    bodyParser: false, // Native parsing을 위해 비활성화
     sizeLimit: '100mb', // 파일 크기 제한
   },
 }
