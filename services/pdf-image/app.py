@@ -87,7 +87,8 @@ def api_pdf_to_images():
     quality = request.form.get("quality")                  # 75~100 또는 low/medium/high
     pages_spec = request.form.get("pages")                 # "1-3,5"
 
-    transparent_bg = _flag(request.form.get("transparentBg"), False)
+    # 투명 배경 처리 - 다양한 파라미터명 지원
+    transparent_bg = _flag(request.form.get("transparentBg"), False) or _flag(request.form.get("transparent"), False)
     transparent_color = request.form.get("transparentColor")   # 예: ffffff, #fff
     tolerance = int(request.form.get("tolerance") or 8)
     webp_lossless = _flag(request.form.get("webpLossless"), True)
