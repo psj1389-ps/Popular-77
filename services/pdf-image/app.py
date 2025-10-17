@@ -1,4 +1,4 @@
-from flask import Flask, request, send_file, jsonify
+from flask import Flask, request, send_file, jsonify, render_template
 from werkzeug.utils import secure_filename
 import os, io, zipfile
 
@@ -14,6 +14,11 @@ ensure_dirs([UPLOAD_DIR, OUTPUT_DIR])
 
 @app.route("/", methods=["GET"])
 def root():
+    # Check if request accepts HTML (browser request)
+    if request.headers.get('Accept', '').find('text/html') != -1:
+        return render_template('index.html')
+    
+    # Return JSON for API requests
     return jsonify({
         "service": "PDF-Image Converter",
         "version": "1.0.0",
