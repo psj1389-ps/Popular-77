@@ -1,18 +1,40 @@
 {
-  "version": 2,
-  "buildCommand": "npm ci && npm run build",
-  "outputDirectory": "dist",
   "rewrites": [
-    { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
-    { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-jh3s.onrender.com/$1" },
-    { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
-    { "source": "/api/pdf-svg/(.*)", "destination": "https://pdf-svg.onrender.com/$1" },
-    { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
-    { "source": "/api/pdf-png/(.*)", "destination": "https://pdf-png.onrender.com/$1" },
-    { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
-    { "source": "/api/pdf-xls/(.*)", "destination": "https://pdf-xls.onrender.com/$1" },
-    { "source": "/api/pdf-pptx/(.*)", "destination": "https://pdf-pptx.onrender.com/$1" },
-    { "source": "/api/pdf-tiff/(.*)", "destination": "https://pdf-tiff.onrender.com/$1" },
-    { "source": "/(.*)", "destination": "/index.html" }
+    { "source": "/rss.xml", "destination": "/api/rss" },
+    { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/:path((?!api/|rss\\.xml|sitemap\\.xml).*)", "destination": "/index.html" }
+  ],
+  "headers": [
+    {
+      "source": "/api/rss",
+      "headers": [
+        {
+          "key": "Content-Type",
+          "value": "application/rss+xml; charset=utf-8"
+        },
+        {
+          "key": "Cache-Control",
+          "value": "public, s-maxage=600, stale-while-revalidate=300"
+        }
+      ]
+    },
+    {
+      "source": "/api/pdf-image/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "POST, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    }
   ]
 }

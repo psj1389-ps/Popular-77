@@ -19,7 +19,7 @@ services:
     name: pdf-doc-service
     env: python
     rootDir: services/pdf-doc
-    buildCommand: pip install -r requirements.txt
+    buildCommand: pip install Flask
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -154,4 +154,20 @@ services:
         value: production
       - key: PORT
         value: 10000
+    healthCheckPath: /health
+
+  # PDF to Image Service (Advanced)
+  - type: web
+    name: pdf-image-service
+    env: python
+    rootDir: services/pdf-image
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.6
     healthCheckPath: /health
