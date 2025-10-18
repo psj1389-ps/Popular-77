@@ -115,8 +115,9 @@ def api_pdf_to_images():
     # 1개면 단일 파일, 2개 이상이면 ZIP
     if len(out_files) == 1:
         fp = out_files[0]
-        # 단일 페이지: 1장.확장자 형식으로 파일명 설정
-        korean_filename = f"1장.{fmt}"
+        # 단일 페이지: 원본파일명.확장자 형식으로 파일명 설정
+        base_name = os.path.splitext(f.filename)[0]
+        korean_filename = f"{base_name}.{fmt}"
         resp = send_file(fp, as_attachment=True, download_name=korean_filename)
         resp.headers["Content-Length"] = str(os.path.getsize(fp))
         # UTF-8 인코딩을 위한 Content-Disposition 헤더 설정 (URL 인코딩)
@@ -129,9 +130,9 @@ def api_pdf_to_images():
     buf.seek(0, os.SEEK_END)
     length = buf.tell()
     buf.seek(0)
-    # 다중 페이지: 원본파일명_images.zip 형식으로 파일명 설정
-    base_name = os.path.splitext(name)[0]
-    korean_zip_filename = f"{base_name}_images.zip"
+    # 다중 페이지: 원본파일명_확장자.zip 형식으로 파일명 설정
+    base_name = os.path.splitext(f.filename)[0]
+    korean_zip_filename = f"{base_name}_{fmt}.zip"
     resp = send_file(buf, mimetype="application/zip", as_attachment=True,
                      download_name=korean_zip_filename)
     resp.headers["Content-Length"] = str(length)
