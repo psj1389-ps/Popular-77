@@ -306,36 +306,118 @@ def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale
     
     # 새 워크북 생성 및 기본 설정
     wb = openpyxl.Workbook()
-    ws = wb.active
-    ws.title = "PDF_Content"
     
     # 기본 스타일 설정
     header_font = Font(bold=True, size=12)
     normal_font = Font(size=10)
     
     with fitz.open(in_pdf_path) as doc:
-        row = 1
-        
-        for page_num, page in enumerate(doc, start=1):
-            # 페이지 헤더 추가
-            page_header = f"=== Page {page_num} ==="
-            cell = ws.cell(row=row, column=1, value=page_header)
-            cell.font = header_font
-            cell.alignment = Alignment(horizontal='center')
-            row += 1
+        # 1페이지 PDF인 경우 시트별로 분할
+        if len(doc) == 1:
+            page = doc[0]
             
-            # 텍스트 추출 및 추가
+            # 텍스트 추출 및 분석
             text_content = page.get_text("text")
-            if text_content.strip():
-                for line in text_content.splitlines():
-                    if line.strip():  # 빈 줄 제외
-                        cell = ws.cell(row=row, column=1, value=line.strip())
+            text_lines = [line.strip() for line in text_content.splitlines() if line.strip()]
+            
+            # 이미지 추출
+            image_list = page.get_images(full=True)
+            
+            # 기본 시트 제거 후 새 시트들 생성
+            wb.remove(wb.active)
+            
+            # 텍스트가 있는 경우 텍스트 시트 생성
+            if text_lines:
+                text_ws = wb.create_sheet("텍스트_내용")
+                
+                # 텍스트를 섹션별로 분할 (빈 줄이나 특정 패턴으로 구분)
+                sections = []
+                current_section = []
+                
+                for line in text_lines:
+                    # 제목이나 헤더로 보이는 패턴 (대문자, 숫자로 시작, 특수문자 등)
+                    if (len(line) < 50 and 
+                        (line.isupper() or 
+                         line.startswith(('1.', '2.', '3.', '4.', '5.', 'Chapter', '제', '항목', '●', '■', '-')) or
+                         line.endswith(':') or
+                         any(char in line for char in ['=', '*', '#']))):
+                        if current_section:
+                            sections.append(current_section)
+                            current_section = []
+                        current_section.append(line)
+                    else:
+                        current_section.append(line)
+                
+                if current_section:
+                    sections.append(current_section)
+                
+                # 섹션이 너무 많으면 합치기 (최대 5개 섹션)
+                if len(sections) > 5:
+                    # 작은 섹션들을 합치기
+                    merged_sections = []
+                    temp_section = []
+                    
+                    for section in sections:
+                        temp_section.extend(section)
+                        if len(temp_section) >= len(text_lines) // 3:  # 전체의 1/3 정도씩
+                            merged_sections.append(temp_section)
+                            temp_section = []
+                    
+                    if temp_section:
+                        if merged_sections:
+                            merged_sections[-1].extend(temp_section)
+                        else:
+                            merged_sections.append(temp_section)
+                    
+                    sections = merged_sections[:5]  # 최대 5개로 제한
+                
+                # 섹션별로 시트 생성 또는 하나의 시트에 모든 텍스트
+                if len(sections) > 1:
+                    for i, section in enumerate(sections, 1):
+                        section_ws = wb.create_sheet(f"섹션_{i}")
+                        row = 1
+                        
+                        # 섹션 헤더
+                        header_cell = section_ws.cell(row=row, column=1, value=f"=== 섹션 {i} ===")
+                        header_cell.font = header_font
+                        header_cell.alignment = Alignment(horizontal='center')
+                        row += 2
+                        
+                        # 섹션 내용
+                        for line in section:
+                            cell = section_ws.cell(row=row, column=1, value=line)
+                            cell.font = normal_font
+                            row += 1
+                        
+                        # 열 너비 조정
+                        _adjust_column_width(section_ws)
+                else:
+                    # 섹션이 하나뿐이면 전체 텍스트를 하나의 시트에
+                    row = 1
+                    header_cell = text_ws.cell(row=row, column=1, value="=== 전체 텍스트 ===")
+                    header_cell.font = header_font
+                    header_cell.alignment = Alignment(horizontal='center')
+                    row += 2
+                    
+                    for line in text_lines:
+                        cell = text_ws.cell(row=row, column=1, value=line)
                         cell.font = normal_font
                         row += 1
+                    
+                    # 열 너비 조정
+                    _adjust_column_width(text_ws)
             
-            # 이미지 추출 및 추가
-            try:
-                image_list = page.get_images(full=True)
+            # 이미지가 있는 경우 이미지 시트 생성
+            if image_list:
+                img_ws = wb.create_sheet("이미지_내용")
+                row = 1
+                
+                # 이미지 시트 헤더
+                header_cell = img_ws.cell(row=row, column=1, value="=== 이미지 목록 ===")
+                header_cell.font = header_font
+                header_cell.alignment = Alignment(horizontal='center')
+                row += 2
+                
                 for img_index, img in enumerate(image_list):
                     try:
                         # 이미지 데이터 추출
@@ -368,25 +450,107 @@ def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale
                         # Excel에 이미지 추가
                         excel_img = OpenpyxlImage(img_buffer)
                         excel_img.anchor = f'B{row}'  # B열에 이미지 배치
-                        ws.add_image(excel_img)
+                        img_ws.add_image(excel_img)
                         
                         # 이미지 설명 추가
-                        ws.cell(row=row, column=1, value=f"[Image {img_index + 1}]").font = Font(italic=True, color="0066CC")
+                        img_ws.cell(row=row, column=1, value=f"이미지 {img_index + 1}").font = Font(italic=True, color="0066CC")
                         row += max(15, int(excel_img.height / 20))  # 이미지 높이에 따라 행 조정
                         
                     except Exception as img_error:
                         # 이미지 처리 실패 시 텍스트로 표시
-                        ws.cell(row=row, column=1, value=f"[Image {img_index + 1} - 처리 실패: {str(img_error)}]").font = Font(italic=True, color="FF0000")
+                        img_ws.cell(row=row, column=1, value=f"이미지 {img_index + 1} - 처리 실패: {str(img_error)}").font = Font(italic=True, color="FF0000")
                         row += 1
-                        
-            except Exception as e:
-                # 이미지 추출 실패 시 로그만 남기고 계속 진행
-                logging.warning(f"Page {page_num} 이미지 추출 실패: {e}")
+                
+                # 열 너비 조정
+                _adjust_column_width(img_ws)
             
-            row += 2  # 페이지 간 간격
+            # 시트가 하나도 생성되지 않은 경우 기본 시트 생성
+            if len(wb.worksheets) == 0:
+                default_ws = wb.create_sheet("PDF_내용")
+                default_ws.cell(row=1, column=1, value="PDF에서 추출할 수 있는 내용이 없습니다.").font = normal_font
+                _adjust_column_width(default_ws)
+        
+        else:
+            # 다중 페이지 PDF인 경우 기존 방식 유지 (각 페이지를 별도 시트에)
+            wb.remove(wb.active)  # 기본 시트 제거
+            
+            for page_num, page in enumerate(doc, start=1):
+                # 각 페이지를 별도 시트로 생성
+                ws = wb.create_sheet(f"페이지_{page_num}")
+                row = 1
+                
+                # 페이지 헤더 추가
+                page_header = f"=== 페이지 {page_num} ==="
+                cell = ws.cell(row=row, column=1, value=page_header)
+                cell.font = header_font
+                cell.alignment = Alignment(horizontal='center')
+                row += 1
+                
+                # 텍스트 추출 및 추가
+                text_content = page.get_text("text")
+                if text_content.strip():
+                    for line in text_content.splitlines():
+                        if line.strip():  # 빈 줄 제외
+                            cell = ws.cell(row=row, column=1, value=line.strip())
+                            cell.font = normal_font
+                            row += 1
+                
+                # 이미지 추출 및 추가
+                try:
+                    image_list = page.get_images(full=True)
+                    for img_index, img in enumerate(image_list):
+                        try:
+                            # 이미지 데이터 추출
+                            xref = img[0]
+                            pix = fitz.Pixmap(doc, xref)
+                            
+                            # CMYK를 RGB로 변환
+                            if pix.n - pix.alpha < 4:  # GRAY or RGB
+                                img_data = pix.tobytes("png")
+                            else:  # CMYK
+                                pix1 = fitz.Pixmap(fitz.csRGB, pix)
+                                img_data = pix1.tobytes("png")
+                                pix1 = None
+                            
+                            pix = None
+                            
+                            # PIL로 이미지 처리
+                            pil_img = PILImage.open(io.BytesIO(img_data))
+                            
+                            # 이미지 크기 조정 (너무 큰 경우)
+                            max_width, max_height = 400, 300
+                            if pil_img.width > max_width or pil_img.height > max_height:
+                                pil_img.thumbnail((max_width, max_height), PILImage.Resampling.LANCZOS)
+                            
+                            # 이미지를 바이트로 변환
+                            img_buffer = io.BytesIO()
+                            pil_img.save(img_buffer, format='PNG')
+                            img_buffer.seek(0)
+                            
+                            # Excel에 이미지 추가
+                            excel_img = OpenpyxlImage(img_buffer)
+                            excel_img.anchor = f'B{row}'  # B열에 이미지 배치
+                            ws.add_image(excel_img)
+                            
+                            # 이미지 설명 추가
+                            ws.cell(row=row, column=1, value=f"[Image {img_index + 1}]").font = Font(italic=True, color="0066CC")
+                            row += max(15, int(excel_img.height / 20))  # 이미지 높이에 따라 행 조정
+                            
+                        except Exception as img_error:
+                            # 이미지 처리 실패 시 텍스트로 표시
+                            ws.cell(row=row, column=1, value=f"[Image {img_index + 1} - 처리 실패: {str(img_error)}]").font = Font(italic=True, color="FF0000")
+                            row += 1
+                            
+                except Exception as e:
+                    # 이미지 추출 실패 시 로그만 남기고 계속 진행
+                    logging.warning(f"Page {page_num} 이미지 추출 실패: {e}")
+                
+                # 열 너비 조정
+                _adjust_column_width(ws)
     
-    # 열 너비 자동 조정
-    for column in ws.columns:
+def _adjust_column_width(worksheet):
+    """워크시트의 열 너비를 자동 조정하는 헬퍼 함수"""
+    for column in worksheet.columns:
         max_length = 0
         column_letter = get_column_letter(column[0].column)
         for cell in column:
@@ -396,7 +560,7 @@ def perform_xlsx_conversion_fallback(in_pdf_path: str, out_xlsx_path: str, scale
             except:
                 pass
         adjusted_width = min(max_length + 2, 50)  # 최대 50자로 제한
-        ws.column_dimensions[column_letter].width = adjusted_width
+        worksheet.column_dimensions[column_letter].width = adjusted_width
     
     # 워크북 속성 설정 (복구 문의 방지)
     try:
