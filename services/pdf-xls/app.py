@@ -162,6 +162,72 @@ def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
     _export_via_adobe(in_path, "XLSX", final_path)
     return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+def perform_xlsx_conversion_adobe_with_sheets(in_path: str, base_name: str):
+    """Adobe SDK를 사용한 XLSX 변환 후 각 페이지별 시트로 재구성"""
+    import openpyxl
+    
+    # 먼저 Adobe SDK로 변환
+    temp_path, temp_name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
+    
+    # PDF 페이지 수 확인
+    doc = fitz.open(in_path)
+    page_count = doc.page_count
+    doc.close()
+    
+    # Adobe SDK 결과 파일 읽기
+    adobe_wb = openpyxl.load_workbook(temp_path)
+    adobe_ws = adobe_wb.active
+    
+    # 새로운 워크북 생성 (각 페이지별 시트)
+    new_wb = Workbook()
+    first_sheet = True
+    
+    # 전체 데이터를 페이지 수로 나누어 각 시트에 배치
+    total_rows = adobe_ws.max_row
+    rows_per_page = max(1, total_rows // page_count) if page_count > 0 else total_rows
+    
+    for page_num in range(1, page_count + 1):
+        if first_sheet:
+            ws = new_wb.active
+            ws.title = f"Page_{page_num:02d}"
+            first_sheet = False
+        else:
+            ws = new_wb.create_sheet(title=f"Page_{page_num:02d}")
+        
+        # 해당 페이지에 해당하는 행 범위 계산
+        start_row = (page_num - 1) * rows_per_page + 1
+        end_row = min(page_num * rows_per_page, total_rows) if page_num < page_count else total_rows
+        
+        # 데이터 복사
+        row_offset = 0
+        for row_num in range(start_row, end_row + 1):
+            row_offset += 1
+            for col_num in range(1, adobe_ws.max_column + 1):
+                source_cell = adobe_ws.cell(row=row_num, column=col_num)
+                target_cell = ws.cell(row=row_offset, column=col_num)
+                
+                # 값과 스타일 복사
+                target_cell.value = source_cell.value
+                if source_cell.font:
+                    target_cell.font = source_cell.font
+                if source_cell.alignment:
+                    target_cell.alignment = source_cell.alignment
+    
+    # 새로운 파일로 저장
+    final_name = f"{base_name}.xlsx"
+    final_path = os.path.join(OUTPUTS_DIR, final_name)
+    if os.path.exists(final_path):
+        os.remove(final_path)
+    new_wb.save(final_path)
+    
+    # 임시 파일 정리
+    try:
+        os.remove(temp_path)
+    except:
+        pass
+    
+    return final_path, final_name, ctype
+
 def has_extractable_text(page):
     """PDF 페이지에서 추출 가능한 텍스트가 있는지 확인"""
     text = page.get_text().strip()
@@ -337,8 +403,23 @@ def convert_async():
         try:
             set_progress(job_id, 10, "변환 준비 중")
             
-            # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
-            set_progress(job_id, 30, "지능형 텍스트 추출 변환 중")
+            # Adobe SDK 사용 가능하고 환경 변수가 설정된 경우에만 시도
+            if ADOBE_AVAILABLE:
+                try:
+                    set_progress(job_id, 30, "Adobe SDK로 변환 중 (각 페이지별 시트 생성)")
+                    out_path, name, ctype = perform_xlsx_conversion_adobe_with_sheets(in_path, base_name)
+                    JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
+                                   "progress":100,"message":"Adobe SDK로 변환 완료 (각 페이지별 시트 생성)"}
+                    return
+                except KeyError as e:
+                    app.logger.warning(f"Adobe 자격 증명 누락: {e}")
+                    set_progress(job_id, 40, "Adobe 자격 증명 누락 - 폴백 변환 중")
+                except Exception as e:
+                    app.logger.warning(f"Adobe SDK 변환 실패: {e}")
+                    set_progress(job_id, 40, "Adobe SDK 실패 - 폴백 변환 중")
+            
+            # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
+            set_progress(job_id, 50, "지능형 텍스트 추출 변환 중")
             out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
                            "progress":100,"message":"지능형 텍스트 추출로 변환 완료 (각 페이지별 시트 생성)"}
@@ -411,8 +492,21 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
-        # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
-        out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
+        # Adobe SDK 사용 가능하고 환경 변수가 설정된 경우에만 시도
+        if ADOBE_AVAILABLE:
+            try:
+                out_path, name, ctype = perform_xlsx_conversion_adobe_with_sheets(in_path, base_name)
+            except KeyError as e:
+                app.logger.warning(f"Adobe 자격 증명 누락: {e}")
+                # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
+                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
+            except Exception as e:
+                app.logger.warning(f"Adobe SDK 변환 실패: {e}")
+                # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
+                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
+        else:
+            # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
+            out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
     finally:
         try: 
             os.remove(in_path)
