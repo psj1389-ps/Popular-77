@@ -13,16 +13,20 @@ from openpyxl.utils import get_column_letter
 from typing import Optional
 import re
 
-# Adobe PDF Services SDK imports
+# Adobe PDF Services SDK imports - v4.2.0 compatible
 ADOBE_AVAILABLE = False
 try:
     from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.execution_context import ExecutionContext
-    from adobe.pdfservices.operation.io.file_ref import FileRef
-    from adobe.pdfservices.operation.pdfops.export_pdf_operation import ExportPDFOperation
-    from adobe.pdfservices.operation.pdfops.options.export_pdf_options import ExportPDFTargetFormat
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
+    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
+    from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
+    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
+    from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
+    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException, SdkException
     ADOBE_AVAILABLE = True
-    logging.info("Adobe PDF Services SDK loaded successfully")
+    logging.info("Adobe PDF Services SDK v4.2.0 loaded successfully")
 except ImportError as e:
     logging.warning(f"Adobe PDF Services SDK not available: {e}")
     logging.info("Service will use fallback image-based conversion")
@@ -76,30 +80,83 @@ def _env(key: str, alt: list[str] = []):
     raise KeyError(f"Missing env: {key}")
 
 def adobe_context():
+    """Adobe PDF Services SDK v4.2.0 자격 증명 설정"""
+    from dotenv import load_dotenv
+    load_dotenv()
+    
     # ADOBE_* 또는 PDF_SERVICES_* 둘 다 허용
     client_id = os.environ.get("ADOBE_CLIENT_ID") or os.environ.get("PDF_SERVICES_CLIENT_ID")
     client_secret = os.environ.get("ADOBE_CLIENT_SECRET") or os.environ.get("PDF_SERVICES_CLIENT_SECRET")
-    org_id = os.environ.get("ADOBE_ORGANIZATION_ID") or os.environ.get("PDF_SERVICES_ORGANIZATION_ID")
-    account_id = os.environ.get("ADOBE_ACCOUNT_ID") or os.environ.get("PDF_SERVICES_ACCOUNT_ID")
+    
     if not client_id or not client_secret:
         raise KeyError("Adobe credentials missing: ADOBE_CLIENT_ID / ADOBE_CLIENT_SECRET")
-    if org_id and account_id:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret,
-                                          organization_id=org_id, account_id=account_id)
-    else:
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
-    return ExecutionContext.create(creds)
+    
+    # SDK v4.2.0에서는 ServicePrincipalCredentials만 사용
+    creds = ServicePrincipalCredentials(
+        client_id=client_id,
+        client_secret=client_secret
+    )
+    return creds
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
-    ctx = adobe_context()
-    op = ExportPDFOperation.create_new(ExportPDFTargetFormat[target])  # "XLSX"
-    op.set_input(FileRef.create_from_local_file(in_pdf_path))
-    result = op.execute(ctx)
-    if os.path.exists(out_path):
-        os.remove(out_path)
-    result.save_as(out_path)
+    """Adobe PDF Services SDK v4.2.0을 사용한 PDF 변환"""
+    try:
+        # 자격 증명 생성
+        credentials = adobe_context()
+        
+        # PDF Services 클라이언트 생성
+        pdf_services = PDFServices(credentials=credentials)
+        
+        # PDF 파일을 StreamAsset으로 업로드
+        with open(in_pdf_path, 'rb') as file:
+            input_stream = file.read()
+        
+        input_asset = pdf_services.upload(
+            input_stream=input_stream, 
+            mime_type=PDFServicesMediaType.PDF
+        )
+        
+        # Export 파라미터 설정
+        if target == "XLSX":
+            target_format = ExportPDFTargetFormat.XLSX
+        else:
+            raise ValueError(f"Unsupported target format: {target}")
+            
+        export_pdf_params = ExportPDFParams(target_format=target_format)
+        
+        # ExportPDFJob 생성 및 실행
+        export_pdf_job = ExportPDFJob(
+            input_asset=input_asset,
+            export_pdf_params=export_pdf_params
+        )
+        
+        # 작업 제출 및 결과 대기
+        location = pdf_services.submit(export_pdf_job)
+        pdf_services_response = pdf_services.get_job_result(location, ExportPDFResult)
+        
+        # 결과 파일 다운로드 및 저장
+        result_asset = pdf_services_response.get_result().get_asset()
+        stream_asset = pdf_services.get_content(result_asset)
+        
+        # 기존 파일이 있으면 삭제
+        if os.path.exists(out_path):
+            os.remove(out_path)
+            
+        # 결과를 파일로 저장
+        with open(out_path, 'wb') as output_file:
+            output_file.write(stream_asset.get_input_stream())
+            
+        logging.info(f"Adobe SDK v4.2.0 변환 완료: {out_path}")
+        
+    except (ServiceApiException, ServiceUsageException, SdkException) as e:
+        logging.error(f"Adobe SDK 변환 실패: {e}")
+        raise
+    except Exception as e:
+        logging.error(f"Adobe SDK 변환 중 예상치 못한 오류: {e}")
+        raise
 
 def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
+    """Adobe SDK를 사용한 XLSX 변환"""
     final_name = f"{base_name}.xlsx"
     final_path = os.path.join(OUTPUTS_DIR, final_name)
     _export_via_adobe(in_path, "XLSX", final_path)
@@ -279,15 +336,27 @@ def convert_async():
         current_job_id = job_id
         try:
             set_progress(job_id, 10, "변환 준비 중")
-            try:
-                set_progress(job_id, 30, "Adobe로 변환 중")
-                out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
-            except Exception as e:
-                app.logger.exception("Adobe export failed; fallback to image-based.")
-                set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)  # 기존 이미지 방식
+            
+            # Adobe SDK 사용 가능하고 환경 변수가 설정된 경우에만 시도
+            if ADOBE_AVAILABLE:
+                try:
+                    set_progress(job_id, 30, "Adobe SDK로 변환 중")
+                    out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
+                    JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
+                                   "progress":100,"message":"Adobe SDK로 변환 완료"}
+                    return
+                except KeyError as e:
+                    app.logger.warning(f"Adobe 자격 증명 누락: {e}")
+                    set_progress(job_id, 40, "Adobe 자격 증명 누락 - 폴백 변환 중")
+                except Exception as e:
+                    app.logger.warning(f"Adobe SDK 변환 실패: {e}")
+                    set_progress(job_id, 40, "Adobe SDK 실패 - 폴백 변환 중")
+            
+            # 폴백: 이미지 기반 변환 (텍스트 추출 + 이미지)
+            set_progress(job_id, 50, "지능형 텍스트 추출 변환 중")
+            out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
-                           "progress":100,"message":"완료"}
+                           "progress":100,"message":"지능형 텍스트 추출로 변환 완료"}
         except Exception as e:
             app.logger.exception("convert error")
             JOBS[job_id] = {"status":"error","error":str(e),"progress":0,"message":"오류"}
