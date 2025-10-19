@@ -337,26 +337,11 @@ def convert_async():
         try:
             set_progress(job_id, 10, "변환 준비 중")
             
-            # Adobe SDK 사용 가능하고 환경 변수가 설정된 경우에만 시도
-            if ADOBE_AVAILABLE:
-                try:
-                    set_progress(job_id, 30, "Adobe SDK로 변환 중")
-                    out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
-                    JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
-                                   "progress":100,"message":"Adobe SDK로 변환 완료"}
-                    return
-                except KeyError as e:
-                    app.logger.warning(f"Adobe 자격 증명 누락: {e}")
-                    set_progress(job_id, 40, "Adobe 자격 증명 누락 - 폴백 변환 중")
-                except Exception as e:
-                    app.logger.warning(f"Adobe SDK 변환 실패: {e}")
-                    set_progress(job_id, 40, "Adobe SDK 실패 - 폴백 변환 중")
-            
-            # 폴백: 이미지 기반 변환 (텍스트 추출 + 이미지)
-            set_progress(job_id, 50, "지능형 텍스트 추출 변환 중")
+            # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
+            set_progress(job_id, 30, "지능형 텍스트 추출 변환 중")
             out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
             JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
-                           "progress":100,"message":"지능형 텍스트 추출로 변환 완료"}
+                           "progress":100,"message":"지능형 텍스트 추출로 변환 완료 (각 페이지별 시트 생성)"}
         except Exception as e:
             app.logger.exception("convert error")
             JOBS[job_id] = {"status":"error","error":str(e),"progress":0,"message":"오류"}
@@ -426,8 +411,7 @@ def convert_sync():
     scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
     try:
-        out_path, name, ctype = perform_xlsx_conversion_adobe(in_path, base_name)
-    except Exception:
+        # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
         out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
     finally:
         try: 
