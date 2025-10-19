@@ -8,7 +8,10 @@ import fitz  # PyMuPDF
 from PIL import Image
 from openpyxl import Workbook
 from openpyxl.drawing.image import Image as XLImage
+from openpyxl.styles import Font, Alignment
+from openpyxl.utils import get_column_letter
 from typing import Optional
+import re
 
 # Adobe PDF Services SDK imports
 ADOBE_AVAILABLE = False
@@ -102,9 +105,98 @@ def perform_xlsx_conversion_adobe(in_path: str, base_name: str):
     _export_via_adobe(in_path, "XLSX", final_path)
     return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
 
+def has_extractable_text(page):
+    """PDF 페이지에서 추출 가능한 텍스트가 있는지 확인"""
+    text = page.get_text().strip()
+    # 텍스트가 있고, 단순히 공백이나 특수문자만이 아닌 경우
+    return len(text) > 10 and bool(re.search(r'[a-zA-Z가-힣0-9]', text))
+
+def extract_text_to_excel(page, ws):
+    """PDF 페이지에서 텍스트를 추출하여 Excel 셀에 배치"""
+    # 텍스트 블록 추출 (위치 정보 포함)
+    blocks = page.get_text("dict")["blocks"]
+    
+    # 텍스트 블록들을 y 좌표로 정렬 (위에서 아래로)
+    text_blocks = []
+    for block in blocks:
+        if "lines" in block:  # 텍스트 블록인 경우
+            for line in block["lines"]:
+                for span in line["spans"]:
+                    text = span["text"].strip()
+                    if text:
+                        text_blocks.append({
+                            "text": text,
+                            "x": span["bbox"][0],
+                            "y": span["bbox"][1],
+                            "font_size": span["size"]
+                        })
+    
+    # y 좌표로 정렬 후 x 좌표로 정렬
+    text_blocks.sort(key=lambda x: (x["y"], x["x"]))
+    
+    # 행별로 그룹화 (비슷한 y 좌표끼리)
+    rows = []
+    current_row = []
+    current_y = None
+    tolerance = 5  # y 좌표 허용 오차
+    
+    for block in text_blocks:
+        if current_y is None or abs(block["y"] - current_y) <= tolerance:
+            current_row.append(block)
+            current_y = block["y"] if current_y is None else current_y
+        else:
+            if current_row:
+                rows.append(current_row)
+            current_row = [block]
+            current_y = block["y"]
+    
+    if current_row:
+        rows.append(current_row)
+    
+    # Excel에 텍스트 배치
+    for row_idx, row_blocks in enumerate(rows, 1):
+        # 행 내에서 x 좌표로 정렬
+        row_blocks.sort(key=lambda x: x["x"])
+        
+        # 열 위치 계산 (x 좌표 기반)
+        col_positions = {}
+        for i, block in enumerate(row_blocks):
+            # x 좌표를 기반으로 열 번호 결정
+            col_num = 1
+            for existing_x in sorted(col_positions.keys()):
+                if block["x"] > existing_x + 50:  # 50포인트 이상 차이나면 다음 열
+                    col_num += 1
+            
+            while col_num in col_positions.values():
+                col_num += 1
+            
+            col_positions[block["x"]] = col_num
+            
+            # 셀에 텍스트 입력
+            cell = ws.cell(row=row_idx, column=col_num)
+            cell.value = block["text"]
+            
+            # 폰트 크기에 따른 스타일 적용
+            if block["font_size"] > 14:
+                cell.font = Font(bold=True, size=12)
+            else:
+                cell.font = Font(size=10)
+            
+            cell.alignment = Alignment(wrap_text=True, vertical='top')
+    
+    # 열 너비 자동 조정
+    for column in ws.columns:
+        max_length = 0
+        column_letter = get_column_letter(column[0].column)
+        for cell in column:
+            if cell.value:
+                max_length = max(max_length, len(str(cell.value)))
+        adjusted_width = min(max_length + 2, 50)  # 최대 50자로 제한
+        ws.column_dimensions[column_letter].width = adjusted_width
+
 def perform_xlsx_conversion(in_path: str, base_name: str, scale: float = 1.0):
     """
-    PDF → XLSX (시트당 이미지 1장, A1에 배치)
+    PDF → XLSX (텍스트 추출 우선, 필요시 이미지 폴백)
     """
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
         doc = fitz.open(in_path)
@@ -116,17 +208,33 @@ def perform_xlsx_conversion(in_path: str, base_name: str, scale: float = 1.0):
         for i in range(doc.page_count):
             set_progress(current_job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
             page = doc.load_page(i)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-            pix.save(img_path)
-
+            
             if first_sheet:
                 ws = wb.active
                 ws.title = f"Page_{i+1:02d}"
                 first_sheet = False
             else:
                 ws = wb.create_sheet(title=f"Page_{i+1:02d}")
-
+            
+            # 텍스트 추출 시도
+            if has_extractable_text(page):
+                try:
+                    extract_text_to_excel(page, ws)
+                    # 텍스트 추출 성공 시 다음 페이지로
+                    continue
+                except Exception as e:
+                    app.logger.warning(f"텍스트 추출 실패 (페이지 {i+1}): {e}")
+            
+            # 텍스트 추출 실패 시 이미지로 폴백
+            pix = page.get_pixmap(matrix=mat, alpha=False)
+            img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
+            pix.save(img_path)
+            
+            # 기존 셀 내용 삭제 (텍스트 추출 실패한 경우)
+            for row in ws.iter_rows():
+                for cell in row:
+                    cell.value = None
+            
             xlimg = XLImage(img_path)
             ws.add_image(xlimg, "A1")
 
