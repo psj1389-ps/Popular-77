@@ -180,6 +180,63 @@ def health():
 def index():
     return render_template('index.html')
 
+@app.route('/convert', methods=['POST'])
+def convert_sync():
+    """동기 변환 - 즉시 파일 다운로드 응답"""
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+    
+    quality = request.form.get("quality", "medium")
+    # 품질 매핑: low -> "low", medium/high -> "standard"
+    payload_quality = "low" if quality == "low" else "standard"
+    
+    # 임시 파일로 저장
+    temp_id = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{temp_id}.pdf")
+    f.save(in_path)
+    
+    # 원본 파일명에서 base_name 추출
+    base_name = safe_base_name(f.filename)
+    
+    try:
+        # 동기적으로 변환 수행
+        out_path, name, ctype = perform_doc_conversion(in_path, payload_quality, base_name)
+        
+        # 파일이 존재하는지 확인
+        if not os.path.exists(out_path):
+            return jsonify({"error": "변환된 파일을 찾을 수 없습니다"}), 500
+        
+        # 파일 다운로드 응답
+        resp = send_file(out_path, mimetype=ctype, as_attachment=True, download_name=name)
+        resp = attach_download_headers(resp, name)
+        
+        # 임시 파일 정리 (백그라운드에서)
+        def cleanup():
+            try:
+                if os.path.exists(in_path):
+                    os.remove(in_path)
+                if os.path.exists(out_path):
+                    os.remove(out_path)
+            except:
+                pass
+        
+        # 응답 후 정리 작업 예약
+        executor.submit(cleanup)
+        
+        return resp
+        
+    except Exception as e:
+        # 오류 발생 시 임시 파일 정리
+        try:
+            if os.path.exists(in_path):
+                os.remove(in_path)
+        except:
+            pass
+        
+        app.logger.exception("변환 중 오류 발생")
+        return jsonify({"error": f"변환 실패: {str(e)}"}), 500
+
 @app.route('/convert-async', methods=['POST'])
 def convert_async():
     f = request.files.get("file") or request.files.get("pdfFile")
@@ -259,6 +316,15 @@ def job_download(job_id):
     
     resp = send_file(path, mimetype=ctype, as_attachment=True, download_name=name)
     return attach_download_headers(resp, name)
+
+@app.errorhandler(404)
+def not_found_error(error):
+    """404 오류 처리"""
+    app.logger.warning(f"404 오류: {request.url}")
+    return jsonify({
+        "error": "요청한 페이지를 찾을 수 없습니다",
+        "available_endpoints": ["/", "/convert", "/convert-async", "/job/<job_id>", "/download/<job_id>", "/health"]
+    }), 404
 
 @app.errorhandler(Exception)
 def handle_any_error(e):
