@@ -14,18 +14,36 @@ services:
         value: 10000
     healthCheckPath: /
 
-  # PDF to DOC Service
+  # PDF to DOC Service (PDF → DOCX)
   - type: web
     name: pdf-doc-service
     env: python
     rootDir: services/pdf-doc
-    buildCommand: pip install Flask
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.7
+    healthCheckPath: /health
+
+  # DOC to PDF Service (DOCX → PDF)
+  - type: web
+    name: doc-pdf-service
+    env: python
+    rootDir: services/doc-pdf
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.7
     healthCheckPath: /health
 
   # PDF to JPG Service
