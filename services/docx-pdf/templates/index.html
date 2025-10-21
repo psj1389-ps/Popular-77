@@ -1,9 +1,9 @@
-<!doctype html>
+ï»¿<!doctype html>
 <html lang="ko">
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>DOC/DOCX  PDF º¯È¯</title>
+  <title>DOC/DOCX  PDF ë³€í™˜</title>
   <style>
     body{font-family:system-ui,-apple-system,Segoe UI,Roboto,Helvetica,Arial,"Apple SD Gothic Neo","Noto Sans KR",sans-serif;padding:24px;line-height:1.6;}
     .wrap{max-width:720px;margin:0 auto;}
@@ -16,20 +16,20 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>DOC/DOCX  PDF º¯È¯ (LibreOffice)</h1>
-    <p class="note">ÆÄÀÏÀ» ¾÷·ÎµåÇÏ¸é ¼­¹ö°¡ PDF·Î º¯È¯ÇØ ´Ù¿î·ÎµåÇÕ´Ï´Ù.</p>
+    <h1>DOC/DOCX  PDF ë³€í™˜ (LibreOffice)</h1>
+    <p class="note">íŒŒì¼ì„ ì—…ë¡œë“œí•˜ë©´ ì„œë²„ê°€ PDFë¡œ ë³€í™˜í•´ ë‹¤ìš´ë¡œë“œí•©ë‹ˆë‹¤.</p>
 
     <div class="card">
       <form id="convertForm">
         <input type="file" id="fileInput" name="file" accept=".doc,.docx" required />
         <br />
-        <button type="submit">º¯È¯ÇÏ±â</button>
+        <button type="submit">ë³€í™˜í•˜ê¸°</button>
       </form>
       <div id="status" class="result"></div>
     </div>
 
     <div class="card">
-      <h2>»óÅÂ È®ÀÎ</h2>
+      <h2>ìƒíƒœ í™•ì¸</h2>
       <pre id="health"></pre>
     </div>
   </div>
@@ -41,7 +41,7 @@
         const json = await res.json();
         document.getElementById('health').textContent = JSON.stringify(json, null, 2);
       }catch(e){
-        document.getElementById('health').textContent = 'health ¿äÃ» ½ÇÆĞ: ' + e;
+        document.getElementById('health').textContent = 'health ìš”ì²­ ì‹¤íŒ¨: ' + e;
       }
     }
 
@@ -49,18 +49,18 @@
       e.preventDefault();
       const file = document.getElementById('fileInput').files[0];
       if(!file){
-        alert('ÆÄÀÏÀ» ¼±ÅÃÇÏ¼¼¿ä');
+        alert('íŒŒì¼ì„ ì„ íƒí•˜ì„¸ìš”');
         return;
       }
       const fd = new FormData();
       fd.append('file', file);
       const status = document.getElementById('status');
-      status.textContent = 'º¯È¯ Áß...';
+      status.textContent = 'ë³€í™˜ ì¤‘...';
       try{
         const res = await fetch('/convert', { method: 'POST', body: fd });
         if(!res.ok){
           const err = await res.json().catch(()=>({error:'unknown'}));
-          status.textContent = '¿¡·¯: ' + (err.error || res.statusText);
+          status.textContent = 'ì—ëŸ¬: ' + (err.error || res.statusText);
           return;
         }
         const blob = await res.blob();
@@ -70,9 +70,9 @@
         a.download = 'converted.pdf';
         a.click();
         URL.revokeObjectURL(url);
-        status.textContent = '¿Ï·á! ÆÄÀÏÀÌ ´Ù¿î·ÎµåµÇ¾ú½À´Ï´Ù.';
+        status.textContent = 'ì™„ë£Œ! íŒŒì¼ì´ ë‹¤ìš´ë¡œë“œë˜ì—ˆìŠµë‹ˆë‹¤.';
       }catch(e){
-        status.textContent = '¿äÃ» ½ÇÆĞ: ' + e;
+        status.textContent = 'ìš”ì²­ ì‹¤íŒ¨: ' + e;
       }
     });
 
@@ -80,3 +80,4 @@
   </script>
 </body>
 </html>
+
