@@ -35,7 +35,7 @@ services:
     name: doc-pdf-service
     env: python
     rootDir: services/docx-pdf
-    buildCommand: apt-get update && xargs -a apt.txt apt-get install -y && pip install -r requirements.txt
+    buildCommand: apt-get update && xargs -a apt.txt apt-get install -y && python -m pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
