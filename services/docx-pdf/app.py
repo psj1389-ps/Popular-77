@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file
+from flask import Flask, request, jsonify, send_file, render_template
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os, io, sys, logging, tempfile, shutil, subprocess, shlex
@@ -53,13 +53,13 @@ def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
 
 @app.get("/")
 def index():
+    accept = request.headers.get("Accept", "") or ""
+    if "text/html" in accept:
+        return render_template("index.html")
     return jsonify({
         "service": "docx-pdf",
-        "status": "ok",
-        "routes": {
-            "GET /health": "service health",
-            "POST /convert": "multipart file ('file' or 'document') -> PDF via LibreOffice",
-        }
+        "version": "libreoffice-only",
+        "endpoints": ["/convert", "/health", "/index.html"],
     })
 
 
@@ -111,6 +111,11 @@ def convert_sync():
             pass
 
     return _send_download(final_path, out_name)
+
+
+@app.get("/index.html")
+def index_html():
+    return render_template("index.html")
 
 
 if __name__ == "__main__":
