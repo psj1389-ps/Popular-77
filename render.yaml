@@ -19,7 +19,7 @@ services:
     name: pdf-doc-service
     env: python
     rootDir: services/pdf-doc
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -34,8 +34,8 @@ services:
   - type: web
     name: doc-pdf-service
     env: python
-    rootDir: services/doc-pdf
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    rootDir: services/docx-pdf
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -51,7 +51,7 @@ services:
     name: pdf-jpg-service
     env: python
     rootDir: services/pdf-jpg
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -65,7 +65,7 @@ services:
     name: pdf-xls-service
     env: python
     rootDir: services/pdf-xls
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: gunicorn app:app --timeout 180 --bind 0.0.0.0:$PORT
     envVars:
       - key: FLASK_ENV
@@ -81,7 +81,7 @@ services:
     name: pdf-png-service
     env: python
     rootDir: services/pdf-png
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -95,7 +95,7 @@ services:
     name: pdf-ai-service
     env: python
     rootDir: services/pdf-ai
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -109,7 +109,7 @@ services:
     name: pdf-bmp-service
     env: python
     rootDir: services/pdf-bmp
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -123,7 +123,7 @@ services:
     name: pdf-gif-service
     env: python
     rootDir: services/pdf-gif
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -137,7 +137,7 @@ services:
     name: pdf-pptx-service
     env: python
     rootDir: services/pdf-pptx
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -151,7 +151,7 @@ services:
     name: pdf-svg-service
     env: python
     rootDir: services/pdf-svg
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -165,7 +165,7 @@ services:
     name: pdf-tiff-service
     env: python
     rootDir: services/pdf-tiff
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -179,7 +179,7 @@ services:
     name: pdf-image-service
     env: python
     rootDir: services/pdf-image
-    buildCommand: pip install -r requirements.txt || pip install -r ../../requirements.txt
+    buildCommand: pip install -r requirements.txt
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
