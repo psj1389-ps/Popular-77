@@ -23,8 +23,8 @@ def _truthy(v: str | None) -> bool:
 # Adobe v4 imports (Create PDF)
 ADOBE_AVAILABLE, ADOBE_SDK_VERSION, ADOBE_IMPORT_ERROR = False, None, None
 try:
-    from adobe.pdfservices.operation.pdfservices import PDFServices
-    from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
+    from adobe.pdfservices.operation.pdf_services import PDFServices
+    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
     from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
     from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf_job import CreatePDFJob
     from adobe.pdfservices.operation.pdfjobs.params.create_pdf import CreatePDFParams
@@ -49,11 +49,36 @@ def ensure_adobe_creds_file() -> str:
     raise RuntimeError("Missing ADOBE_CREDENTIALS_JSON or ADOBE_CREDENTIALS_FILE_PATH")
 
 
+def build_adobe_credentials():
+    """Create ServicePrincipalCredentials from env vars or provided JSON/file."""
+    client_id = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID")
+    client_secret = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET")
+    if not client_id or not client_secret:
+        js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
+        p = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
+        try:
+            import json
+            data = None
+            if js:
+                data = json.loads(js)
+            elif p and os.path.exists(p):
+                with open(p, "r") as f:
+                    data = json.load(f)
+            if data:
+                client_id = data.get("client_id") or data.get("PDF_SERVICES_CLIENT_ID") or data.get("clientId")
+                client_secret = data.get("client_secret") or data.get("PDF_SERVICES_CLIENT_SECRET") or data.get("clientSecret")
+        except Exception as e:
+            app.logger.warning(f"Failed to parse Adobe credentials JSON/file: {e}")
+    if not client_id or not client_secret:
+        raise RuntimeError("Adobe credentials missing: set ADOBE_CLIENT_ID/ADOBE_CLIENT_SECRET or provide credentials JSON/file")
+    return ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
+
+
 def perform_createpdf_adobe(in_path: str, out_pdf_path: str):
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
-    creds_file = ensure_adobe_creds_file()
-    credentials = OAuthServiceAccountCredentials.create_from_file(creds_file)
+    # credentials = OAuthServiceAccountCredentials.create_from_file(ensure_adobe_creds_file())
+    credentials = build_adobe_credentials()
     pdf_services = PDFServices(credentials)
     input_ref = JobFileRef.create_from_local_file(in_path)
     params = CreatePDFParams()
