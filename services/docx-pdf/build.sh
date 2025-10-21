@@ -33,7 +33,6 @@ apt-get install -y \
 # LibreOffice 및 필수 패키지 설치
 echo "Installing LibreOffice and dependencies..."
 apt-get install -y \
-    libreoffice \
     libreoffice-writer \
     libreoffice-calc \
     libreoffice-impress \
@@ -42,8 +41,14 @@ apt-get install -y \
     fonts-liberation \
     fonts-noto \
     fonts-noto-cjk \
-    fonts-noto-color-emoji \
-    fonts-nanum
+    fonts-noto-color-emoji || {
+    echo "ERROR: Failed to install LibreOffice packages"
+    echo "Attempting to install minimal LibreOffice..."
+    apt-get install -y libreoffice-core libreoffice-writer || {
+        echo "CRITICAL: LibreOffice installation completely failed"
+        exit 1
+    }
+}
 
 # PATH에 LibreOffice 바이너리 경로 추가
 echo "Setting up LibreOffice PATH..."
@@ -60,6 +65,10 @@ echo "Verifying LibreOffice installation..."
 echo "Checking possible LibreOffice locations..."
 find /usr -name "soffice" -type f 2>/dev/null || echo "No soffice found in /usr"
 find /opt -name "soffice" -type f 2>/dev/null || echo "No soffice found in /opt"
+
+# 설치된 LibreOffice 패키지 확인
+echo "Installed LibreOffice packages:"
+dpkg -l | grep libreoffice || echo "No LibreOffice packages found"
 
 # 다양한 경로에서 soffice 확인
 SOFFICE_PATHS=(
@@ -78,18 +87,27 @@ for path in "${SOFFICE_PATHS[@]}"; do
 done
 
 if [ -n "$SOFFICE_FOUND" ]; then
-    echo "LibreOffice installed successfully"
-    $SOFFICE_FOUND --version || echo "Version check failed but binary exists"
+    echo "LibreOffice installed successfully at: $SOFFICE_FOUND"
     
     # 실행 권한 확인 및 설정
     chmod +x "$SOFFICE_FOUND"
     
-    # 환경 변수 파일에 PATH 저장
-    echo "export PATH=\"/usr/bin:/usr/local/bin:/usr/lib/libreoffice/program:\$PATH\"" > /app/.profile
+    # 버전 확인 (더 안전한 방법)
+    echo "Testing LibreOffice version..."
+    timeout 10 "$SOFFICE_FOUND" --version || echo "Version check failed or timed out"
+    
+    # 환경 변수 설정
+    export SOFFICE_BIN="$SOFFICE_FOUND"
+    echo "export SOFFICE_BIN=\"$SOFFICE_FOUND\"" >> /app/.profile
+    echo "export PATH=\"/usr/bin:/usr/local/bin:/usr/lib/libreoffice/program:\$PATH\"" >> /app/.profile
+    
+    echo "LibreOffice setup completed successfully"
 else
     echo "ERROR: LibreOffice installation failed - soffice binary not found"
     echo "Available LibreOffice packages:"
     dpkg -l | grep libreoffice || echo "No LibreOffice packages found"
+    echo "Attempting to locate any LibreOffice files..."
+    find /usr -name "*libreoffice*" -type f 2>/dev/null | head -10
     exit 1
 fi
 

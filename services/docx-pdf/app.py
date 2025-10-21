@@ -37,37 +37,107 @@ def _send_download(path: str, download_name: str):
     return resp
 
 
-def _find_soffice() -> str | None:
-    # 1) 환경변수 우선
-    cand_env = os.getenv("SOFFICE_BIN")
-    if cand_env and os.path.exists(cand_env) and os.access(cand_env, os.X_OK):
-        return cand_env
-    # 2) PATH 탐색
-    p = _sh.which("soffice") or _sh.which("libreoffice")
-    if p:
-        return p
-    # 3) 흔한 설치 경로
-    for p in ["/usr/bin/soffice", "/usr/lib/libreoffice/program/soffice", "/opt/libreoffice/program/soffice"]:
-        if os.path.exists(p) and os.access(p, os.X_OK):
-            return p
+def _find_soffice():
+    """LibreOffice soffice 실행 파일 경로를 찾습니다."""
+    # 환경 변수에서 먼저 확인
+    if 'SOFFICE_BIN' in os.environ:
+        soffice_path = os.environ['SOFFICE_BIN']
+        if os.path.exists(soffice_path):
+            app.logger.info(f"Found soffice from environment variable: {soffice_path}")
+            return soffice_path
+    
+    possible_paths = [
+        '/usr/bin/soffice',
+        '/usr/lib/libreoffice/program/soffice',
+        '/opt/libreoffice*/program/soffice',
+        '/snap/libreoffice/current/lib/libreoffice/program/soffice'
+    ]
+    
+    for path in possible_paths:
+        # 와일드카드 경로 처리
+        if '*' in path:
+            import glob
+            matches = glob.glob(path)
+            for match in matches:
+                if os.path.exists(match):
+                    app.logger.info(f"Found soffice at: {match}")
+                    return match
+        elif os.path.exists(path):
+            app.logger.info(f"Found soffice at: {path}")
+            return path
+    
+    # 시스템 PATH에서 찾기
+    import shutil
+    soffice_in_path = shutil.which('soffice')
+    if soffice_in_path:
+        app.logger.info(f"Found soffice in PATH: {soffice_in_path}")
+        return soffice_in_path
+    
+    app.logger.error("soffice not found in any known location")
     return None
 
 def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
     soffice = _find_soffice()
     if not soffice:
+        app.logger.error("LibreOffice (soffice) not found in system PATH")
+        app.logger.error("Checked paths: SOFFICE_BIN env var, PATH, /usr/bin/soffice, /usr/lib/libreoffice/program/soffice, /opt/libreoffice/program/soffice")
         raise RuntimeError("LibreOffice (soffice) not found in system PATH. Set SOFFICE_BIN or install apt packages.")
+    
+    app.logger.info(f"Using LibreOffice at: {soffice}")
     outdir = os.path.dirname(out_pdf_path)
     os.makedirs(outdir, exist_ok=True)
-    cmd = f"{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}"
-    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    if proc.returncode != 0:
-        raise RuntimeError(f"LibreOffice failed: {proc.stderr.decode('utf-8','ignore')}")
+    
+    # 더 안전한 명령어 구성
+    cmd = [
+        soffice,
+        "--headless",
+        "--nologo", 
+        "--nofirststartwizard",
+        "--convert-to", "pdf",
+        "--outdir", outdir,
+        in_path
+    ]
+    
+    app.logger.info(f"Running LibreOffice command: {' '.join(shlex.quote(arg) for arg in cmd)}")
+    
+    try:
+        proc = subprocess.run(cmd, stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=60)
+        stdout = proc.stdout.decode('utf-8', 'ignore')
+        stderr = proc.stderr.decode('utf-8', 'ignore')
+        
+        app.logger.info(f"LibreOffice stdout: {stdout}")
+        if stderr:
+            app.logger.warning(f"LibreOffice stderr: {stderr}")
+            
+        if proc.returncode != 0:
+            app.logger.error(f"LibreOffice failed with return code {proc.returncode}")
+            raise RuntimeError(f"LibreOffice failed (code {proc.returncode}): {stderr}")
+            
+    except subprocess.TimeoutExpired:
+        app.logger.error("LibreOffice conversion timed out after 60 seconds")
+        raise RuntimeError("LibreOffice conversion timed out")
+    except Exception as e:
+        app.logger.error(f"LibreOffice subprocess error: {str(e)}")
+        raise RuntimeError(f"LibreOffice subprocess error: {str(e)}")
+    
     base = os.path.splitext(os.path.basename(in_path))[0]
     produced = os.path.join(outdir, f"{base}.pdf")
+    
+    if not os.path.exists(produced):
+        app.logger.error(f"Expected output file not found: {produced}")
+        # List files in output directory for debugging
+        try:
+            files = os.listdir(outdir)
+            app.logger.error(f"Files in output directory: {files}")
+        except Exception as e:
+            app.logger.error(f"Could not list output directory: {e}")
+        raise RuntimeError(f"LibreOffice did not produce expected output file: {produced}")
+    
     if produced != out_pdf_path:
         if os.path.exists(out_pdf_path):
             os.remove(out_pdf_path)
         os.replace(produced, out_pdf_path)
+        app.logger.info(f"Moved output from {produced} to {out_pdf_path}")
 
 
 @app.get("/")
