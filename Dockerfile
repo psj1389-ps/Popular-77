@@ -17,5 +17,7 @@ COPY services/docx-pdf/requirements.txt .
 RUN python -m pip install --upgrade pip && pip install --no-cache-dir -r requirements.txt
 
 COPY services/docx-pdf/ /app/
+COPY services/docx-pdf/boot.sh /app/boot.sh
+RUN chmod +x /app/boot.sh
 
-CMD ["bash","-lc","python -m gunicorn app:app -b 0.0.0.0:$PORT -k gthread --threads 2 -w 1 -t 600"]
+CMD ["/app/boot.sh"]
