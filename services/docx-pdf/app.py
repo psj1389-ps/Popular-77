@@ -25,7 +25,7 @@ ADOBE_AVAILABLE, ADOBE_SDK_VERSION, ADOBE_IMPORT_ERROR = False, None, None
 try:
     from adobe.pdfservices.operation.pdf_services import PDFServices
     from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.pdfjobs.io.file_ref import FileRef as JobFileRef
+    from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
     from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf_job import CreatePDFJob
     from adobe.pdfservices.operation.pdfjobs.params.create_pdf import CreatePDFParams
     from adobe.pdfservices.operation.pdfjobs.result.create_pdf_result import CreatePDFResult
