@@ -358,7 +358,7 @@
                 <div style="position: relative;">
                     <!-- 네비게이션 아이콘들 -->
                     <div class="nav-icons-container">
-                        <a href="#" class="nav-icon" title="홈페이지">🏠</a>
+                        <a href="https://77-tools.xyz/tools/docx-pdf" class="nav-icon" title="메인 사이트로 이동" target="_blank">🏠</a>
                         <a href="#" class="nav-icon" title="설정">⚙️</a>
                         <a href="#" class="nav-icon" title="도움말">❓</a>
                         <a href="#uploadArea" class="nav-icon" title="파일 업로드">📤</a>
@@ -529,7 +529,7 @@
             try {
                 console.log('변환 요청 시작:', selectedFile.name, '품질:', quality);
                 
-                const response = await fetch('/upload', {
+                const response = await fetch('/convert', {
                     method: 'POST',
                     body: formData
                 });
@@ -589,7 +589,15 @@
                 
             } catch (error) {
                 console.error('변환 오류:', error);
-                showError(error.message || '변환 중 오류가 발생했습니다.');
+                
+                // 네트워크 오류 상세 처리
+                if (error.name === 'TypeError' && error.message.includes('Failed to fetch')) {
+                    showError('서버에 연결할 수 없습니다. 네트워크 연결을 확인하거나 잠시 후 다시 시도해주세요.');
+                } else if (error.message.includes('NetworkError')) {
+                    showError('네트워크 오류가 발생했습니다. 인터넷 연결을 확인해주세요.');
+                } else {
+                    showError(error.message || '변환 중 오류가 발생했습니다.');
+                }
             } finally {
                 // UI 복원
                 document.getElementById('convertBtn').disabled = false;

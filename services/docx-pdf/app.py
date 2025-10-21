@@ -11,7 +11,7 @@ ADOBE_SDK_AVAILABLE = False
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, expose_headers=["Content-Disposition"])
+CORS(app, resources={r"/*": {"origins": ["*", "https://77-tools.xyz", "http://localhost:*", "http://127.0.0.1:*"]}}, expose_headers=["Content-Disposition"], supports_credentials=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
