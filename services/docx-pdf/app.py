@@ -36,28 +36,74 @@ def _send_download(path: str, download_name: str):
     return resp
 
 
-def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
-    outdir = os.path.dirname(out_pdf_path)
-    os.makedirs(outdir, exist_ok=True)
-    
-    # LibreOffice 바이너리 경로 확인 및 설정
+def find_soffice_binary():
+    """LibreOffice soffice 바이너리를 찾는 함수"""
+    # 가능한 soffice 경로들
     soffice_paths = [
         "/usr/bin/soffice",
         "/usr/local/bin/soffice", 
+        "/usr/lib/libreoffice/program/soffice",
         "/opt/libreoffice/program/soffice",
         "soffice"
     ]
     
-    soffice_cmd = None
+    # 환경 변수에서 추가 경로 확인
+    if 'PATH' in os.environ:
+        for path_dir in os.environ['PATH'].split(':'):
+            potential_path = os.path.join(path_dir, 'soffice')
+            if potential_path not in soffice_paths:
+                soffice_paths.append(potential_path)
+    
+    # 각 경로 확인
     for path in soffice_paths:
+        # 직접 파일 존재 확인
+        if os.path.isfile(path) and os.access(path, os.X_OK):
+            return path
+        # shutil.which로 확인
         if shutil.which(path):
-            soffice_cmd = path
-            break
+            return shutil.which(path)
+    
+    # find 명령어로 시스템 전체 검색
+    try:
+        result = subprocess.run(['find', '/usr', '/opt', '-name', 'soffice', '-type', 'f', '-executable'], 
+                              capture_output=True, text=True, timeout=10)
+        if result.returncode == 0 and result.stdout.strip():
+            found_paths = result.stdout.strip().split('\n')
+            for found_path in found_paths:
+                if os.path.isfile(found_path) and os.access(found_path, os.X_OK):
+                    return found_path
+    except (subprocess.TimeoutExpired, FileNotFoundError):
+        pass
+    
+    return None
+
+def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
+    outdir = os.path.dirname(out_pdf_path)
+    os.makedirs(outdir, exist_ok=True)
+    
+    # LibreOffice 바이너리 찾기
+    soffice_cmd = find_soffice_binary()
     
     if not soffice_cmd:
-        raise RuntimeError("LibreOffice (soffice) not found in system PATH")
+        # 디버깅 정보 수집
+        debug_info = []
+        debug_info.append(f"PATH: {os.environ.get('PATH', 'Not set')}")
+        
+        # 가능한 위치들 확인
+        possible_locations = [
+            "/usr/bin/soffice",
+            "/usr/lib/libreoffice/program/soffice",
+            "/opt/libreoffice/program/soffice"
+        ]
+        
+        for loc in possible_locations:
+            exists = os.path.exists(loc)
+            executable = os.access(loc, os.X_OK) if exists else False
+            debug_info.append(f"{loc}: exists={exists}, executable={executable}")
+        
+        raise RuntimeError(f"LibreOffice (soffice) not found in system PATH. Debug info: {'; '.join(debug_info)}")
     
-    cmd = f"{soffice_cmd} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}"
+    cmd = f"{shlex.quote(soffice_cmd)} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}"
     proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
         raise RuntimeError(f"LibreOffice failed: {proc.stderr.decode('utf-8','ignore')}")
@@ -84,23 +130,14 @@ def index():
 @app.get("/health")
 def health():
     try:
-        # LibreOffice 바이너리 경로 확인
-        soffice_paths = [
-            "/usr/bin/soffice",
-            "/usr/local/bin/soffice", 
-            "/opt/libreoffice/program/soffice",
-            "soffice"
-        ]
-        
-        soffice_cmd = None
-        for path in soffice_paths:
-            if shutil.which(path):
-                soffice_cmd = path
-                break
+        # 공통 함수 사용하여 LibreOffice 바이너리 찾기
+        soffice_cmd = find_soffice_binary()
         
         if soffice_cmd:
             v = subprocess.run([soffice_cmd, "--version"], capture_output=True, text=True, check=False)
             soffice_ver = (v.stdout or v.stderr or "").strip()
+            if not soffice_ver:
+                soffice_ver = f"available at {soffice_cmd} (version check failed)"
         else:
             soffice_ver = "unavailable: soffice not found in system PATH"
     except Exception as e:
