@@ -208,6 +208,11 @@ def convert_sync():
     except Exception as e:
         app.logger.warning(f"Primary conversion failed: {e}; falling back to LibreOffice.")
         perform_createpdf_libreoffice(in_path, out_path)
+    finally:
+        try:
+            os.remove(in_path)
+        except:
+            pass
 
     return send_file(out_path, as_attachment=True, download_name=out_name, mimetype="application/pdf")
 
