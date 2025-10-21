@@ -7,7 +7,7 @@ import importlib
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__)
-CORS(app, resources={r"/*": {"origins": "*"}}, expose_headers=["Content-Disposition"])
+CORS(app, resources={r"/*": {"origins": "*", "expose_headers": ["Content-Disposition"]}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -15,22 +15,25 @@ OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-# DOC/DOCX only
 ALLOWED_EXTS = {".doc", ".docx"}
 
 def _truthy(v: str | None) -> bool:
     return str(v).lower() in {"1", "true", "yes", "on"} if v is not None else False
 
-# Adobe v4 imports (Create PDF)
+# Adobe v4 imports (¸ðµç °æ·Î Æú¹é Æ÷ÇÔ)
 ADOBE_AVAILABLE, ADOBE_SDK_VERSION, ADOBE_IMPORT_ERROR = False, None, None
 try:
     try:
         from adobe.pdfservices.operation.pdfservices import PDFServices
     except Exception:
         from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
 
-    # FileRefëŠ” ì—¬ê¸°ì„œ ìž„í¬íŠ¸í•˜ì§€ ì•ŠìŠµë‹ˆë‹¤ (ë™ì  ë¡œë“œ)
+    try:
+        from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
+    except Exception:
+        # ÀÏºÎ ¹èÆ÷ÆÇ¿¡¼­´Â ÀÌ °æ·Î°¡ ´Ù¸¦ ¼ö ÀÖÀ¸³ª, º¸Åë À§°¡ Ç¥ÁØ
+        raise
+
     try:
         from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf_job import CreatePDFJob
     except Exception:
@@ -52,12 +55,12 @@ except Exception as e:
     ADOBE_IMPORT_ERROR = f"v4 import failed: {e}"
     app.logger.warning(ADOBE_IMPORT_ERROR)
 
-# FileRef ë™ì  ë¡œë”
+# FileRef µ¿Àû ·Î´õ
 def _load_file_ref():
     errors = []
     for mod_path in [
-        "adobe.pdfservices.operation.pdfjobs.io.file_ref",  # v4 í‘œì¤€ ê²½ë¡œ
-        "adobe.pdfservices.operation.io.file_ref",          # ì¼ë¶€ ë°°í¬/í´ë°±
+        "adobe.pdfservices.operation.pdfjobs.io.file_ref",
+        "adobe.pdfservices.operation.io.file_ref",
     ]:
         try:
             mod = importlib.import_module(mod_path)
@@ -68,41 +71,16 @@ def _load_file_ref():
 
 
 def ensure_adobe_creds_file() -> str:
-    p = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
+    path = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
     js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
-    if p and os.path.exists(p):
-        return p
+    if path and os.path.exists(path):
+        return path
     if js:
         fd, tmp = tempfile.mkstemp(prefix="adobe_creds_", suffix=".json")
         with os.fdopen(fd, "w") as f:
             f.write(js)
         return tmp
     raise RuntimeError("Missing ADOBE_CREDENTIALS_JSON or ADOBE_CREDENTIALS_FILE_PATH")
-
-
-def build_adobe_credentials():
-    """Create ServicePrincipalCredentials from env vars or provided JSON/file."""
-    client_id = os.getenv("ADOBE_CLIENT_ID") or os.getenv("PDF_SERVICES_CLIENT_ID")
-    client_secret = os.getenv("ADOBE_CLIENT_SECRET") or os.getenv("PDF_SERVICES_CLIENT_SECRET")
-    if not client_id or not client_secret:
-        js = os.getenv("ADOBE_CREDENTIALS_JSON") or os.getenv("PDF_SERVICES_CREDENTIALS_JSON")
-        p = os.getenv("ADOBE_CREDENTIALS_FILE_PATH") or os.getenv("PDF_SERVICES_CREDENTIALS_FILE_PATH")
-        try:
-            import json
-            data = None
-            if js:
-                data = json.loads(js)
-            elif p and os.path.exists(p):
-                with open(p, "r") as f:
-                    data = json.load(f)
-            if data:
-                client_id = data.get("client_id") or data.get("PDF_SERVICES_CLIENT_ID") or data.get("clientId")
-                client_secret = data.get("client_secret") or data.get("PDF_SERVICES_CLIENT_SECRET") or data.get("clientSecret")
-        except Exception as e:
-            app.logger.warning(f"Failed to parse Adobe credentials JSON/file: {e}")
-    if not client_id or not client_secret:
-        raise RuntimeError("Adobe credentials missing: set ADOBE_CLIENT_ID/ADOBE_CLIENT_SECRET or provide credentials JSON/file")
-    return ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
 
 
 def perform_createpdf_adobe(in_path: str, out_pdf_path: str):
@@ -149,6 +127,17 @@ def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
         os.replace(produced, out_pdf_path)
 
 
+def _send_download(path: str, download_name: str):
+    with open(path, "rb") as f:
+        data = f.read()
+    resp = send_file(io.BytesIO(data), as_attachment=True, download_name=download_name, mimetype="application/pdf")
+    resp.direct_passthrough = False
+    resp.headers["Content-Length"] = str(len(data))
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Content-Disposition"] = f"attachment; filename={download_name}"
+    return resp
+
+
 @app.get("/health")
 def health():
     from importlib.metadata import version, PackageNotFoundError
@@ -169,6 +158,7 @@ def health():
         },
         "allowed_exts": sorted(list(ALLOWED_EXTS)),
     }
+
 
 @app.get("/")
 def index():
@@ -211,12 +201,12 @@ def convert_sync():
     finally:
         try:
             os.remove(in_path)
-        except:
+        except Exception:
             pass
 
-    return send_file(out_path, as_attachment=True, download_name=out_name, mimetype="application/pdf")
+    return _send_download(out_path, out_name)
 
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "10000"))
+    port = int(os.environ.get("PORT", "5000"))
     app.run(host="0.0.0.0", port=port)
