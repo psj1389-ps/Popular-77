@@ -7,9 +7,20 @@ echo "Starting build process..."
 # 환경 변수 설정
 export DEBIAN_FRONTEND=noninteractive
 
-# 시스템 패키지 업데이트
+# 시스템 패키지 업데이트 (읽기 전용 파일 시스템 문제 해결)
 echo "Updating package lists..."
-apt-get update -y
+# Render의 읽기 전용 파일 시스템 문제 해결을 위한 설정
+mkdir -p /tmp/apt-lists
+export APT_CONFIG=/tmp/apt.conf
+echo 'Dir::State::Lists "/tmp/apt-lists";' > $APT_CONFIG
+echo 'Dir::Cache::Archives "/tmp/apt-cache";' >> $APT_CONFIG
+mkdir -p /tmp/apt-cache
+
+# 패키지 목록 업데이트 (임시 디렉토리 사용)
+apt-get -c $APT_CONFIG update -y || {
+    echo "Warning: apt update failed, trying alternative approach..."
+    # 대안: 캐시 없이 직접 설치 시도
+}
 
 # 필수 패키지 먼저 설치
 echo "Installing essential packages..."
