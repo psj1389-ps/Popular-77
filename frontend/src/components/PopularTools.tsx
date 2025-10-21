@@ -264,9 +264,12 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             문서도구
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-            <div className="bg-orange-50 p-6 rounded-lg hover:bg-orange-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">워드 변환</h4>
-              <p className="text-gray-600">다양한 문서를 워드 형식으로 변환합니다.</p>
+            <div 
+              onClick={() => window.open('https://77-tools.xyz/tools/docx-pdf', '_blank')}
+              className="bg-orange-50 p-6 rounded-lg hover:bg-orange-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
+            >
+              <h4 className="font-semibold text-lg mb-2">DOCX to PDF</h4>
+              <p className="text-gray-600">워드 형식의 문서를 PDF로 변환합니다.</p>
             </div>
             <div className="bg-orange-50 p-6 rounded-lg hover:bg-orange-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
               <h4 className="font-semibold text-lg mb-2">엑셀 변환</h4>

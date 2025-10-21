@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import PageTitle from '../shared/PageTitle';
+import { Helmet } from 'react-helmet-async';
 
 const API_BASE = "https://docx-pdf-g6zu.onrender.com";
 
@@ -207,10 +207,10 @@ const DocxPdfPage: React.FC = () => {
 
   return (
     <>
-      <PageTitle 
-        title={`${getConversionText()} 변환기 - 77-tools.xyz`}
-        description={`${getFileTypeText()} 파일을 ${getTargetFormat()}로 무료 변환. 빠르고 안전한 온라인 문서 변환 도구.`}
-      />
+      <Helmet>
+        <title>{`${getConversionText()} 변환기 - 77-tools.xyz`}</title>
+        <meta name="description" content={`${getFileTypeText()} 파일을 ${getTargetFormat()}로 무료 변환. 빠르고 안전한 온라인 문서 변환 도구.`} />
+      </Helmet>
       
       <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
         {/* 배경 패턴 */}
