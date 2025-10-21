@@ -4,6 +4,7 @@ from dotenv import load_dotenv
 import os, io, sys, logging, tempfile, shutil, subprocess, shlex
 import shutil as _sh
 from uuid import uuid4
+from urllib.parse import quote
 
 # Adobe API 비활성화 (LibreOffice 전용)
 ADOBE_SDK_AVAILABLE = False
@@ -36,7 +37,18 @@ def _send_download(path: str, download_name: str):
     resp.direct_passthrough = False
     resp.headers["Content-Length"] = str(len(data))
     resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
+    
+    # RFC 5987 표준에 따른 한글/유니코드 파일명 인코딩
+    try:
+        # ASCII 파일명인지 확인
+        download_name.encode('ascii')
+        # ASCII인 경우 기본 형식 사용
+        resp.headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
+    except UnicodeEncodeError:
+        # 유니코드 파일명인 경우 RFC 5987 형식 사용
+        encoded_filename = quote(download_name, safe='')
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
+    
     return resp
 
 
