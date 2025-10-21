@@ -108,6 +108,19 @@ def health():
         "allowed_exts": sorted(list(ALLOWED_EXTS)),
     }
 
+@app.get("/")
+def index():
+    return jsonify({
+        "service": "docx-pdf",
+        "status": "ok",
+        "routes": {
+            "GET /health": "service health and SDK status",
+            "POST /convert": "multipart file ('file' or 'document') -> PDF",
+        },
+        "adobe_available": ADOBE_AVAILABLE,
+        "adobe_sdk_version": ADOBE_SDK_VERSION,
+    })
+
 
 @app.post("/convert")
 def convert_sync():
