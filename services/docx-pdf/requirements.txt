@@ -3,5 +3,5 @@ Werkzeug==2.3.7
 Flask-Cors==3.0.10
 requests>=2.31.0
 python-dotenv==1.0.0
-pdfservices-sdk
+pdfservices-sdk==4.2.0
 gunicorn
