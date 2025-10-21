@@ -2,6 +2,7 @@ from flask import Flask, request, jsonify, send_file
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os, io, sys, logging, tempfile, shutil, subprocess, shlex
+import importlib
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
@@ -23,17 +24,44 @@ def _truthy(v: str | None) -> bool:
 # Adobe v4 imports (Create PDF)
 ADOBE_AVAILABLE, ADOBE_SDK_VERSION, ADOBE_IMPORT_ERROR = False, None, None
 try:
-    from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.io.file_ref import FileRef as JobFileRef
-    from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf_job import CreatePDFJob
-    from adobe.pdfservices.operation.pdfjobs.params.create_pdf import CreatePDFParams
-    from adobe.pdfservices.operation.pdfjobs.result.create_pdf_result import CreatePDFResult
+    from adobe.pdfservices.operation.pdfservices import PDFServices
+    from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
+
+    # FileRef는 여기서 임포트하지 않습니다 (동적 로드)
+    try:
+        from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf_job import CreatePDFJob
+    except Exception:
+        from adobe.pdfservices.operation.pdfjobs.jobs.create_pdf.create_pdf_job import CreatePDFJob
+
+    try:
+        from adobe.pdfservices.operation.pdfjobs.params.create_pdf import CreatePDFParams
+    except Exception:
+        from adobe.pdfservices.operation.pdfjobs.params.create_pdf.create_pdf_params import CreatePDFParams
+
+    try:
+        from adobe.pdfservices.operation.pdfjobs.result.create_pdf_result import CreatePDFResult
+    except Exception:
+        from adobe.pdfservices.operation.pdfjobs.result.create_pdf.create_pdf_result import CreatePDFResult
+
     ADOBE_AVAILABLE, ADOBE_SDK_VERSION = True, "4.x"
 except Exception as e:
     ADOBE_AVAILABLE, ADOBE_SDK_VERSION = False, None
     ADOBE_IMPORT_ERROR = f"v4 import failed: {e}"
     app.logger.warning(ADOBE_IMPORT_ERROR)
+
+# FileRef 동적 로더
+def _load_file_ref():
+    errors = []
+    for mod_path in [
+        "adobe.pdfservices.operation.pdfjobs.io.file_ref",  # v4 표준 경로
+        "adobe.pdfservices.operation.io.file_ref",          # 일부 배포/폴백
+    ]:
+        try:
+            mod = importlib.import_module(mod_path)
+            return getattr(mod, "FileRef")
+        except Exception as e:
+            errors.append(f"{mod_path}: {e}")
+    raise ImportError("Cannot import FileRef. Tried -> " + " | ".join(errors))
 
 
 def ensure_adobe_creds_file() -> str:
@@ -77,14 +105,20 @@ def build_adobe_credentials():
 def perform_createpdf_adobe(in_path: str, out_pdf_path: str):
     if not ADOBE_AVAILABLE or ADOBE_SDK_VERSION != "4.x":
         raise RuntimeError("Adobe v4 SDK not available")
-    # credentials = OAuthServiceAccountCredentials.create_from_file(ensure_adobe_creds_file())
-    credentials = build_adobe_credentials()
+
+    creds_file = ensure_adobe_creds_file()
+    credentials = OAuthServiceAccountCredentials.create_from_file(creds_file)
     pdf_services = PDFServices(credentials)
-    input_ref = JobFileRef.create_from_local_file(in_path)
+
+    FileRef = _load_file_ref()
+    input_ref = FileRef.create_from_local_file(in_path)
+
     params = CreatePDFParams()
     job = CreatePDFJob(input_ref, params)
+
     location = pdf_services.submit(job)
     result = pdf_services.get_job_result(location, CreatePDFResult)
+
     tmp_dir = tempfile.mkdtemp(prefix="createpdf_")
     try:
         tmp_out = os.path.join(tmp_dir, os.path.basename(out_pdf_path))
