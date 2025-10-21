@@ -14,6 +14,7 @@ import PdfToTiffPage from "@/pages/pdf-to-tiff";
 import PdfToXlsPage from "@/pages/pdf-to-xls";
 import PdfVectorPage from "@/pages/pdf-vector";
 import PdfImagePage from "@/pages/pdf-image";
+import DocxPdfPage from "@/pages/docx-pdf";
 import MainLayout from '@/components/MainLayout';
 
 function App() {
@@ -121,6 +122,14 @@ function App() {
           element={
             <MainLayout>
               <PdfImagePage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/docx-pdf"
+          element={
+            <MainLayout>
+              <DocxPdfPage />
             </MainLayout>
           }
         />
