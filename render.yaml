@@ -27,7 +27,7 @@ services:
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
-        value: 3.12.7
+        value: 3.12.6
     healthCheckPath: /health
 
   # DOC to PDF Service (DOCX → PDF)
@@ -43,7 +43,7 @@ services:
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
-        value: 3.12.7
+        value: 3.12.6
     healthCheckPath: /health
 
   # PDF to JPG Service
@@ -73,7 +73,7 @@ services:
       - key: PORT
         value: 10000
       - key: PYTHON_VERSION
-        value: 3.12.7
+        value: 3.12.6
     healthCheckPath: /health
 
   # PDF to PNG Service
