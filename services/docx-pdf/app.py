@@ -24,7 +24,10 @@ def _truthy(v: str | None) -> bool:
 # Adobe v4 imports (Create PDF)
 ADOBE_AVAILABLE, ADOBE_SDK_VERSION, ADOBE_IMPORT_ERROR = False, None, None
 try:
-    from adobe.pdfservices.operation.pdfservices import PDFServices
+    try:
+        from adobe.pdfservices.operation.pdfservices import PDFServices
+    except Exception:
+        from adobe.pdfservices.operation.pdf_services import PDFServices
     from adobe.pdfservices.operation.auth.oauth_service_account_credentials import OAuthServiceAccountCredentials
 
     # FileRef는 여기서 임포트하지 않습니다 (동적 로드)
