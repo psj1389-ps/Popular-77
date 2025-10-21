@@ -39,7 +39,25 @@ def _send_download(path: str, download_name: str):
 def perform_createpdf_libreoffice(in_path: str, out_pdf_path: str):
     outdir = os.path.dirname(out_pdf_path)
     os.makedirs(outdir, exist_ok=True)
-    cmd = f"soffice --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}"
+    
+    # LibreOffice 바이너리 경로 확인 및 설정
+    soffice_paths = [
+        "/usr/bin/soffice",
+        "/usr/local/bin/soffice", 
+        "/opt/libreoffice/program/soffice",
+        "soffice"
+    ]
+    
+    soffice_cmd = None
+    for path in soffice_paths:
+        if shutil.which(path):
+            soffice_cmd = path
+            break
+    
+    if not soffice_cmd:
+        raise RuntimeError("LibreOffice (soffice) not found in system PATH")
+    
+    cmd = f"{soffice_cmd} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}"
     proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
     if proc.returncode != 0:
         raise RuntimeError(f"LibreOffice failed: {proc.stderr.decode('utf-8','ignore')}")
@@ -66,8 +84,25 @@ def index():
 @app.get("/health")
 def health():
     try:
-        v = subprocess.run(["soffice", "--version"], capture_output=True, text=True, check=False)
-        soffice_ver = (v.stdout or v.stderr or "").strip()
+        # LibreOffice 바이너리 경로 확인
+        soffice_paths = [
+            "/usr/bin/soffice",
+            "/usr/local/bin/soffice", 
+            "/opt/libreoffice/program/soffice",
+            "soffice"
+        ]
+        
+        soffice_cmd = None
+        for path in soffice_paths:
+            if shutil.which(path):
+                soffice_cmd = path
+                break
+        
+        if soffice_cmd:
+            v = subprocess.run([soffice_cmd, "--version"], capture_output=True, text=True, check=False)
+            soffice_ver = (v.stdout or v.stderr or "").strip()
+        else:
+            soffice_ver = "unavailable: soffice not found in system PATH"
     except Exception as e:
         soffice_ver = f"unavailable: {e}"
     return {

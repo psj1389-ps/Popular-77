@@ -35,7 +35,7 @@ services:
     name: doc-pdf-service
     env: python
     rootDir: services/docx-pdf
-    buildCommand: apt-get update && xargs -a apt.txt apt-get install -y && python -m pip install --upgrade pip setuptools wheel && pip install -r requirements.txt
+    buildCommand: chmod +x build.sh && ./build.sh
     startCommand: python app.py
     envVars:
       - key: FLASK_ENV
@@ -44,6 +44,8 @@ services:
         value: 10000
       - key: PYTHON_VERSION
         value: 3.12.6
+      - key: PATH
+        value: /usr/bin:/bin:/usr/local/bin
     healthCheckPath: /health
 
   # PDF to JPG Service
