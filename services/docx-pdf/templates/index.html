@@ -75,6 +75,34 @@
             font-weight: 300;
         }
         
+        /* 77-tools.xyz 연동 링크 스타일 */
+        .tools-link {
+            display: inline-block;
+            margin-top: 15px;
+            padding: 12px 24px;
+            background: rgba(255,255,255,0.2);
+            color: white;
+            text-decoration: none;
+            border-radius: 25px;
+            font-weight: 500;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,0.3);
+        }
+        
+        .tools-link:hover {
+            background: rgba(255,255,255,0.3);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+            color: white;
+            text-decoration: none;
+        }
+        
+        .tools-link::before {
+            content: '🏠 ';
+            margin-right: 8px;
+        }
+        
         /* 네비게이션 관련 스타일 제거 또는 주석 처리 */
         /*
         .header-nav {
@@ -365,6 +393,7 @@
                     </div>
                     <h1 class="header-title">DOCX to PDF Converter</h1>
                     <p class="header-subtitle">AI 기반 지능형 PDF to DOCX 변환 서비스로 문서를 Word 파일로 쉽게 변환하세요.</p>
+                    <a href="https://77-tools.xyz/tools/docx-pdf" class="tools-link" target="_blank">77-tools.xyz 메인 사이트로 이동</a>
                 </div>
             </div>
             

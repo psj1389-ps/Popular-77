@@ -208,41 +208,80 @@ def convert_sync():
     out_path = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
     final_path = os.path.join(OUTPUTS_DIR, out_name)
 
-    f.save(in_path)
+    app.logger.info(f"Starting conversion: {name} -> {out_name}")
+    app.logger.info(f"Input path: {in_path}")
+    app.logger.info(f"Output path: {out_path}")
+    app.logger.info(f"Final path: {final_path}")
+
+    try:
+        f.save(in_path)
+        app.logger.info(f"File saved successfully: {in_path}")
+    except Exception as e:
+        app.logger.error(f"Failed to save input file: {e}")
+        return jsonify({"error": f"Failed to save input file: {str(e)}"}), 500
     
-    # 먼저 LibreOffice로 시도, 실패 시 Adobe API로 폴백
+    # LibreOffice 변환 시도
     conversion_success = False
     error_messages = []
     
     try:
         app.logger.info("Attempting conversion with LibreOffice...")
         perform_createpdf_libreoffice(in_path, out_path)
-        conversion_success = True
-        app.logger.info("LibreOffice conversion successful")
+        
+        # 변환 성공 확인: 출력 파일이 실제로 생성되었는지 검증
+        if os.path.exists(out_path) and os.path.getsize(out_path) > 0:
+            conversion_success = True
+            app.logger.info(f"LibreOffice conversion successful - output file created: {out_path} (size: {os.path.getsize(out_path)} bytes)")
+        else:
+            app.logger.error(f"LibreOffice conversion failed - output file not found or empty: {out_path}")
+            error_messages.append("LibreOffice: Output file not created or is empty")
+            
     except Exception as e:
-        app.logger.error(f"LibreOffice conversion failed: {e}")
+        app.logger.error(f"LibreOffice conversion failed with exception: {e}")
         error_messages.append(f"LibreOffice: {str(e)}")
     
+    # 변환 실패 시 오류 반환
     if not conversion_success:
         app.logger.error("All conversion methods failed")
+        # 입력 파일 정리
+        try:
+            os.remove(in_path)
+        except Exception:
+            pass
         return jsonify({
             "error": "PDF conversion failed with all available methods",
             "details": error_messages
         }), 500
     
+    # 파일 이동 및 최종 처리
     try:
+        app.logger.info(f"Moving output file from {out_path} to {final_path}")
+        
         if out_path != final_path:
             if os.path.exists(final_path):
                 os.remove(final_path)
+                app.logger.info(f"Removed existing final file: {final_path}")
             os.replace(out_path, final_path)
+            app.logger.info(f"Successfully moved output file to: {final_path}")
+        
+        # 최종 파일 존재 및 크기 확인
+        if not os.path.exists(final_path) or os.path.getsize(final_path) == 0:
+            app.logger.error(f"Final output file is missing or empty: {final_path}")
+            return jsonify({"error": "Final output file processing failed"}), 500
+            
+        app.logger.info(f"Conversion completed successfully - final file: {final_path} (size: {os.path.getsize(final_path)} bytes)")
+        
     except Exception as e:
         app.logger.error(f"Failed to move output file: {e}")
         return jsonify({"error": f"File processing error: {str(e)}"}), 500
     finally:
+        # 입력 파일 정리
         try:
-            os.remove(in_path)
-        except Exception:
-            pass
+            if os.path.exists(in_path):
+                os.remove(in_path)
+                app.logger.info(f"Cleaned up input file: {in_path}")
+        except Exception as e:
+            app.logger.warning(f"Failed to clean up input file: {e}")
 
     return _send_download(final_path, out_name)
 
