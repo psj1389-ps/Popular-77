@@ -17,7 +17,7 @@ services:
   # Docker-based DOCX to PDF Service
   - type: web
     name: docx-pdf-docker
-    env: docker
+    runtime: docker
     dockerfilePath: ./Dockerfile
     dockerContext: .
     envVars:
