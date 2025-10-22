@@ -61,15 +61,37 @@ def set_progress(job_id, p, msg=None):
 
 def send_download_memory(path: str, download_name: str, ctype: str):
     if not path or not os.path.exists(path):
+        app.logger.error(f"Output file missing: {path}")
         return jsonify({"error": "output file missing"}), 500
-    with open(path, "rb") as f:
-        data = f.read()
-    resp = send_file(io.BytesIO(data), mimetype=ctype, as_attachment=True, download_name=download_name, conditional=False)
-    resp.direct_passthrough = False
-    resp.headers["Content-Length"] = str(len(data))
-    resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
-    return resp
+    
+    try:
+        # 파일 크기 확인
+        file_size = os.path.getsize(path)
+        if file_size == 0:
+            app.logger.error(f"Output file is empty: {path}")
+            return jsonify({"error": "output file is empty"}), 500
+        
+        with open(path, "rb") as f:
+            data = f.read()
+        
+        if not data:
+            app.logger.error(f"Failed to read file data: {path}")
+            return jsonify({"error": "failed to read file data"}), 500
+        
+        resp = send_file(io.BytesIO(data), mimetype=ctype, as_attachment=True, download_name=download_name, conditional=False)
+        resp.direct_passthrough = False
+        resp.headers["Content-Length"] = str(len(data))
+        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
+        
+        app.logger.info(f"Successfully sending file: {download_name} ({file_size} bytes)")
+        return resp
+        
+    except Exception as e:
+        app.logger.error(f"Error sending file {path}: {str(e)}")
+        return jsonify({"error": f"file send error: {str(e)}"}), 500
 
 def safe_move(src: str, dst: str):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -140,45 +162,81 @@ def perform_pptx_conversion_adobe(in_path: str, base_name: str):
     
     final_name = f"{base_name}.pptx"
     final_path = os.path.join(OUTPUTS_DIR, final_name)
-    _export_via_adobe(in_path, "PPTX", final_path)
-    return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+    
+    try:
+        _export_via_adobe(in_path, "PPTX", final_path)
+        
+        # 파일이 제대로 생성되었는지 확인
+        if not os.path.exists(final_path):
+            raise Exception(f"Adobe PPTX 파일 생성 실패: {final_path}")
+        
+        file_size = os.path.getsize(final_path)
+        if file_size == 0:
+            raise Exception(f"Adobe PPTX 파일이 비어있음: {final_path}")
+        
+        app.logger.info(f"Adobe PPTX 변환 완료: {final_name} ({file_size} bytes)")
+        return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        
+    except Exception as e:
+        app.logger.error(f"Adobe PPTX 변환 오류: {str(e)}")
+        raise Exception(f"Adobe PPTX 변환 실패: {str(e)}")
 
 def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, job_id: str = None):
     """
     PDF → PPTX (페이지당 슬라이드 1장, 전체 이미지 맞춤)
     """
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
-        doc = fitz.open(in_path)
-        mat = fitz.Matrix(scale, scale)
-        prs = Presentation()
-        
-        # 첫 페이지 이미지 크기에 맞춰 슬라이드 크기(EMU) 설정
-        first = doc.load_page(0)
-        pix0 = first.get_pixmap(matrix=mat, alpha=False)
-        # 1 px ≈ 9525 EMU
-        prs.slide_width = Emu(pix0.width * 9525)
-        prs.slide_height = Emu(pix0.height * 9525)
+        try:
+            doc = fitz.open(in_path)
+            mat = fitz.Matrix(scale, scale)
+            prs = Presentation()
+            
+            # 첫 페이지 이미지 크기에 맞춰 슬라이드 크기(EMU) 설정
+            first = doc.load_page(0)
+            pix0 = first.get_pixmap(matrix=mat, alpha=False)
+            # 1 px ≈ 9525 EMU
+            prs.slide_width = Emu(pix0.width * 9525)
+            prs.slide_height = Emu(pix0.height * 9525)
 
-        for i in range(doc.page_count):
-            # job_id가 있을 때만 progress 업데이트 (비동기식에서만)
-            if job_id:
-                set_progress(job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
-            page = doc.load_page(i)
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-            pix.save(img_path)
+            for i in range(doc.page_count):
+                # job_id가 있을 때만 progress 업데이트 (비동기식에서만)
+                if job_id:
+                    set_progress(job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
+                page = doc.load_page(i)
+                pix = page.get_pixmap(matrix=mat, alpha=False)
+                img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
+                pix.save(img_path)
 
-            blank = prs.slide_layouts[6]  # Blank
-            slide = prs.slides.add_slide(blank)
-            # 전체 채우기
-            slide.shapes.add_picture(img_path, Emu(0), Emu(0), width=prs.slide_width, height=prs.slide_height)
+                blank = prs.slide_layouts[6]  # Blank
+                slide = prs.slides.add_slide(blank)
+                # 전체 채우기
+                slide.shapes.add_picture(img_path, Emu(0), Emu(0), width=prs.slide_width, height=prs.slide_height)
 
-        final_name = f"{base_name}.pptx"
-        final_path = os.path.join(OUTPUTS_DIR, final_name)
-        if os.path.exists(final_path): 
-            os.remove(final_path)
-        prs.save(final_path)
-        return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            final_name = f"{base_name}.pptx"
+            final_path = os.path.join(OUTPUTS_DIR, final_name)
+            if os.path.exists(final_path): 
+                os.remove(final_path)
+            
+            # PPTX 파일 저장
+            prs.save(final_path)
+            
+            # 파일이 제대로 생성되었는지 확인
+            if not os.path.exists(final_path):
+                raise Exception(f"PPTX 파일 생성 실패: {final_path}")
+            
+            file_size = os.path.getsize(final_path)
+            if file_size == 0:
+                raise Exception(f"PPTX 파일이 비어있음: {final_path}")
+            
+            app.logger.info(f"PPTX 변환 완료: {final_name} ({file_size} bytes)")
+            return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            
+        except Exception as e:
+            app.logger.error(f"PPTX 변환 오류: {str(e)}")
+            raise Exception(f"PPTX 변환 실패: {str(e)}")
+        finally:
+            if 'doc' in locals():
+                doc.close()
 
 @app.get("/")
 def index():
@@ -220,7 +278,22 @@ def convert_async():
     base_name = safe_base_name(f.filename)
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
-    f.save(in_path)
+    
+    try:
+        f.save(in_path)
+        
+        # 업로드된 파일 확인
+        if not os.path.exists(in_path):
+            return jsonify({"error": "파일 업로드 실패"}), 500
+        
+        upload_size = os.path.getsize(in_path)
+        if upload_size == 0:
+            return jsonify({"error": "업로드된 파일이 비어있음"}), 400
+        
+        app.logger.info(f"비동기 파일 업로드 완료: {f.filename} ({upload_size} bytes)")
+        
+    except Exception as e:
+        return jsonify({"error": f"파일 업로드 오류: {str(e)}"}), 500
 
     def clamp_num(v, lo, hi, default, T=float):
         try: 
@@ -248,11 +321,13 @@ def convert_async():
             out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
         
         JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
+        app.logger.info(f"비동기 변환 완료: {job_id} -> {name}")
         
         try: 
-            os.remove(in_path)
-        except: 
-            pass
+            if os.path.exists(in_path):
+                os.remove(in_path)
+        except Exception as e:
+            app.logger.warning(f"비동기 임시 파일 삭제 실패: {str(e)}")
 
     executor.submit(run_job)
     return jsonify({"job_id": job_id}), 202
@@ -264,6 +339,18 @@ def job_status(job_id):
         return jsonify({"error":"job not found"}), 404
     info.setdefault("progress", 0)
     info.setdefault("message","")
+    
+    # 에러 상태인 경우 상세 정보 제공
+    if info.get("status") == "error":
+        error_msg = info.get("error", "알 수 없는 오류")
+        app.logger.error(f"Job {job_id} 상태 확인 - 오류: {error_msg}")
+        return jsonify({
+            "status": "error",
+            "error": error_msg,
+            "progress": info.get("progress", 0),
+            "message": info.get("message", "")
+        }), 200
+    
     return jsonify(info), 200
 
 @app.route("/download/<job_id>", methods=["GET"])
@@ -286,34 +373,51 @@ def convert_sync():
     base_name = safe_base_name(f.filename)
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
-    f.save(in_path)
-
-    # doc과 동일: quality는 받되, PPTX 변환에는 사용하지 않음(무시)
-    quality = request.form.get("quality", "low")  # "low"(빠른) | "standard"
-    # scale은 UI에서 숨기므로 기본 1.0(옵션으로 전달되면 반영)
-    def clamp_num(v, lo, hi, default, T=float):
-        try: 
-            x = T(v)
-        except: 
-            return default
-        return max(lo, min(hi, x))
-    scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
-
+    
     try:
+        f.save(in_path)
+        
+        # 업로드된 파일 확인
+        if not os.path.exists(in_path):
+            return jsonify({"error": "파일 업로드 실패"}), 500
+        
+        upload_size = os.path.getsize(in_path)
+        if upload_size == 0:
+            return jsonify({"error": "업로드된 파일이 비어있음"}), 400
+        
+        app.logger.info(f"파일 업로드 완료: {f.filename} ({upload_size} bytes)")
+
+        # doc과 동일: quality는 받되, PPTX 변환에는 사용하지 않음(무시)
+        quality = request.form.get("quality", "low")  # "low"(빠른) | "standard"
+        # scale은 UI에서 숨기므로 기본 1.0(옵션으로 전달되면 반영)
+        def clamp_num(v, lo, hi, default, T=float):
+            try: 
+                x = T(v)
+            except: 
+                return default
+            return max(lo, min(hi, x))
+        scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
+
         try:
             if ADOBE_AVAILABLE:
                 out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
             else:
                 raise ImportError("Adobe SDK not available")
-        except Exception:
+        except Exception as e:
+            app.logger.warning(f"Adobe 변환 실패, 대체 방법 사용: {str(e)}")
             out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
         
         return send_download_memory(out_path, name, ctype)
+        
+    except Exception as e:
+        app.logger.error(f"변환 오류: {str(e)}")
+        return jsonify({"error": f"변환 실패: {str(e)}"}), 500
     finally:
         try: 
-            os.remove(in_path)
-        except: 
-            pass
+            if os.path.exists(in_path):
+                os.remove(in_path)
+        except Exception as e:
+            app.logger.warning(f"임시 파일 삭제 실패: {str(e)}")
 
 # /api aliases (frontend uses /api paths only)
 @app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])
