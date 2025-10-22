@@ -21,7 +21,13 @@ app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60"))
 # 동시성 제어 세마포어
 SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
 
-CORS(app, resources={r"/*": {"origins": ["*", "https://77-tools.xyz", "http://localhost:*", "http://127.0.0.1:*"]}}, expose_headers=["Content-Disposition"], supports_credentials=True)
+CORS(app, resources={r"/*": {"origins": [
+    "http://localhost:5173",
+    "https://77-tools.xyz",
+    "https://www.77-tools.xyz",
+    "https://popular-77.vercel.app",
+    "https://popular-77-xbqq.onrender.com"
+], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")

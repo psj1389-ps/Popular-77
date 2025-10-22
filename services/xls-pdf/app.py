@@ -47,7 +47,8 @@ CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
     "https://77-tools.xyz",
     "https://www.77-tools.xyz",
-    "https://popular-77.vercel.app"
+    "https://popular-77.vercel.app",
+    "https://popular-77-xbqq.onrender.com"
 ], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))

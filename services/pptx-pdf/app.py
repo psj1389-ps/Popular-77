@@ -59,11 +59,6 @@ def _set_pdf_disposition(resp, pdf_name: str):
     )
     resp.headers["Cache-Control"] = "no-store"
     return resp
-    resp.headers["Content-Disposition"] = (
-        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(pdf_name)}'
-    )
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -436,6 +431,13 @@ def convert_sync():
         in_name = f.filename or "input.pptx"  # 서비스별 기본값
         base, ext = os.path.splitext(os.path.basename(in_name))
         ext = ext.lower()
+        
+        # 디버깅 로그 추가
+        app.logger.info(f"Original filename: {f.filename}")
+        app.logger.info(f"Processed in_name: {in_name}")
+        app.logger.info(f"Extracted base: {base}")
+        app.logger.info(f"Extracted ext: {ext}")
+        
         if ext not in ALLOWED_EXTS:
             return jsonify({"error": f"unsupported extension: {ext}"}), 415
 
@@ -444,6 +446,9 @@ def convert_sync():
         out_name = f"{base}.pdf"
         tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
         final_out = os.path.join(OUTPUTS_DIR, out_name)
+        
+        # 최종 출력 파일명 로그
+        app.logger.info(f"Final output name: {out_name}")
 
         f.save(in_path)
         try:
