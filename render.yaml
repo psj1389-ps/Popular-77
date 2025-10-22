@@ -14,6 +14,21 @@ services:
         value: 10000
     healthCheckPath: /
 
+  # Docker-based DOCX to PDF Service
+  - type: web
+    name: docx-pdf-docker
+    env: docker
+    dockerfilePath: ./Dockerfile
+    dockerContext: .
+    envVars:
+      - key: SERVICE_DIR
+        value: docx-pdf
+      - key: PORT
+        value: 10000
+      - key: FLASK_ENV
+        value: production
+    healthCheckPath: /health
+
   # PDF to DOC Service (PDF → DOCX)
   - type: web
     name: pdf-doc-service
