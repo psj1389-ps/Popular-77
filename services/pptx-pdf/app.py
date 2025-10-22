@@ -104,8 +104,16 @@ def safe_move(src: str, dst: str):
 
 def perform_libreoffice(in_path: str, out_pdf_path: str):
     """
-    LibreOffice를 사용하여 PPTX/PPT/ODP를 PDF로 변환
+    LibreOffice를 사용하여 PPTX/PPT/ODP를 PDF로 변환 (메모리 최적화)
     """
+    import psutil
+    import time
+    
+    # 메모리 사용량 로깅 (변환 전)
+    process = psutil.Process()
+    mem_before = process.memory_info().rss / 1024 / 1024  # MB
+    app.logger.info(f"[MEM] 변환 전 메모리 사용량: {mem_before:.1f}MB")
+    
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
     if not soffice:
         raise RuntimeError("LibreOffice(soffice)를 찾을 수 없습니다")
@@ -113,14 +121,53 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
     outdir = os.path.dirname(out_pdf_path)
     os.makedirs(outdir, exist_ok=True)
     
-    cmd = f'{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}'
-    app.logger.info(f"[LO] cmd={cmd}")
+    # 메모리 절약을 위한 LibreOffice 옵션 추가
+    memory_opts = [
+        "--headless",           # GUI 비활성화
+        "--invisible",          # 완전 비가시 모드
+        "--nologo",            # 로고 비활성화
+        "--nofirststartwizard", # 첫 실행 마법사 비활성화
+        "--norestore",         # 세션 복원 비활성화
+        "--safe-mode",         # 안전 모드 (확장 프로그램 비활성화)
+        "--nolockcheck",       # 파일 잠금 검사 비활성화
+        "--nodefault",         # 기본 문서 생성 안함
+        "--convert-to", "pdf",
+        "--outdir", shlex.quote(outdir),
+        shlex.quote(in_path)
+    ]
     
-    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    app.logger.info(f"[LO] rc={proc.returncode}, stdout={proc.stdout.decode('utf-8','ignore')[:200]}")
+    cmd = f'{shlex.quote(soffice)} {" ".join(memory_opts)}'
+    app.logger.info(f"[LO] 메모리 최적화 명령어: {cmd}")
+    
+    # 프로세스 실행 및 메모리 모니터링
+    start_time = time.time()
+    proc = subprocess.Popen(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    
+    # 변환 중 메모리 사용량 모니터링
+    max_memory = mem_before
+    while proc.poll() is None:
+        try:
+            current_mem = process.memory_info().rss / 1024 / 1024
+            max_memory = max(max_memory, current_mem)
+            if current_mem > 400:  # 400MB 초과 시 경고
+                app.logger.warning(f"[MEM] 높은 메모리 사용량 감지: {current_mem:.1f}MB")
+            time.sleep(0.5)
+        except:
+            break
+    
+    stdout, stderr = proc.communicate()
+    conversion_time = time.time() - start_time
+    
+    # 변환 후 메모리 사용량 로깅
+    mem_after = process.memory_info().rss / 1024 / 1024
+    app.logger.info(f"[MEM] 변환 후 메모리: {mem_after:.1f}MB, 최대: {max_memory:.1f}MB, 시간: {conversion_time:.1f}초")
+    
+    app.logger.info(f"[LO] rc={proc.returncode}, stdout={stdout.decode('utf-8','ignore')[:200]}")
     
     if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.decode("utf-8", "ignore"))
+        error_msg = stderr.decode("utf-8", "ignore")
+        app.logger.error(f"[LO] 변환 실패: {error_msg}")
+        raise RuntimeError(f"LibreOffice 변환 실패: {error_msg}")
     
     base = os.path.splitext(os.path.basename(in_path))[0]
     produced = os.path.join(outdir, f"{base}.pdf")
@@ -134,6 +181,24 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
         if os.path.exists(out_pdf_path):
             os.remove(out_pdf_path)
         os.replace(produced, out_pdf_path)
+    
+    # LibreOffice 프로세스 완전 종료 확인
+    try:
+        # 남아있는 soffice 프로세스 강제 종료
+        for p in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if 'soffice' in p.info['name'] or any('soffice' in str(cmd) for cmd in (p.info['cmdline'] or [])):
+                    app.logger.info(f"[LO] 남은 soffice 프로세스 종료: PID {p.info['pid']}")
+                    p.terminate()
+                    p.wait(timeout=3)
+            except (psutil.NoSuchProcess, psutil.AccessDenied, psutil.TimeoutExpired):
+                pass
+    except Exception as e:
+        app.logger.warning(f"[LO] 프로세스 정리 중 오류: {e}")
+    
+    # 최종 메모리 사용량 로깅
+    final_mem = process.memory_info().rss / 1024 / 1024
+    app.logger.info(f"[MEM] 최종 메모리 사용량: {final_mem:.1f}MB")
 
 # 이미지 기반 변환 (기존 PDF to PPTX 기능 유지)
 
@@ -448,8 +513,14 @@ def convert_sync():
         return jsonify({"error": str(e)}), 500
 
     finally:
-        try: os.remove(in_path)
-        except: pass
+        # 임시 파일들 정리
+        for temp_file in [in_path, tmp_out, final_out]:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    app.logger.debug(f"임시 파일 삭제: {temp_file}")
+                except Exception as e:
+                    app.logger.warning(f"임시 파일 삭제 실패 ({temp_file}): {str(e)}")
 
 # /api aliases (frontend uses /api paths only)
 @app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])
