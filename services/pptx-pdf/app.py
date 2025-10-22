@@ -1,15 +1,15 @@
 from flask import Flask, request, jsonify, send_file, send_from_directory, abort, render_template, make_response
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
-import io, os, urllib.parse, tempfile, shutil, errno, logging
+import io, os, urllib.parse, tempfile, shutil, errno, logging, subprocess, shlex
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
 
-# Adobe PDF Services SDK 제거 - 이미지 기반 변환만 사용
-ADOBE_AVAILABLE = False
+# LibreOffice 기반 변환 사용
+ALLOWED_EXTS = {".pptx", ".ppt", ".odp"}
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 logging.basicConfig(level=logging.INFO)
@@ -102,7 +102,40 @@ def safe_move(src: str, dst: str):
         else:
             raise
 
-# Adobe 관련 함수들 제거됨 - 이미지 기반 변환만 사용
+def perform_libreoffice(in_path: str, out_pdf_path: str):
+    """
+    LibreOffice를 사용하여 PPTX/PPT/ODP를 PDF로 변환
+    """
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if not soffice:
+        raise RuntimeError("LibreOffice(soffice)를 찾을 수 없습니다")
+    
+    outdir = os.path.dirname(out_pdf_path)
+    os.makedirs(outdir, exist_ok=True)
+    
+    cmd = f'{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to pdf --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}'
+    app.logger.info(f"[LO] cmd={cmd}")
+    
+    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    app.logger.info(f"[LO] rc={proc.returncode}, stdout={proc.stdout.decode('utf-8','ignore')[:200]}")
+    
+    if proc.returncode != 0:
+        raise RuntimeError(proc.stderr.decode("utf-8", "ignore"))
+    
+    base = os.path.splitext(os.path.basename(in_path))[0]
+    produced = os.path.join(outdir, f"{base}.pdf")
+    app.logger.info(f"[LO] produced={produced}, exists={os.path.exists(produced)}")
+    
+    if not os.path.exists(produced):
+        raise RuntimeError(f"LibreOffice가 PDF 파일을 생성하지 못했습니다: {produced}")
+    
+    # 최종 경로로 이동
+    if produced != out_pdf_path:
+        if os.path.exists(out_pdf_path):
+            os.remove(out_pdf_path)
+        os.replace(produced, out_pdf_path)
+
+# 이미지 기반 변환 (기존 PDF to PPTX 기능 유지)
 
 def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, job_id: str = None):
     """
@@ -251,10 +284,30 @@ def spa(path):
 
 @app.route("/health", methods=["GET"])
 def health():
+    import sys, shutil, os
+    # soffice 경로/버전
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    if soffice:
+        import subprocess as sp
+        v = sp.run([soffice, "--version"], capture_output=True, text=True)
+        lo_ver = (v.stdout or v.stderr or "").strip()
+    else:
+        lo_ver = "not_found"
+    # SDK 존재 여부 확인
+    try:
+        from importlib.metadata import version
+        sdk_ver = version("pdfservices-sdk")
+    except Exception:
+        sdk_ver = None
     return {
         "service": "pptx-pdf",
-        "status": "ok"
-    }, 200
+        "engine": "libreoffice",
+        "soffice_path": soffice,
+        "libreoffice": lo_ver,
+        "pdfservices_sdk": sdk_ver,
+        "allowed_exts": [".pptx", ".ppt", ".odp"],
+        "python": sys.version,
+    }
 
 @app.route("/convert-async", methods=["POST"])
 def convert_async():
@@ -349,67 +402,54 @@ def job_download(job_id):
 @app.post("/upload")
 @app.post("/convert")
 def convert_sync():
-    f = request.files.get("file") or request.files.get("pdfFile")
+    f = request.files.get("file") or request.files.get("document")
     if not f:
-        return jsonify({"error":"file field is required"}), 400
+        return jsonify({"error": "file field is required"}), 400
 
-    base_name = safe_base_name(f.filename)
-    job_id = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
-    
-    out_path = None
+    name = f.filename or "input.pptx"
+    ext = os.path.splitext(name)[1].lower()
+    if ext not in ALLOWED_EXTS:
+        return jsonify({"error": f"unsupported extension: {ext}"}), 415
+
+    jid = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
+    out_name = os.path.splitext(os.path.basename(name))[0] + ".pdf"
+    tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+    final_out = os.path.join(OUTPUTS_DIR, out_name)
+
+    f.save(in_path)
+
     try:
-        f.save(in_path)
-        
-        # 업로드된 파일 확인
-        if not os.path.exists(in_path):
-            app.logger.error(f"파일 업로드 실패: {f.filename}")
-            return jsonify({"error": "파일 업로드 실패"}), 500
-        
-        upload_size = os.path.getsize(in_path)
-        if upload_size == 0:
-            app.logger.error(f"업로드된 파일이 비어있음: {f.filename}")
-            return jsonify({"error": "업로드된 파일이 비어있음"}), 400
-        
-        app.logger.info(f"파일 업로드 완료: {f.filename} ({upload_size} bytes)")
+        # 변환 실패 시 예외가 나도록(perform_libreoffice 내부에서 returncode 검사)
+        perform_libreoffice(in_path, tmp_out)
 
-        # doc과 동일: quality는 받되, PPTX 변환에는 사용하지 않음(무시)
-        quality = request.form.get("quality", "low")  # "low"(빠른) | "standard"
-        # scale은 UI에서 숨기므로 기본 1.0(옵션으로 전달되면 반영)
-        def clamp_num(v, lo, hi, default, T=float):
-            try: 
-                x = T(v)
-            except: 
-                return default
-            return max(lo, min(hi, x))
-        scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
+        # 최종 파일명으로 이동
+        if tmp_out != final_out:
+            if os.path.exists(final_out):
+                os.remove(final_out)
+            os.replace(tmp_out, final_out)
 
-        # 이미지 기반 변환만 사용
-        app.logger.info("이미지 기반 PDF to PPTX 변환 시작")
-        out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
-        
-        # 변환 결과 파일 확인
-        if not out_path or not os.path.exists(out_path):
-            app.logger.error(f"변환 결과 파일이 생성되지 않음: {out_path}")
-            return jsonify({"error": "변환 결과 파일 생성 실패"}), 500
-        
-        result_size = os.path.getsize(out_path)
-        app.logger.info(f"변환 완료: {name} ({result_size} bytes)")
-        
-        return send_download_memory(out_path, name, ctype)
-        
+        # 확실히 PDF 헤더로 전송
+        with open(final_out, "rb") as rf:
+            data = rf.read()
+        resp = send_file(
+            io.BytesIO(data),
+            as_attachment=True,
+            download_name=out_name,
+            mimetype="application/pdf",   # 강제 PDF
+        )
+        resp.direct_passthrough = False
+        resp.headers["Content-Length"] = str(len(data))
+        resp.headers["Cache-Control"] = "no-store"
+        return resp
+
     except Exception as e:
-        app.logger.error(f"변환 오류: {str(e)}")
-        return jsonify({"error": f"변환 실패: {str(e)}"}), 500
+        app.logger.exception("conversion failed")
+        return jsonify({"error": str(e)}), 500
+
     finally:
-        # 임시 파일들 정리
-        for temp_file in [in_path, out_path]:
-            if temp_file and os.path.exists(temp_file):
-                try:
-                    os.remove(temp_file)
-                    app.logger.debug(f"임시 파일 삭제: {temp_file}")
-                except Exception as e:
-                    app.logger.warning(f"임시 파일 삭제 실패 ({temp_file}): {str(e)}")
+        try: os.remove(in_path)
+        except: pass
 
 # /api aliases (frontend uses /api paths only)
 @app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])
