@@ -11,7 +11,7 @@ ADOBE_SDK_AVAILABLE = False
 
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
-app = Flask(__name__)
+app = Flask(__name__, template_folder="templates", static_folder="static")
 CORS(app, resources={r"/*": {"origins": ["*", "https://77-tools.xyz", "http://localhost:*", "http://127.0.0.1:*"]}}, expose_headers=["Content-Disposition"], supports_credentials=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -190,15 +190,15 @@ def perform_createpdf_libreoffice(input_path, output_dir, timeout=120):
 
 @app.get("/")
 def index():
-    accept = request.headers.get("Accept", "") or ""
-    if "text/html" in accept:
-        return render_template("index.html")
-    return jsonify({
-        "service": "docx-pdf",
-        "version": "libreoffice-only",
-        "endpoints": ["/convert", "/health", "/index.html"],
-        "conversion_methods": ["LibreOffice"]
-    })
+    # 이 서비스 전용 텍스트/수치(템플릿에서 사용)
+    page = {
+        "title": "DOCX to PDF Converter",
+        "subtitle": "Word 문서를 PDF로 안정적으로 변환",
+        "accept": ".doc,.docx",
+        "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "100"),
+        "service": "docx-pdf"
+    }
+    return render_template("index.html", page=page)
 
 
 @app.get("/health")
