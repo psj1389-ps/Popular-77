@@ -573,23 +573,48 @@
                 } else {
                     // 파일 다운로드
                     const blob = await response.blob();
+                    
+                    // 🔥 Blob 유효성 검증
+                    if (!blob || blob.size === 0) {
+                        throw new Error('다운로드된 파일이 비어있습니다.');
+                    }
+                    
+                    console.log('다운로드된 파일 크기:', blob.size, 'bytes');
+                    
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = selectedFile.name.replace(/\.[^/.]+$/, '.pdf');
+                    a.download = selectedFile.name.replace(/\.[^/.]+$/, '.pptx');
                     
                     document.body.appendChild(a);
                     a.click();
                     document.body.removeChild(a);
                     
-                    URL.revokeObjectURL(url);
+                    // 🔥 URL 정리를 약간 지연시켜 다운로드 완료 보장
+                    setTimeout(() => {
+                        URL.revokeObjectURL(url);
+                    }, 1000);
                     
                     showSuccess(`변환 완료! ${a.download} 파일이 다운로드됩니다.`);
                 }
                 
             } catch (error) {
                 console.error('변환 오류:', error);
-                showError(error.message || '변환 중 오류가 발생했습니다.');
+                
+                // 🔥 더 구체적인 에러 메시지 제공
+                let errorMessage = '변환 중 오류가 발생했습니다.';
+                
+                if (error.message.includes('Failed to fetch')) {
+                    errorMessage = '서버에 연결할 수 없습니다. 네트워크 연결을 확인해주세요.';
+                } else if (error.message.includes('비어있습니다')) {
+                    errorMessage = '문서를 로드하지 못했습니다. 파일이 손상되었거나 지원되지 않는 형식일 수 있습니다.';
+                } else if (error.message.includes('크기가 너무')) {
+                    errorMessage = error.message;
+                } else if (error.message) {
+                    errorMessage = error.message;
+                }
+                
+                showError(errorMessage);
             } finally {
                 // UI 복원
                 document.getElementById('convertBtn').disabled = false;

@@ -24,7 +24,8 @@ CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
     "https://77-tools.xyz",
     "https://www.77-tools.xyz",
-    "https://popular-77.vercel.app"
+    "https://popular-77.vercel.app",
+    "https://popular-77-xbqq.onrender.com"
 ], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"]}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -74,6 +75,10 @@ def send_download_memory(path: str, download_name: str, ctype: str):
         response = make_response(data)
         response.headers["Content-Type"] = ctype
         response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
+        response.headers["Content-Length"] = str(len(data))
+        response.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        response.headers["Pragma"] = "no-cache"
+        response.headers["Expires"] = "0"
         
         app.logger.info(f"파일 전송 완료: {download_name}")
         return response
