@@ -156,7 +156,7 @@ const DocxPdfPage: React.FC = () => {
 
       setConvertedFileName(filename);
       setConvertedFileUrl(URL.createObjectURL(blob));
-      setSuccessMessage('DOCX 파일이 성공적으로 PDF로 변환되었습니다!');
+      setSuccessMessage(`변환 완료! 파일명: ${filename}로 다운로드됩니다.`);
       setShowSuccessMessage(true);
       setConversionProgress(100);
 
@@ -285,15 +285,6 @@ const DocxPdfPage: React.FC = () => {
                     </svg>
                     <p className="text-green-800 font-medium">{successMessage}</p>
                   </div>
-                  {convertedFileUrl && (
-                    <a
-                      href={convertedFileUrl}
-                      download={convertedFileName}
-                      className="inline-block mt-2 text-green-600 hover:text-green-800 underline"
-                    >
-                      다시 다운로드
-                    </a>
-                  )}
                 </div>
               )}
 
