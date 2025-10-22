@@ -104,31 +104,79 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
     PDF → PPTX (페이지당 슬라이드 1장, 전체 이미지 맞춤)
     """
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
+        doc = None
         try:
-            doc = fitz.open(in_path)
+            # 파일 존재 여부 확인
+            if not os.path.exists(in_path):
+                raise FileNotFoundError(f"PDF 파일을 찾을 수 없습니다: {in_path}")
+            
+            # 파일 크기 확인
+            file_size = os.path.getsize(in_path)
+            if file_size == 0:
+                raise ValueError(f"PDF 파일이 비어있습니다: {in_path}")
+            
+            app.logger.info(f"PDF 파일 로딩 시작: {in_path} ({file_size} bytes)")
+            
+            # PDF 파일 열기 시도
+            try:
+                doc = fitz.open(in_path)
+            except Exception as pdf_error:
+                app.logger.error(f"PDF 파일 열기 실패: {str(pdf_error)}")
+                raise ValueError(f"PDF 문서를 로드하지 못했습니다. 파일이 손상되었거나 유효하지 않은 PDF 형식일 수 있습니다: {str(pdf_error)}")
+            
+            # PDF 문서 유효성 검증
+            if doc is None:
+                raise ValueError("PDF 문서 객체가 None입니다")
+            
+            if doc.is_closed:
+                raise ValueError("PDF 문서가 이미 닫혀있습니다")
+            
+            page_count = doc.page_count
+            if page_count == 0:
+                raise ValueError("PDF 문서에 페이지가 없습니다")
+            
+            app.logger.info(f"PDF 문서 로딩 성공: {page_count}페이지")
+            
             mat = fitz.Matrix(scale, scale)
             prs = Presentation()
             
             # 첫 페이지 이미지 크기에 맞춰 슬라이드 크기(EMU) 설정
-            first = doc.load_page(0)
-            pix0 = first.get_pixmap(matrix=mat, alpha=False)
-            # 1 px ≈ 9525 EMU
-            prs.slide_width = Emu(pix0.width * 9525)
-            prs.slide_height = Emu(pix0.height * 9525)
+            try:
+                first = doc.load_page(0)
+                pix0 = first.get_pixmap(matrix=mat, alpha=False)
+                # 1 px ≈ 9525 EMU
+                prs.slide_width = Emu(pix0.width * 9525)
+                prs.slide_height = Emu(pix0.height * 9525)
+                app.logger.info(f"슬라이드 크기 설정: {pix0.width}x{pix0.height} px")
+            except Exception as page_error:
+                app.logger.error(f"첫 페이지 로딩 실패: {str(page_error)}")
+                raise ValueError(f"PDF 첫 페이지를 처리할 수 없습니다: {str(page_error)}")
 
-            for i in range(doc.page_count):
-                # job_id가 있을 때만 progress 업데이트 (비동기식에서만)
-                if job_id:
-                    set_progress(job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
-                page = doc.load_page(i)
-                pix = page.get_pixmap(matrix=mat, alpha=False)
-                img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-                pix.save(img_path)
+            for i in range(page_count):
+                try:
+                    # job_id가 있을 때만 progress 업데이트 (비동기식에서만)
+                    if job_id:
+                        set_progress(job_id, 10 + int(80 * (i + 1) / page_count), f"페이지 {i+1}/{page_count} 처리 중")
+                    
+                    page = doc.load_page(i)
+                    pix = page.get_pixmap(matrix=mat, alpha=False)
+                    img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
+                    pix.save(img_path)
+                    
+                    # 이미지 파일 생성 확인
+                    if not os.path.exists(img_path):
+                        raise ValueError(f"페이지 {i+1} 이미지 생성 실패: {img_path}")
 
-                blank = prs.slide_layouts[6]  # Blank
-                slide = prs.slides.add_slide(blank)
-                # 전체 채우기
-                slide.shapes.add_picture(img_path, Emu(0), Emu(0), width=prs.slide_width, height=prs.slide_height)
+                    blank = prs.slide_layouts[6]  # Blank
+                    slide = prs.slides.add_slide(blank)
+                    # 전체 채우기
+                    slide.shapes.add_picture(img_path, Emu(0), Emu(0), width=prs.slide_width, height=prs.slide_height)
+                    
+                    app.logger.debug(f"페이지 {i+1}/{page_count} 처리 완료")
+                    
+                except Exception as page_error:
+                    app.logger.error(f"페이지 {i+1} 처리 실패: {str(page_error)}")
+                    raise ValueError(f"페이지 {i+1} 처리 중 오류가 발생했습니다: {str(page_error)}")
 
             final_name = f"{base_name}.pptx"
             final_path = os.path.join(OUTPUTS_DIR, final_name)
@@ -136,7 +184,12 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
                 os.remove(final_path)
             
             # PPTX 파일 저장
-            prs.save(final_path)
+            try:
+                prs.save(final_path)
+                app.logger.info(f"PPTX 파일 저장 완료: {final_path}")
+            except Exception as save_error:
+                app.logger.error(f"PPTX 파일 저장 실패: {str(save_error)}")
+                raise ValueError(f"PPTX 파일 저장 중 오류가 발생했습니다: {str(save_error)}")
             
             # 파일이 제대로 생성되었는지 확인
             if not os.path.exists(final_path):
@@ -149,12 +202,22 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
             app.logger.info(f"PPTX 변환 완료: {final_name} ({file_size} bytes)")
             return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
             
+        except FileNotFoundError as e:
+            app.logger.error(f"파일 없음 오류: {str(e)}")
+            raise Exception(f"파일을 찾을 수 없습니다: {str(e)}")
+        except ValueError as e:
+            app.logger.error(f"PDF 처리 오류: {str(e)}")
+            raise Exception(str(e))
         except Exception as e:
             app.logger.error(f"PPTX 변환 오류: {str(e)}")
             raise Exception(f"PPTX 변환 실패: {str(e)}")
         finally:
-            if 'doc' in locals():
-                doc.close()
+            if doc is not None and not doc.is_closed:
+                try:
+                    doc.close()
+                    app.logger.debug("PDF 문서 닫기 완료")
+                except Exception as close_error:
+                    app.logger.warning(f"PDF 문서 닫기 실패: {str(close_error)}")
 
 @app.get("/")
 def index():
