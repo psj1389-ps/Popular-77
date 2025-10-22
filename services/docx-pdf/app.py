@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, render_template
+from flask import Flask, request, jsonify, send_file, render_template, make_response
 from flask_cors import CORS
 from dotenv import load_dotenv
 import os, io, sys, logging, tempfile, shutil, subprocess, shlex
@@ -198,7 +198,10 @@ def index():
         "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "100"),
         "service": "docx-pdf"
     }
-    return render_template("index.html", page=page)
+    resp = make_response(render_template("index.html", page=page))
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 
 @app.get("/health")
@@ -216,6 +219,7 @@ def health():
         lo_ver = f"unavailable: {e}"
     
     return {
+        "service": "docx-pdf",
         "python": sys.version,
         "libreoffice": lo_ver,
         "allowed_exts": sorted(list(ALLOWED_EXTS))

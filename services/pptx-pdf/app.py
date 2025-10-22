@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, send_from_directory, abort, render_template
+from flask import Flask, request, jsonify, send_file, send_from_directory, abort, render_template, make_response
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
 import io, os, urllib.parse, tempfile, shutil, errno, logging
@@ -190,7 +190,10 @@ def index():
         "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "100"),
         "service": "pptx-pdf"
     }
-    return render_template("index.html", page=page)
+    resp = make_response(render_template("index.html", page=page))
+    resp.headers["Cache-Control"] = "no-store"
+    resp.headers["Pragma"] = "no-cache"
+    return resp
 
 @app.route("/<path:path>")
 def spa(path):
@@ -204,7 +207,10 @@ def spa(path):
 
 @app.route("/health", methods=["GET"])
 def health():
-    return "ok", 200
+    return {
+        "service": "pptx-pdf",
+        "status": "ok"
+    }, 200
 
 @app.route("/convert-async", methods=["POST"])
 def convert_async():
