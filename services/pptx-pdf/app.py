@@ -14,6 +14,9 @@ ALLOWED_EXTS = {".pptx", ".ppt", ".odp"}
 app = Flask(__name__, template_folder="templates", static_folder="static")
 logging.basicConfig(level=logging.INFO)
 
+# 프로덕션 설정
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
+
 # 요청 로깅 추가
 @app.before_request
 def _trace():
@@ -103,27 +106,32 @@ def safe_move(src: str, dst: str):
             raise
 
 def perform_libreoffice(in_path: str, out_pdf_path: str):
-    import shlex, subprocess, os, shutil
+    import shlex, subprocess, shutil, os
     soffice = shutil.which("soffice") or shutil.which("libreoffice")
-    if not soffice:
-        raise RuntimeError("LibreOffice (soffice) not found")
+    if not soffice: 
+        raise RuntimeError("LibreOffice not found")
+    
     outdir = os.path.dirname(out_pdf_path)
     os.makedirs(outdir, exist_ok=True)
+    
     ext = os.path.splitext(in_path)[1].lower()
-    filter_map = {
+    filters = {
         ".ppt": "impress_pdf_Export", ".pptx": "impress_pdf_Export",
-        ".xls": "calc_pdf_Export", ".xlsx": "calc_pdf_Export",
-        ".doc": "writer_pdf_Export", ".docx": "writer_pdf_Export",
+        ".xls": "calc_pdf_Export", ".xlsx": "calc_pdf_Export", 
+        ".doc": "writer_pdf_Export", ".docx": "writer_pdf_Export"
     }
-    conv = f"pdf:{filter_map.get(ext, 'pdf')}"
+    conv = f"pdf:{filters.get(ext,'pdf')}"
+    
     cmd = f'{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to {conv} --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}'
     app.logger.info(f"[LO] cmd={cmd}")
-    proc = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
-    app.logger.info(f"[LO] rc={proc.returncode}, stdout={proc.stdout.decode('utf-8','ignore')[:200]}")
-    if proc.returncode != 0:
-        raise RuntimeError(proc.stderr.decode("utf-8","ignore"))
-    base = os.path.splitext(os.path.basename(in_path))[0]
-    produced = os.path.join(outdir, f"{base}.pdf")
+    
+    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    app.logger.info(f"[LO] rc={p.returncode}, out={p.stdout.decode('utf-8','ignore')[:200]}")
+    
+    if p.returncode != 0:
+        raise RuntimeError(p.stderr.decode("utf-8","ignore"))
+    
+    produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
     if not os.path.exists(produced):
         raise RuntimeError(f"PDF not produced: {produced}")
     
@@ -407,7 +415,8 @@ def convert_sync():
 
     jid = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
-    out_name = os.path.splitext(os.path.basename(name))[0] + ".pdf"
+    base = safe_base_name(name)
+    out_name = base + ".pdf"
     tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
     final_out = os.path.join(OUTPUTS_DIR, out_name)
 
@@ -416,20 +425,21 @@ def convert_sync():
     try:
         perform_libreoffice(in_path, tmp_out)
         if not _is_pdf(tmp_out):
-            raise RuntimeError("Output is not a valid PDF (magic mismatch)")
+            raise RuntimeError("Output is not a valid PDF")
         if tmp_out != final_out:
             if os.path.exists(final_out): os.remove(final_out)
             os.replace(tmp_out, final_out)
-        with open(final_out, "rb") as rf:
-            data = rf.read()
+        
+        # 스트리밍으로 바로 내보내기(메모리 절약)
+        size = os.path.getsize(final_out)
         resp = send_file(
-            io.BytesIO(data),
+            final_out,
             as_attachment=True,
             download_name=out_name, # 파일명 .pdf 강제
-            mimetype="application/pdf", # 컨텐츠타입 .pdf 강제
+            mimetype="application/pdf",
+            conditional=False
         )
-        resp.direct_passthrough = False
-        resp.headers["Content-Length"] = str(len(data))
+        resp.headers["Content-Length"] = str(size)
         resp.headers["Cache-Control"] = "no-store"
         return resp
 
