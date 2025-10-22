@@ -7,6 +7,9 @@ from concurrent.futures import ThreadPoolExecutor
 import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
+from urllib.parse import quote
+import unicodedata
+from threading import Semaphore
 
 # LibreOffice 기반 변환 사용
 ALLOWED_EXTS = {".pptx", ".ppt", ".odp"}
@@ -16,6 +19,9 @@ logging.basicConfig(level=logging.INFO)
 
 # 프로덕션 설정
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
+
+# 동시성 제어 세마포어
+SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
 
 # 요청 로깅 추가
 @app.before_request
@@ -39,6 +45,21 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
+
+def ascii_fallback(name: str) -> str:
+    """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
+    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
+    # 따옴표/세미콜론 등 위험 문자 제거
+    return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
+
+def _set_pdf_disposition(resp, pdf_name: str):
+    """RFC 5987 + ASCII fallback으로 Content-Disposition 헤더 설정"""
+    ascii_name = ascii_fallback(pdf_name)
+    resp.headers["Content-Disposition"] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(pdf_name)}'
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -296,17 +317,12 @@ def health():
     if soffice:
         v = subprocess.run([soffice, "--version"], capture_output=True, text=True)
         lo_ver = (v.stdout or v.stderr or "").strip()
-    try:
-        from importlib.metadata import version
-        sdk_ver = version("pdfservices-sdk")
-    except Exception:
-        sdk_ver = None
     return {
         "service": "pptx-pdf",
         "engine": "libreoffice",
         "soffice_path": soffice,
         "libreoffice": lo_ver,
-        "pdfservices_sdk": sdk_ver,  # 반드시 null
+        "pdfservices_sdk": None,  # Adobe 완전 제거 확인
         "allowed_exts": sorted(list(ALLOWED_EXTS)),
         "python": sys.version,
     }
@@ -404,52 +420,55 @@ def job_download(job_id):
 @app.post("/upload")
 @app.post("/convert")
 def convert_sync():
-    f = request.files.get("file") or request.files.get("document")
-    if not f:
-        return jsonify({"error": "file field is required"}), 400
-
-    name = f.filename or "input.pptx"
-    ext = os.path.splitext(name)[1].lower()
-    if ext not in ALLOWED_EXTS:
-        return jsonify({"error": f"unsupported extension: {ext}"}), 415
-
-    jid = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
-    base = safe_base_name(name)
-    out_name = base + ".pdf"
-    tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
-    final_out = os.path.join(OUTPUTS_DIR, out_name)
-
-    f.save(in_path)
-
+    # 세마포어로 동시성 제어
+    if not SEMA.acquire(timeout=float(os.getenv("QUEUE_TIMEOUT", "0"))):
+        return jsonify({"error": "busy"}), 503
+    
     try:
-        perform_libreoffice(in_path, tmp_out)
-        if not _is_pdf(tmp_out):
-            raise RuntimeError("Output is not a valid PDF")
-        if tmp_out != final_out:
-            if os.path.exists(final_out): os.remove(final_out)
-            os.replace(tmp_out, final_out)
-        
-        # 스트리밍으로 바로 내보내기(메모리 절약)
-        size = os.path.getsize(final_out)
-        resp = send_file(
-            final_out,
-            as_attachment=True,
-            download_name=out_name, # 파일명 .pdf 강제
-            mimetype="application/pdf",
-            conditional=False
-        )
-        resp.headers["Content-Length"] = str(size)
-        resp.headers["Cache-Control"] = "no-store"
-        return resp
+        f = request.files.get("file") or request.files.get("document")
+        if not f:
+            return jsonify({"error": "file field is required"}), 400
 
-    except Exception as e:
-        app.logger.exception("conversion failed")
-        return jsonify({"error": str(e)}), 500
+        in_name = f.filename or "input.pptx"  # 서비스별 기본값
+        base, ext = os.path.splitext(os.path.basename(in_name))
+        ext = ext.lower()
+        if ext not in ALLOWED_EXTS:
+            return jsonify({"error": f"unsupported extension: {ext}"}), 415
 
+        jid = uuid4().hex
+        in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
+        out_name = f"{base}.pdf"
+        tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+        final_out = os.path.join(OUTPUTS_DIR, out_name)
+
+        f.save(in_path)
+        try:
+            perform_libreoffice(in_path, tmp_out)
+            if not _is_pdf(tmp_out):
+                raise RuntimeError("Output is not a valid PDF")
+            if tmp_out != final_out:
+                if os.path.exists(final_out): os.remove(final_out)
+                os.replace(tmp_out, final_out)
+
+            size = os.path.getsize(final_out)
+            # 스트리밍으로 직접 전송(메모리 절약)
+            resp = send_file(
+                final_out,
+                as_attachment=True,
+                download_name=out_name,         # 기본 파일명(추가로 아래에서 RFC5987 설정)
+                mimetype="application/pdf",
+                conditional=False
+            )
+            resp.headers["Content-Length"] = str(size)
+            return _set_pdf_disposition(resp, out_name)
+        except Exception as e:
+            app.logger.exception("conversion failed")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            try: os.remove(in_path)
+            except: pass
     finally:
-        try: os.remove(in_path)
-        except: pass
+        SEMA.release()
 
 # /api aliases (frontend uses /api paths only)
 @app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])

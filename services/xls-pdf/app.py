@@ -12,6 +12,9 @@ from openpyxl.styles import Font, Alignment
 from openpyxl.utils import get_column_letter
 from typing import Optional
 import re
+from urllib.parse import quote
+import unicodedata
+from threading import Semaphore
 
 # Adobe PDF Services SDK imports - v4.2.0 compatible
 ADOBE_AVAILABLE = False
@@ -33,6 +36,13 @@ except ImportError as e:
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 logging.basicConfig(level=logging.INFO)
+
+# 프로덕션 설정
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
+
+# 동시성 제어 세마포어
+SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
+
 CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
     "https://77-tools.xyz",
@@ -49,6 +59,21 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 executor = ThreadPoolExecutor(max_workers=2)
 JOBS = {}
 current_job_id: Optional[str] = None
+
+def ascii_fallback(name: str) -> str:
+    """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
+    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
+    # 따옴표/세미콜론 등 위험 문자 제거
+    return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
+
+def _set_pdf_disposition(resp, pdf_name: str):
+    """RFC 5987 + ASCII fallback으로 Content-Disposition 헤더 설정"""
+    ascii_name = ascii_fallback(pdf_name)
+    resp.headers["Content-Disposition"] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(pdf_name)}'
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
 
 def safe_base_name(filename: str) -> str:
     base = os.path.splitext(os.path.basename(filename or "output"))[0]
@@ -445,8 +470,20 @@ def index():
 
 @app.get("/health")
 def health():
+    import sys, shutil, subprocess
+    soffice = shutil.which("soffice") or shutil.which("libreoffice")
+    lo_ver = "not_found"
+    if soffice:
+        v = subprocess.run([soffice, "--version"], capture_output=True, text=True)
+        lo_ver = (v.stdout or v.stderr or "").strip()
+    
     return {
         "service": "xls-pdf",
+        "engine": "libreoffice",
+        "soffice_path": soffice,
+        "libreoffice": lo_ver,
+        "pdfservices_sdk": None,  # Adobe 완전 제거 확인
+        "python": sys.version,
         "status": "ok"
     }, 200
 
@@ -554,110 +591,75 @@ def _api_job_download(job_id):
 @app.post("/convert")
 def convert_sync():
     """동기 변환 API - XLS/XLSX to PDF"""
-    f = request.files.get("file") or request.files.get("xlsFile")
-    if not f:
-        return jsonify({"error":"파일이 없습니다"}), 400
-
-    name = f.filename or "input.xlsx"
-    if name == '':
-        return jsonify({"error":"파일이 선택되지 않았습니다"}), 400
-    
-    ext = os.path.splitext(name)[1].lower()
-    
-    # XLS/XLSX 파일을 PDF로 변환하는 서비스로 변경
-    ALLOWED_EXTS = {".xls", ".xlsx"}
-    if ext not in ALLOWED_EXTS:
-        return jsonify({"error": "XLS 또는 XLSX 파일만 업로드 가능합니다"}), 415
-
-    job_id = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{job_id}{ext}")
-    out_name = os.path.splitext(os.path.basename(name))[0] + ".pdf"
-    out_path = os.path.join(OUTPUTS_DIR, f"{job_id}.pdf")
-    final_path = os.path.join(OUTPUTS_DIR, out_name)
-
-    app.logger.info(f"Starting XLS to PDF conversion: {name} -> {out_name}")
-    app.logger.info(f"Input path: {in_path}")
-    app.logger.info(f"Output path: {out_path}")
-    app.logger.info(f"Final path: {final_path}")
-
-    try:
-        f.save(in_path)
-        app.logger.info(f"File saved successfully: {in_path}")
-    except Exception as e:
-        app.logger.error(f"Failed to save input file: {e}")
-        return jsonify({"error": f"Failed to save input file: {str(e)}"}), 500
-    
-    # LibreOffice 변환 시도
-    conversion_success = False
-    error_messages = []
+    # 세마포어로 동시성 제어
+    if not SEMA.acquire(timeout=float(os.getenv("QUEUE_TIMEOUT", "0"))):
+        return jsonify({"error": "busy"}), 503
     
     try:
-        app.logger.info("Attempting conversion with LibreOffice...")
-        result = perform_xls_to_pdf_libreoffice(in_path, OUTPUTS_DIR)
+        f = request.files.get("file") or request.files.get("xlsFile")
+        if not f:
+            return jsonify({"error":"파일이 없습니다"}), 400
+
+        in_name = f.filename or "input.xlsx"  # 서비스별 기본값
+        if in_name == '':
+            return jsonify({"error":"파일이 선택되지 않았습니다"}), 400
         
-        if result:
-            # result is the path to the created PDF file
-            app.logger.info(f"LibreOffice conversion successful - output file: {result}")
-            conversion_success = True
+        base, ext = os.path.splitext(os.path.basename(in_name))
+        ext = ext.lower()
+        
+        # XLS/XLSX 파일을 PDF로 변환하는 서비스로 변경
+        ALLOWED_EXTS = {".xls", ".xlsx"}
+        if ext not in ALLOWED_EXTS:
+            return jsonify({"error": "XLS 또는 XLSX 파일만 업로드 가능합니다"}), 415
+
+        job_id = uuid4().hex
+        in_path = os.path.join(UPLOADS_DIR, f"{job_id}{ext}")
+        out_name = f"{base}.pdf"
+        tmp_out = os.path.join(OUTPUTS_DIR, f"{job_id}.pdf")
+        final_out = os.path.join(OUTPUTS_DIR, out_name)
+
+        f.save(in_path)
+        try:
+            app.logger.info("Attempting conversion with LibreOffice...")
+            result = perform_xls_to_pdf_libreoffice(in_path, OUTPUTS_DIR)
+            
+            if not result:
+                raise RuntimeError("LibreOffice conversion failed - no output file created")
             
             # Move the file to the expected output path
-            if result != out_path:
-                if os.path.exists(out_path):
-                    os.remove(out_path)
-                os.replace(result, out_path)
-                app.logger.info(f"Moved output from {result} to {out_path}")
-        else:
-            app.logger.error("LibreOffice conversion failed - no output file created")
-            error_messages.append("LibreOffice: No output file created")
+            if result != tmp_out:
+                if os.path.exists(tmp_out):
+                    os.remove(tmp_out)
+                os.replace(result, tmp_out)
             
-    except Exception as e:
-        app.logger.error(f"LibreOffice conversion failed with exception: {e}")
-        error_messages.append(f"LibreOffice: {str(e)}")
-    
-    # 변환 실패 시 오류 반환
-    if not conversion_success:
-        app.logger.error("All conversion methods failed")
-        # 입력 파일 정리
-        try:
-            os.remove(in_path)
-        except Exception:
-            pass
-        return jsonify({
-            "error": "PDF conversion failed with all available methods",
-            "details": error_messages
-        }), 500
-    
-    # 파일 이동 및 최종 처리
-    try:
-        app.logger.info(f"Moving output file from {out_path} to {final_path}")
-        
-        if out_path != final_path:
-            if os.path.exists(final_path):
-                os.remove(final_path)
-                app.logger.info(f"Removed existing final file: {final_path}")
-            os.replace(out_path, final_path)
-            app.logger.info(f"Moved to final path: {final_path}")
-    except Exception as e:
-        app.logger.error(f"Failed to move output file: {e}")
-        # 원본 파일이 있다면 그것을 사용
-        if os.path.exists(out_path):
-            final_path = out_path
-        else:
-            # 입력 파일 정리
-            try:
-                os.remove(in_path)
-            except Exception:
-                pass
-            return jsonify({"error": f"Failed to finalize output file: {str(e)}"}), 500
+            # PDF 유효성 검사 (간단한 시그니처 체크)
+            with open(tmp_out, 'rb') as f_check:
+                if not f_check.read(4).startswith(b'%PDF'):
+                    raise RuntimeError("Output is not a valid PDF")
+            
+            if tmp_out != final_out:
+                if os.path.exists(final_out): os.remove(final_out)
+                os.replace(tmp_out, final_out)
+
+            size = os.path.getsize(final_out)
+            # 스트리밍으로 직접 전송(메모리 절약)
+            resp = send_file(
+                final_out,
+                as_attachment=True,
+                download_name=out_name,         # 기본 파일명(추가로 아래에서 RFC5987 설정)
+                mimetype="application/pdf",
+                conditional=False
+            )
+            resp.headers["Content-Length"] = str(size)
+            return _set_pdf_disposition(resp, out_name)
+        except Exception as e:
+            app.logger.exception("conversion failed")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            try: os.remove(in_path)
+            except: pass
     finally:
-        # 입력 파일 정리
-        try:
-            os.remove(in_path)
-        except Exception:
-            pass
-    
-    ctype = "application/pdf"
-    return send_download_memory(final_path, out_name, ctype)
+        SEMA.release()
 
 @app.post("/api/pdf-xls/convert")
 def _alias_convert_sync():

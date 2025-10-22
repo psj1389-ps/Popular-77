@@ -5,6 +5,8 @@ import os, io, sys, logging, tempfile, shutil, subprocess, shlex
 import shutil as _sh
 from uuid import uuid4
 from urllib.parse import quote
+import unicodedata
+from threading import Semaphore
 
 # Adobe API 비활성화 (LibreOffice 전용)
 ADOBE_SDK_AVAILABLE = False
@@ -12,6 +14,13 @@ ADOBE_SDK_AVAILABLE = False
 load_dotenv()
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, template_folder="templates", static_folder="static")
+
+# 프로덕션 설정
+app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
+
+# 동시성 제어 세마포어
+SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
+
 CORS(app, resources={r"/*": {"origins": ["*", "https://77-tools.xyz", "http://localhost:*", "http://127.0.0.1:*"]}}, expose_headers=["Content-Disposition"], supports_credentials=True)
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
@@ -22,6 +31,28 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 ALLOWED_EXTS = {".doc", ".docx", ".pdf"}
 
+def ascii_fallback(name: str) -> str:
+    """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
+    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
+    # 따옴표/세미콜론 등 위험 문자 제거
+    return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
+
+def _set_pdf_disposition(resp, pdf_name: str):
+    """RFC 5987 + ASCII fallback으로 Content-Disposition 헤더 설정"""
+    ascii_name = ascii_fallback(pdf_name)
+    resp.headers["Content-Disposition"] = (
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(pdf_name)}'
+    )
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+def _is_pdf(path: str) -> bool:
+    """PDF 파일 시그니처 검증"""
+    try:
+        with open(path, 'rb') as f:
+            return f.read(4) == b'%PDF'
+    except:
+        return False
 
 def _send_download(path: str, download_name: str):
     if not os.path.exists(path):
@@ -220,6 +251,9 @@ def health():
     
     return {
         "service": "docx-pdf",
+        "engine": "libreoffice",
+        "soffice_path": _find_soffice(),
+        "pdfservices_sdk": None,  # Adobe 완전 제거 확인
         "python": sys.version,
         "libreoffice": lo_ver,
         "allowed_exts": sorted(list(ALLOWED_EXTS))
@@ -229,107 +263,71 @@ def health():
 @app.post("/upload")
 @app.post("/convert")
 def convert_sync():
-    f = request.files.get("file") or request.files.get("document")
-    if not f:
-        return jsonify({"error": "파일이 없습니다"}), 400
-
-    name = f.filename or "input.docx"
-    if name == '':
-        return jsonify({"error": "파일이 선택되지 않았습니다"}), 400
+    # 세마포어를 이용한 동시성 제어
+    if not SEMA.acquire(timeout=float(os.getenv("QUEUE_TIMEOUT", "0"))):
+        return jsonify({"error": "busy"}), 503
     
-    ext = os.path.splitext(name)[1].lower()
-    if ext not in ALLOWED_EXTS:
-        return jsonify({"error": f"지원하지 않는 파일 형식입니다: {ext}. DOC, DOCX, PDF 파일만 업로드 가능합니다"}), 415
-
-    jid = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
-    out_name = os.path.splitext(os.path.basename(name))[0] + ".pdf"
-    out_path = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
-    final_path = os.path.join(OUTPUTS_DIR, out_name)
-
-    app.logger.info(f"Starting conversion: {name} -> {out_name}")
-    app.logger.info(f"Input path: {in_path}")
-    app.logger.info(f"Output path: {out_path}")
-    app.logger.info(f"Final path: {final_path}")
-
     try:
+        f = request.files.get("file") or request.files.get("document")
+        if not f:
+            return jsonify({"error": "file field is required"}), 400
+
+        in_name = f.filename or "input.docx"  # 서비스별 기본값
+        base, ext = os.path.splitext(os.path.basename(in_name))
+        ext = ext.lower()
+        if ext not in ALLOWED_EXTS:
+            return jsonify({"error": f"unsupported extension: {ext}"}), 415
+
+        jid = uuid4().hex
+        in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
+        out_name = f"{base}.pdf"
+        tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+        final_out = os.path.join(OUTPUTS_DIR, out_name)
+
         f.save(in_path)
-        app.logger.info(f"File saved successfully: {in_path}")
-    except Exception as e:
-        app.logger.error(f"Failed to save input file: {e}")
-        return jsonify({"error": f"Failed to save input file: {str(e)}"}), 500
-    
-    # LibreOffice 변환 시도
-    conversion_success = False
-    error_messages = []
-    
-    try:
-        app.logger.info("Attempting conversion with LibreOffice...")
-        result = perform_createpdf_libreoffice(in_path, OUTPUTS_DIR)
-        
-        if result:
-            # result is the path to the created PDF file
-            app.logger.info(f"LibreOffice conversion successful - output file: {result}")
-            conversion_success = True
-            
-            # Move the file to the expected output path
-            if result != out_path:
-                if os.path.exists(out_path):
-                    os.remove(out_path)
-                os.replace(result, out_path)
-                app.logger.info(f"Moved output from {result} to {out_path}")
-        else:
-            app.logger.error("LibreOffice conversion failed - no output file created")
-            error_messages.append("LibreOffice: No output file created")
-            
-    except Exception as e:
-        app.logger.error(f"LibreOffice conversion failed with exception: {e}")
-        error_messages.append(f"LibreOffice: {str(e)}")
-    
-    # 변환 실패 시 오류 반환
-    if not conversion_success:
-        app.logger.error("All conversion methods failed")
-        # 입력 파일 정리
         try:
-            os.remove(in_path)
-        except Exception:
-            pass
-        return jsonify({
-            "error": "PDF conversion failed with all available methods",
-            "details": error_messages
-        }), 500
-    
-    # 파일 이동 및 최종 처리
-    try:
-        app.logger.info(f"Moving output file from {out_path} to {final_path}")
-        
-        if out_path != final_path:
-            if os.path.exists(final_path):
-                os.remove(final_path)
-                app.logger.info(f"Removed existing final file: {final_path}")
-            os.replace(out_path, final_path)
-            app.logger.info(f"Successfully moved output file to: {final_path}")
-        
-        # 최종 파일 존재 및 크기 확인
-        if not os.path.exists(final_path) or os.path.getsize(final_path) == 0:
-            app.logger.error(f"Final output file is missing or empty: {final_path}")
-            return jsonify({"error": "Final output file processing failed"}), 500
+            # LibreOffice를 이용한 PDF 변환
+            result = perform_createpdf_libreoffice(in_path, OUTPUTS_DIR)
+            if not result:
+                raise RuntimeError("LibreOffice conversion failed")
             
-        app.logger.info(f"Conversion completed successfully - final file: {final_path} (size: {os.path.getsize(final_path)} bytes)")
-        
-    except Exception as e:
-        app.logger.error(f"Failed to move output file: {e}")
-        return jsonify({"error": f"File processing error: {str(e)}"}), 500
-    finally:
-        # 입력 파일 정리
-        try:
-            if os.path.exists(in_path):
-                os.remove(in_path)
-                app.logger.info(f"Cleaned up input file: {in_path}")
-        except Exception as e:
-            app.logger.warning(f"Failed to clean up input file: {e}")
+            # 결과 파일을 tmp_out으로 이동
+            if result != tmp_out:
+                if os.path.exists(tmp_out):
+                    os.remove(tmp_out)
+                os.replace(result, tmp_out)
+            
+            # PDF 유효성 검사
+            if not _is_pdf(tmp_out):
+                raise RuntimeError("Output is not a valid PDF")
+            
+            # 최종 파일명으로 이동
+            if tmp_out != final_out:
+                if os.path.exists(final_out):
+                    os.remove(final_out)
+                os.replace(tmp_out, final_out)
 
-    return _send_download(final_path, out_name)
+            size = os.path.getsize(final_out)
+            # 스트리밍으로 직접 전송(메모리 절약)
+            resp = send_file(
+                final_out,
+                as_attachment=True,
+                download_name=out_name,         # 기본 파일명(추가로 아래에서 RFC5987 설정)
+                mimetype="application/pdf",
+                conditional=False
+            )
+            resp.headers["Content-Length"] = str(size)
+            return _set_pdf_disposition(resp, out_name)
+        except Exception as e:
+            app.logger.exception("conversion failed")
+            return jsonify({"error": str(e)}), 500
+        finally:
+            try:
+                os.remove(in_path)
+            except:
+                pass
+    finally:
+        SEMA.release()
 
 
 @app.get("/index.html")
