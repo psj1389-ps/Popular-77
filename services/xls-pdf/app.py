@@ -317,56 +317,115 @@ def extract_text_to_excel(page, ws):
         adjusted_width = min(max_length + 2, 50)  # 최대 50자로 제한
         ws.column_dimensions[column_letter].width = adjusted_width
 
-def perform_xlsx_conversion(in_path: str, base_name: str, scale: float = 1.0):
-    """
-    PDF → XLSX (텍스트 추출 우선, 필요시 이미지 폴백)
-    """
-    with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
-        doc = fitz.open(in_path)
-        mat = fitz.Matrix(scale, scale)
-        wb = Workbook()
-        # openpyxl 기본 시트를 첫 페이지로 사용, 나머지는 추가
-        first_sheet = True
+def perform_xls_to_pdf_libreoffice(input_path, output_dir, timeout=120):
+    """Convert XLS/XLSX to PDF using LibreOffice with enhanced error handling"""
+    try:
+        soffice_path = _find_soffice()
+        app.logger.info(f"Using LibreOffice at: {soffice_path}")
+        
+        # Ensure output directory exists
+        os.makedirs(output_dir, exist_ok=True)
+        
+        # Build command with proper escaping
+        cmd = [
+            soffice_path,
+            '--headless',
+            '--nologo',
+            '--nofirststartwizard',
+            '--convert-to', 'pdf',
+            '--outdir', output_dir,
+            input_path
+        ]
+        
+        app.logger.info(f"Running LibreOffice command: {' '.join(repr(arg) for arg in cmd)}")
+        
+        # Set environment variables for better compatibility
+        env = os.environ.copy()
+        env['HOME'] = '/tmp'  # Set HOME for headless operation
+        env['TMPDIR'] = '/tmp'
+        
+        # Run LibreOffice conversion
+        result = subprocess.run(
+            cmd,
+            capture_output=True,
+            text=True,
+            timeout=timeout,
+            env=env,
+            cwd=output_dir  # Set working directory to output directory
+        )
+        
+        app.logger.info(f"LibreOffice stdout: {result.stdout}")
+        if result.stderr:
+            app.logger.warning(f"LibreOffice stderr: {result.stderr}")
+        
+        if result.returncode != 0:
+            app.logger.error(f"LibreOffice failed with return code {result.returncode}")
+            app.logger.error(f"Command: {' '.join(cmd)}")
+            app.logger.error(f"Stdout: {result.stdout}")
+            app.logger.error(f"Stderr: {result.stderr}")
+            return False
+        
+        # Check if output file was created
+        input_filename = os.path.basename(input_path)
+        name_without_ext = os.path.splitext(input_filename)[0]
+        expected_output = os.path.join(output_dir, f"{name_without_ext}.pdf")
+        
+        if os.path.exists(expected_output):
+            file_size = os.path.getsize(expected_output)
+            app.logger.info(f"LibreOffice conversion successful - output file created: {expected_output} (size: {file_size} bytes)")
+            return expected_output
+        else:
+            app.logger.error(f"Expected output file not found: {expected_output}")
+            # List files in output directory for debugging
+            try:
+                files_in_output = os.listdir(output_dir)
+                app.logger.info(f"Files in output directory: {files_in_output}")
+            except Exception as e:
+                app.logger.error(f"Could not list output directory: {e}")
+            return False
+            
+    except subprocess.TimeoutExpired:
+        app.logger.error(f"LibreOffice conversion timed out after {timeout} seconds")
+        return False
+    except Exception as e:
+        app.logger.error(f"LibreOffice conversion failed with exception: {str(e)}")
+        app.logger.exception("Full exception details:")
+        return False
 
-        for i in range(doc.page_count):
-            set_progress(current_job_id, 10 + int(80 * (i + 1) / doc.page_count), f"페이지 {i+1}/{doc.page_count} 처리 중")
-            page = doc.load_page(i)
-            
-            if first_sheet:
-                ws = wb.active
-                ws.title = f"Page_{i+1:02d}"
-                first_sheet = False
-            else:
-                ws = wb.create_sheet(title=f"Page_{i+1:02d}")
-            
-            # 텍스트 추출 시도
-            if has_extractable_text(page):
-                try:
-                    extract_text_to_excel(page, ws)
-                    # 텍스트 추출 성공 시 다음 페이지로
-                    continue
-                except Exception as e:
-                    app.logger.warning(f"텍스트 추출 실패 (페이지 {i+1}): {e}")
-            
-            # 텍스트 추출 실패 시 이미지로 폴백
-            pix = page.get_pixmap(matrix=mat, alpha=False)
-            img_path = os.path.join(tmp, f"{base_name}_{i+1:02d}.png")
-            pix.save(img_path)
-            
-            # 기존 셀 내용 삭제 (텍스트 추출 실패한 경우)
-            for row in ws.iter_rows():
-                for cell in row:
-                    cell.value = None
-            
-            xlimg = XLImage(img_path)
-            ws.add_image(xlimg, "A1")
-
-        final_name = f"{base_name}.xlsx"
-        final_path = os.path.join(OUTPUTS_DIR, final_name)
-        if os.path.exists(final_path): 
-            os.remove(final_path)
-        wb.save(final_path)
-        return final_path, final_name, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+def _find_soffice():
+    """Find LibreOffice soffice binary"""
+    # Common paths where LibreOffice might be installed
+    possible_paths = [
+        "/usr/bin/soffice",
+        "/usr/lib/libreoffice/program/soffice",
+        "/opt/libreoffice*/program/soffice",
+        "/snap/libreoffice/current/lib/libreoffice/program/soffice"
+    ]
+    
+    for path in possible_paths:
+        if os.path.exists(path):
+            app.logger.info(f"Found soffice at predefined path: {path}")
+            return path
+        # Handle wildcard paths
+        if "*" in path:
+            import glob
+            matches = glob.glob(path)
+            if matches:
+                app.logger.info(f"Found soffice at wildcard path: {matches[0]}")
+                return matches[0]
+    
+    # Try to find using which command
+    try:
+        result = subprocess.run(['which', 'soffice'], capture_output=True, text=True)
+        if result.returncode == 0 and result.stdout.strip():
+            path = result.stdout.strip()
+            app.logger.info(f"Found soffice using 'which': {path}")
+            return path
+    except Exception as e:
+        app.logger.warning(f"Could not use 'which' to find soffice: {e}")
+    
+    app.logger.error("LibreOffice soffice binary not found")
+    return None
 
 @app.route("/")
 def index():
@@ -432,11 +491,16 @@ def convert_async():
                     app.logger.warning(f"Adobe SDK 변환 실패: {e}")
                     set_progress(job_id, 40, "Adobe SDK 실패 - 폴백 변환 중")
             
-            # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
-            set_progress(job_id, 50, "지능형 텍스트 추출 변환 중")
-            out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
-            JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
-                           "progress":100,"message":"지능형 텍스트 추출로 변환 완료 (각 페이지별 시트 생성)"}
+            # LibreOffice 변환 방식 (XLS/XLSX → PDF)
+            set_progress(job_id, 50, "LibreOffice로 PDF 변환 중")
+            out_path = perform_xls_to_pdf_libreoffice(in_path, OUTPUTS_DIR)
+            if out_path:
+                name = os.path.basename(out_path)
+                ctype = "application/pdf"
+                JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,
+                               "progress":100,"message":"LibreOffice로 PDF 변환 완료"}
+            else:
+                raise Exception("LibreOffice PDF 변환 실패")
         except Exception as e:
             app.logger.exception("convert error")
             JOBS[job_id] = {"status":"error","error":str(e),"progress":0,"message":"오류"}
@@ -488,47 +552,111 @@ def _api_job_download(job_id):
 @app.post("/upload")
 @app.post("/convert")
 def convert_sync():
-    f = request.files.get("file") or request.files.get("pdfFile")
+    """동기 변환 API - XLS/XLSX to PDF"""
+    f = request.files.get("file") or request.files.get("xlsFile")
     if not f:
-        return jsonify({"error":"file field is required"}), 400
+        return jsonify({"error":"파일이 없습니다"}), 400
 
-    base_name = safe_base_name(f.filename)
+    name = f.filename or "input.xlsx"
+    if name == '':
+        return jsonify({"error":"파일이 선택되지 않았습니다"}), 400
+    
+    ext = os.path.splitext(name)[1].lower()
+    
+    # XLS/XLSX 파일을 PDF로 변환하는 서비스로 변경
+    ALLOWED_EXTS = {".xls", ".xlsx"}
+    if ext not in ALLOWED_EXTS:
+        return jsonify({"error": "XLS 또는 XLSX 파일만 업로드 가능합니다"}), 415
+
     job_id = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
-    f.save(in_path)
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}{ext}")
+    out_name = os.path.splitext(os.path.basename(name))[0] + ".pdf"
+    out_path = os.path.join(OUTPUTS_DIR, f"{job_id}.pdf")
+    final_path = os.path.join(OUTPUTS_DIR, out_name)
 
-    quality = request.form.get("quality", "low")  # 수신만, 변환에는 사용하지 않음
-    def clamp_num(v, lo, hi, default, T=float):
-        try: 
-            x = T(v)
-        except: 
-            return default
-        return max(lo, min(hi, x))
-    scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
+    app.logger.info(f"Starting XLS to PDF conversion: {name} -> {out_name}")
+    app.logger.info(f"Input path: {in_path}")
+    app.logger.info(f"Output path: {out_path}")
+    app.logger.info(f"Final path: {final_path}")
 
     try:
-        # Adobe SDK 사용 가능하고 환경 변수가 설정된 경우에만 시도
-        if ADOBE_AVAILABLE:
-            try:
-                out_path, name, ctype = perform_xlsx_conversion_adobe_with_sheets(in_path, base_name)
-            except KeyError as e:
-                app.logger.warning(f"Adobe 자격 증명 누락: {e}")
-                # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
-                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
-            except Exception as e:
-                app.logger.warning(f"Adobe SDK 변환 실패: {e}")
-                # 폴백: 지능형 텍스트 추출 방식 (각 페이지를 별도 시트로 생성)
-                out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
+        f.save(in_path)
+        app.logger.info(f"File saved successfully: {in_path}")
+    except Exception as e:
+        app.logger.error(f"Failed to save input file: {e}")
+        return jsonify({"error": f"Failed to save input file: {str(e)}"}), 500
+    
+    # LibreOffice 변환 시도
+    conversion_success = False
+    error_messages = []
+    
+    try:
+        app.logger.info("Attempting conversion with LibreOffice...")
+        result = perform_xls_to_pdf_libreoffice(in_path, OUTPUTS_DIR)
+        
+        if result:
+            # result is the path to the created PDF file
+            app.logger.info(f"LibreOffice conversion successful - output file: {result}")
+            conversion_success = True
+            
+            # Move the file to the expected output path
+            if result != out_path:
+                if os.path.exists(out_path):
+                    os.remove(out_path)
+                os.replace(result, out_path)
+                app.logger.info(f"Moved output from {result} to {out_path}")
         else:
-            # 지능형 텍스트 추출 방식을 기본으로 사용 (각 페이지를 별도 시트로 생성)
-            out_path, name, ctype = perform_xlsx_conversion(in_path, base_name, scale=scale)
-    finally:
-        try: 
+            app.logger.error("LibreOffice conversion failed - no output file created")
+            error_messages.append("LibreOffice: No output file created")
+            
+    except Exception as e:
+        app.logger.error(f"LibreOffice conversion failed with exception: {e}")
+        error_messages.append(f"LibreOffice: {str(e)}")
+    
+    # 변환 실패 시 오류 반환
+    if not conversion_success:
+        app.logger.error("All conversion methods failed")
+        # 입력 파일 정리
+        try:
             os.remove(in_path)
-        except: 
+        except Exception:
+            pass
+        return jsonify({
+            "error": "PDF conversion failed with all available methods",
+            "details": error_messages
+        }), 500
+    
+    # 파일 이동 및 최종 처리
+    try:
+        app.logger.info(f"Moving output file from {out_path} to {final_path}")
+        
+        if out_path != final_path:
+            if os.path.exists(final_path):
+                os.remove(final_path)
+                app.logger.info(f"Removed existing final file: {final_path}")
+            os.replace(out_path, final_path)
+            app.logger.info(f"Moved to final path: {final_path}")
+    except Exception as e:
+        app.logger.error(f"Failed to move output file: {e}")
+        # 원본 파일이 있다면 그것을 사용
+        if os.path.exists(out_path):
+            final_path = out_path
+        else:
+            # 입력 파일 정리
+            try:
+                os.remove(in_path)
+            except Exception:
+                pass
+            return jsonify({"error": f"Failed to finalize output file: {str(e)}"}), 500
+    finally:
+        # 입력 파일 정리
+        try:
+            os.remove(in_path)
+        except Exception:
             pass
     
-    return send_download_memory(out_path, name, ctype)
+    ctype = "application/pdf"
+    return send_download_memory(final_path, out_name, ctype)
 
 @app.post("/api/pdf-xls/convert")
 def _alias_convert_sync():
@@ -552,5 +680,5 @@ def handle_any(e):
     return jsonify({"error": str(e)}), 500
 
 if __name__ == "__main__":
-    port = int(os.environ.get("PORT", 5000))
+    port = int(os.environ.get("PORT", 10000))
     app.run(host="0.0.0.0", port=port)

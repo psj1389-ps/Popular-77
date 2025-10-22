@@ -20,7 +20,7 @@ OUTPUTS_DIR = os.path.join(BASE_DIR, "outputs")
 os.makedirs(UPLOADS_DIR, exist_ok=True)
 os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
-ALLOWED_EXTS = {".doc", ".docx"}
+ALLOWED_EXTS = {".doc", ".docx", ".pdf"}
 
 
 def _send_download(path: str, download_name: str):
@@ -231,12 +231,15 @@ def health():
 def convert_sync():
     f = request.files.get("file") or request.files.get("document")
     if not f:
-        return jsonify({"error": "file field is required"}), 400
+        return jsonify({"error": "파일이 없습니다"}), 400
 
     name = f.filename or "input.docx"
+    if name == '':
+        return jsonify({"error": "파일이 선택되지 않았습니다"}), 400
+    
     ext = os.path.splitext(name)[1].lower()
     if ext not in ALLOWED_EXTS:
-        return jsonify({"error": f"unsupported extension: {ext}"}), 415
+        return jsonify({"error": f"지원하지 않는 파일 형식입니다: {ext}. DOC, DOCX, PDF 파일만 업로드 가능합니다"}), 415
 
     jid = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
