@@ -183,29 +183,29 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
                     app.logger.error(f"페이지 {i+1} 처리 실패: {str(page_error)}")
                     raise ValueError(f"페이지 {i+1} 처리 중 오류가 발생했습니다: {str(page_error)}")
 
-            final_name = f"{base_name}.pptx"
+            final_name = f"{base_name}.pdf"
             final_path = os.path.join(OUTPUTS_DIR, final_name)
             if os.path.exists(final_path): 
                 os.remove(final_path)
             
-            # PPTX 파일 저장
+            # PDF 파일 저장
             try:
                 prs.save(final_path)
-                app.logger.info(f"PPTX 파일 저장 완료: {final_path}")
+                app.logger.info(f"PDF 파일 저장 완료: {final_path}")
             except Exception as save_error:
-                app.logger.error(f"PPTX 파일 저장 실패: {str(save_error)}")
-                raise ValueError(f"PPTX 파일 저장 중 오류가 발생했습니다: {str(save_error)}")
+                app.logger.error(f"PDF 파일 저장 실패: {str(save_error)}")
+                raise ValueError(f"PDF 파일 저장 중 오류가 발생했습니다: {str(save_error)}")
             
             # 파일이 제대로 생성되었는지 확인
             if not os.path.exists(final_path):
-                raise Exception(f"PPTX 파일 생성 실패: {final_path}")
+                raise Exception(f"PDF 파일 생성 실패: {final_path}")
             
             file_size = os.path.getsize(final_path)
             if file_size == 0:
-                raise Exception(f"PPTX 파일이 비어있음: {final_path}")
+                raise Exception(f"PDF 파일이 비어있음: {final_path}")
             
-            app.logger.info(f"PPTX 변환 완료: {final_name} ({file_size} bytes)")
-            return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+            app.logger.info(f"PDF 변환 완료: {final_name} ({file_size} bytes)")
+            return final_path, final_name, "application/pdf"
             
         except FileNotFoundError as e:
             app.logger.error(f"파일 없음 오류: {str(e)}")
