@@ -166,8 +166,8 @@ temp/
 *.docx
 *.doc
 
-# Adobe SDK credentials
-pdc-services-sdk-credentials.json
+# Temporary files and credentials
+*.json
 
 # Backup folders
 backup/

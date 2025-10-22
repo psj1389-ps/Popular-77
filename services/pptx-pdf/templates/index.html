@@ -559,13 +559,14 @@
                         const downloadUrl = jsonData.download_url;
                         const a = document.createElement('a');
                         a.href = downloadUrl;
-                        a.download = selectedFile.name.replace(/\.[^/.]+$/, '.pptx');
+                        // 서버가 제공하는 파일명을 사용하도록 download 속성 제거
+                        // a.download = selectedFile.name.replace(/\.[^/.]+$/, '.pdf');
                         
                         document.body.appendChild(a);
                         a.click();
                         document.body.removeChild(a);
                         
-                        showSuccess(`변환 완료! ${a.download} 파일이 다운로드됩니다.`);
+                        showSuccess(`변환 완료! PDF 파일이 다운로드됩니다.`);
                     } else {
                         // 일반 메시지 응답
                         showSuccess(jsonData.message || '변환이 완료되었습니다.');
@@ -581,10 +582,20 @@
                     
                     console.log('다운로드된 파일 크기:', blob.size, 'bytes');
                     
+                    // 🔥 서버 Content-Disposition 헤더에서 파일명 추출
+                    const disp = response.headers.get('Content-Disposition') || '';
+                    let fname = 'converted.pdf';
+                    const m = disp.match(/filename[*]?=([^;]+)/i);
+                    if (m) {
+                        let v = m[1].trim();
+                        if (v.startsWith("UTF-8''")) v = decodeURIComponent(v.slice(7));
+                        fname = v.replace(/^"+|"+$/g,'');
+                    }
+                    
                     const url = URL.createObjectURL(blob);
                     const a = document.createElement('a');
                     a.href = url;
-                    a.download = selectedFile.name.replace(/\.[^/.]+$/, '.pptx');
+                    a.download = fname; // 서버가 제공한 .pdf 파일명 사용
                     
                     document.body.appendChild(a);
                     a.click();
