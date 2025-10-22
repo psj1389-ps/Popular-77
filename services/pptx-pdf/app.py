@@ -8,21 +8,8 @@ import fitz  # PyMuPDF
 from pptx import Presentation
 from pptx.util import Emu
 
-# Adobe PDF Services SDK imports - v4.2.0 compatible
-try:
-    from adobe.pdfservices.operation.auth.service_principal_credentials import ServicePrincipalCredentials
-    from adobe.pdfservices.operation.pdf_services import PDFServices
-    from adobe.pdfservices.operation.io.stream_asset import StreamAsset
-    from adobe.pdfservices.operation.pdf_services_media_type import PDFServicesMediaType
-    from adobe.pdfservices.operation.pdfjobs.jobs.export_pdf_job import ExportPDFJob
-    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_params import ExportPDFParams
-    from adobe.pdfservices.operation.pdfjobs.params.export_pdf.export_pdf_target_format import ExportPDFTargetFormat
-    from adobe.pdfservices.operation.pdfjobs.result.export_pdf_result import ExportPDFResult
-    from adobe.pdfservices.operation.exception.exceptions import ServiceApiException, ServiceUsageException, SdkException
-    ADOBE_AVAILABLE = True
-except ImportError as e:
-    logging.warning(f"Adobe PDF Services SDK not available: {e}")
-    ADOBE_AVAILABLE = False
+# Adobe PDF Services SDK 제거 - 이미지 기반 변환만 사용
+ADOBE_AVAILABLE = False
 
 app = Flask(__name__, template_folder="templates", static_folder="static")
 logging.basicConfig(level=logging.INFO)
@@ -110,84 +97,7 @@ def safe_move(src: str, dst: str):
         else:
             raise
 
-def _env(key: str, alt: list[str] = []):
-    import os
-    for k in [key, *alt]:
-        v = os.environ.get(k)
-        if v: return v
-    raise KeyError(f"Missing env: {key}")
-
-def adobe_context():
-    if not ADOBE_AVAILABLE:
-        raise ImportError("Adobe PDF Services SDK not available")
-    
-    try:
-        # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
-        client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
-        client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
-        
-        # v4.2.0 API - ServicePrincipalCredentials 사용
-        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
-        return PDFServices(credentials=creds)
-    except KeyError as e:
-        app.logger.warning(f"Adobe 환경변수 누락: {str(e)}")
-        raise ImportError(f"Adobe 환경변수 설정 필요: {str(e)}")
-    except Exception as e:
-        app.logger.error(f"Adobe 컨텍스트 생성 실패: {str(e)}")
-        raise ImportError(f"Adobe 서비스 초기화 실패: {str(e)}")
-
-def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
-    pdf_services = adobe_context()
-    
-    # PDF 파일을 읽어서 StreamAsset으로 업로드
-    with open(in_pdf_path, 'rb') as file:
-        input_stream = file.read()
-    
-    input_asset = pdf_services.upload(input_stream=input_stream, mime_type=PDFServicesMediaType.PDF)
-    
-    # Export 파라미터 설정
-    export_pdf_params = ExportPDFParams(target_format=ExportPDFTargetFormat.PPTX)
-    export_pdf_job = ExportPDFJob(input_asset=input_asset, export_pdf_params=export_pdf_params)
-    
-    # 작업 실행
-    location = pdf_services.submit(export_pdf_job)
-    pdf_services_response = pdf_services.get_job_result(location, ExportPDFResult)
-    
-    # 결과 다운로드
-    result_asset = pdf_services_response.get_result().get_asset()
-    stream_asset = pdf_services.get_content(result_asset)
-    
-    # 파일 저장
-    if os.path.exists(out_path):
-        os.remove(out_path)
-    
-    with open(out_path, "wb") as file:
-        file.write(stream_asset.get_input_stream())
-
-def perform_pptx_conversion_adobe(in_path: str, base_name: str):
-    if not ADOBE_AVAILABLE:
-        raise ImportError("Adobe PDF Services SDK not available")
-    
-    final_name = f"{base_name}.pptx"
-    final_path = os.path.join(OUTPUTS_DIR, final_name)
-    
-    try:
-        _export_via_adobe(in_path, "PPTX", final_path)
-        
-        # 파일이 제대로 생성되었는지 확인
-        if not os.path.exists(final_path):
-            raise Exception(f"Adobe PPTX 파일 생성 실패: {final_path}")
-        
-        file_size = os.path.getsize(final_path)
-        if file_size == 0:
-            raise Exception(f"Adobe PPTX 파일이 비어있음: {final_path}")
-        
-        app.logger.info(f"Adobe PPTX 변환 완료: {final_name} ({file_size} bytes)")
-        return final_path, final_name, "application/vnd.openxmlformats-officedocument.presentationml.presentation"
-        
-    except Exception as e:
-        app.logger.error(f"Adobe PPTX 변환 오류: {str(e)}")
-        raise Exception(f"Adobe PPTX 변환 실패: {str(e)}")
+# Adobe 관련 함수들 제거됨 - 이미지 기반 변환만 사용
 
 def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, job_id: str = None):
     """
@@ -317,21 +227,13 @@ def convert_async():
 
     def run_job():
         try:
-            if ADOBE_AVAILABLE:
-                set_progress(job_id, 30, "Adobe로 변환 중")
-                out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
-                set_progress(job_id, 90, "파일 저장 중")
-            else:
-                raise ImportError("Adobe SDK not available")
+            set_progress(job_id, 30, "이미지 기반 변환 중")
+            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
+            set_progress(job_id, 90, "파일 저장 중")
         except Exception as e:
-            app.logger.exception("Adobe export failed; fallback to image-based.")
-            set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-            try:
-                out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
-            except Exception as fallback_error:
-                app.logger.error(f"폴백 변환도 실패: {str(fallback_error)}")
-                JOBS[job_id] = {"status":"error","error":f"변환 실패: {str(fallback_error)}","progress":0,"message":"변환 실패"}
-                return
+            app.logger.error(f"변환 실패: {str(e)}")
+            JOBS[job_id] = {"status":"error","error":f"변환 실패: {str(e)}","progress":0,"message":"변환 실패"}
+            return
         
         JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
         app.logger.info(f"비동기 변환 완료: {job_id} -> {name}")
@@ -414,15 +316,9 @@ def convert_sync():
             return max(lo, min(hi, x))
         scale = clamp_num(request.form.get("scale","1.0"), 0.2, 2.0, 1.0, float)
 
-        try:
-            if ADOBE_AVAILABLE:
-                app.logger.info("Adobe PDF Services를 사용하여 변환 시작")
-                out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
-            else:
-                raise ImportError("Adobe SDK not available")
-        except Exception as e:
-            app.logger.warning(f"Adobe 변환 실패, 대체 방법 사용: {str(e)}")
-            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
+        # 이미지 기반 변환만 사용
+        app.logger.info("이미지 기반 PDF to PPTX 변환 시작")
+        out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
         
         # 변환 결과 파일 확인
         if not out_path or not os.path.exists(out_path):
