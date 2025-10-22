@@ -485,6 +485,7 @@ def _api_job_status(job_id):
 def _api_job_download(job_id): 
     return job_download(job_id)
 
+@app.post("/upload")
 @app.post("/convert")
 def convert_sync():
     f = request.files.get("file") or request.files.get("pdfFile")

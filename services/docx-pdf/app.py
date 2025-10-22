@@ -226,6 +226,7 @@ def health():
     }
 
 
+@app.post("/upload")
 @app.post("/convert")
 def convert_sync():
     f = request.files.get("file") or request.files.get("document")

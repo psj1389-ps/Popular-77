@@ -276,6 +276,7 @@ def job_download(job_id):
     return send_download_memory(info["path"], info["name"], info["ctype"])
 
 # API aliases: /api/pdf-pptx/*
+@app.post("/upload")
 @app.post("/convert")
 def convert_sync():
     f = request.files.get("file") or request.files.get("pdfFile")
