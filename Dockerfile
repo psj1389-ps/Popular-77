@@ -25,7 +25,7 @@ COPY entrypoint.sh /entrypoint.sh
 RUN chmod +x /entrypoint.sh
 
 # Install Python dependencies for all services
-RUN find /app/services -name "requirements.txt" -exec pip install -r {} \;
+RUN find /app/services -name "requirements.txt" -exec pip install --root-user-action=ignore -r {} \;
 
 # Expose port
 EXPOSE 10000
