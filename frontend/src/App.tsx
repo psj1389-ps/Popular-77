@@ -15,6 +15,8 @@ import PdfToXlsPage from "@/pages/pdf-to-xls";
 import PdfVectorPage from "@/pages/pdf-vector";
 import PdfImagePage from "@/pages/pdf-image";
 import DocxPdfPage from "@/pages/docx-pdf";
+import PptxPdfPage from "@/pages/pptx-pdf";
+import XlsPdfPage from "@/pages/xls-pdf";
 import MainLayout from '@/components/MainLayout';
 
 function App() {
@@ -130,6 +132,22 @@ function App() {
           element={
             <MainLayout>
               <DocxPdfPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/pptx-pdf"
+          element={
+            <MainLayout>
+              <PptxPdfPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/xls-pdf"
+          element={
+            <MainLayout>
+              <XlsPdfPage />
             </MainLayout>
           }
         />

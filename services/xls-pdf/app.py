@@ -63,7 +63,6 @@ current_job_id: Optional[str] = None
 def ascii_fallback(name: str) -> str:
     """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
     a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
-    # 따옴표/세미콜론 등 위험 문자 제거
     return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
 
 def _set_pdf_disposition(resp, pdf_name: str):

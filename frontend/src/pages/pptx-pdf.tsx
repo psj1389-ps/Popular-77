@@ -2,7 +2,7 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { safeGetFilename, downloadBlob } from '@/utils/pdfUtils';
 
-const API_BASE = "http://127.0.0.1:10000";
+const API_BASE = "http://127.0.0.1:11000";
 
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
@@ -23,7 +23,7 @@ async function getErrorMessage(res: Response) {
   return t || `요청 실패(${res.status})`;
 }
 
-const DocxPdfPage: React.FC = () => {
+const PptxPdfPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<"fast" | "standard">("fast");
   const [isConverting, setIsConverting] = useState(false);
@@ -38,9 +38,12 @@ const DocxPdfPage: React.FC = () => {
   const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0];
     if (file) {
-      // DOCX 파일만 허용
-      if (!file.name.toLowerCase().endsWith('.docx')) {
-        setErrorMessage('DOCX 파일만 업로드할 수 있습니다.');
+      // PPTX/PPT/ODP 파일만 허용
+      const validExtensions = ['.pptx', '.ppt', '.odp'];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      
+      if (!validExtensions.includes(fileExtension)) {
+        setErrorMessage('PPTX, PPT, ODP 파일만 업로드할 수 있습니다.');
         return;
       }
       
@@ -56,9 +59,12 @@ const DocxPdfPage: React.FC = () => {
     event.preventDefault();
     const file = event.dataTransfer.files[0];
     if (file) {
-      // DOCX 파일만 허용
-      if (!file.name.toLowerCase().endsWith('.docx')) {
-        setErrorMessage('DOCX 파일만 업로드할 수 있습니다.');
+      // PPTX/PPT/ODP 파일만 허용
+      const validExtensions = ['.pptx', '.ppt', '.odp'];
+      const fileExtension = file.name.toLowerCase().substring(file.name.lastIndexOf('.'));
+      
+      if (!validExtensions.includes(fileExtension)) {
+        setErrorMessage('PPTX, PPT, ODP 파일만 업로드할 수 있습니다.');
         return;
       }
       
@@ -130,7 +136,7 @@ const DocxPdfPage: React.FC = () => {
       }
 
       const filename = safeGetFilename(response, 
-        selectedFile.name.replace(/\.(docx?)$/i, '.pdf')
+        selectedFile.name.replace(/\.(pptx?|odp)$/i, '.pdf')
       );
 
       setConvertedFileName(filename);
@@ -152,8 +158,8 @@ const DocxPdfPage: React.FC = () => {
   return (
     <>
       <Helmet>
-        <title>DOCX → PDF 변환기 - 77-tools.xyz</title>
-        <meta name="description" content="DOCX 파일을 PDF로 무료 변환. 빠르고 안전한 온라인 문서 변환 도구." />
+        <title>PPTX → PDF 변환기 - 77-tools.xyz</title>
+        <meta name="description" content="PPTX, PPT, ODP 파일을 PDF로 무료 변환. 빠르고 안전한 온라인 프레젠테이션 변환 도구." />
       </Helmet>
       
       <div className="w-full bg-white">
@@ -172,10 +178,10 @@ const DocxPdfPage: React.FC = () => {
         <div className="container mx-auto relative z-10">
             <div className="flex justify-center items-center gap-4 mb-4">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-              <h1 className="text-4xl font-bold">DOCX → PDF 변환기</h1>
+              <h1 className="text-4xl font-bold">PPTX → PDF 변환기</h1>
             </div>
             <p className="text-lg opacity-90 max-w-2xl mx-auto">
-              DOCX 문서를 PDF로 변환하여 어디서나 안전하게 공유하세요
+              PPTX, PPT, ODP 프레젠테이션을 PDF로 변환하여 어디서나 안전하게 공유하세요
             </p>
         </div>
       </div>
@@ -192,101 +198,95 @@ const DocxPdfPage: React.FC = () => {
       <div className="container mx-auto px-4 py-16">
         <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
           <div className="text-center mb-6">
-            <h2 className="text-2xl font-semibold text-gray-800">DOCX → PDF 변환기</h2>
-            <p className="text-gray-500">안정적인 문서 변환 서비스</p>
+            <h2 className="text-2xl font-semibold text-gray-800">PPTX → PDF 변환기</h2>
+            <p className="text-gray-500">안정적인 프레젠테이션 변환 서비스</p>
           </div>
           
           {!selectedFile ? (
             // 파일 선택 전 UI
-            <label htmlFor="file-upload" className="block border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
+            <div 
+              className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors"
+              onDrop={handleDrop}
+              onDragOver={handleDragOver}
+            >
               <input 
-                id="file-upload" 
                 ref={fileInputRef} 
                 type="file" 
-                accept=".docx" 
+                accept=".pptx,.ppt,.odp" 
                 onChange={handleFileChange} 
                 className="hidden" 
               />
-              <p className="font-semibold text-gray-700">파일을 선택하세요</p>
-              <p className="text-sm text-gray-500 mt-1">DOCX 파일을 클릭하여 선택 (최대 100MB)</p>
-            </label>
+              <button 
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full h-full"
+              >
+                <p className="font-semibold text-gray-700">파일을 선택하세요</p>
+                <p className="text-sm text-gray-500 mt-1">PPTX, PPT, ODP 파일을 클릭하여 선택하거나 드래그하여 업로드 (최대 100MB)</p>
+              </button>
+            </div>
           ) : (
             // 파일 선택 후 UI
             <div className="space-y-6">
               {/* 선택된 파일 정보 */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="font-medium text-gray-800">{selectedFile.name}</p>
-                    <p className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</p>
-                  </div>
-                  <div className="text-green-600">
-                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                    </svg>
-                  </div>
+                <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
+                <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
+              </div>
+              
+              {/* 변환 품질 선택 */}
+              <div className="space-y-2">
+                <p className="font-medium text-gray-800">변환 품질 선택:</p>
+                <div className="space-y-2">
+                  <label className="flex items-center">
+                    <input 
+                      type="radio" 
+                      name="quality" 
+                      value="fast" 
+                      checked={quality === 'fast'} 
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")} 
+                      className="w-4 h-4 text-blue-600" 
+                    />
+                    <span className="ml-2 text-gray-700">빠른 변환 (품질이 낮지만 빠름)</span>
+                  </label>
+                  <label className="flex items-center">
+                    <input 
+                      type="radio" 
+                      name="quality" 
+                      value="standard" 
+                      checked={quality === 'standard'} 
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")} 
+                      className="w-4 h-4 text-blue-600" 
+                    />
+                    <span className="ml-2 text-gray-700">표준 품질 (권장)</span>
+                  </label>
                 </div>
               </div>
 
-              {/* 변환 품질 선택 */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">변환 품질 선택:</label>
-                <div className="space-y-2">
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="quality"
-                      value="fast"
-                      checked={quality === "fast"}
-                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
-                    />
-                    <span>빠른 변환 (권장)</span>
-                  </label>
-                  <label className="flex items-center gap-2">
-                    <input
-                      type="radio"
-                      name="quality"
-                      value="standard"
-                      checked={quality === "standard"}
-                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
-                    />
-                    <span>표준 변환</span>
-                  </label>
+              {/* 진행률 표시 */}
+              {isConverting && (
+                <div className="w-full bg-gray-200 rounded-full h-2.5">
+                  <div 
+                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
+                    style={{ width: `${conversionProgress}%` }}
+                  ></div>
                 </div>
-              </div>
+              )}
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    <svg className="w-5 h-5 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
                     </svg>
-                    <p className="text-green-800 font-medium">{successMessage}</p>
+                    <p className="text-green-800">{successMessage}</p>
                   </div>
                 </div>
               )}
 
-              {/* 진행률 바 */}
-              {isConverting && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>변환 진행률</span>
-                    <span>{conversionProgress}%</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
-                    <div 
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full transition-all duration-300"
-                      style={{ width: `${conversionProgress}%` }}
-                    ></div>
-                  </div>
-                  <div className="mt-2 text-sm text-gray-500">⏳ DOCX를 PDF로 변환 중...</div>
-                </div>
-              )}
-
-              {/* 버튼 영역 */}
+              {/* 버튼 그룹 */}
               <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a67d8 0%, #6b46c1 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
                   {isConverting ? '변환 중...' : 'PDF로 변환하기'}
                 </button>
                 <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
@@ -300,15 +300,15 @@ const DocxPdfPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 문서 변환 가이드 섹션 */}
+      {/* 프레젠테이션 변환 가이드 섹션 */}
       <div className="bg-gray-50 py-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
             <h2 className="text-3xl font-bold text-gray-800 mb-4">
-              DOCX → PDF 변환 가이드
+              PPTX → PDF 변환 가이드
             </h2>
             <p className="text-gray-600 text-lg">
-              간단한 4단계로 DOCX 파일을 PDF로 변환하세요
+              간단한 4단계로 PPTX 파일을 PDF로 변환하세요
             </p>
           </div>
           
@@ -318,7 +318,7 @@ const DocxPdfPage: React.FC = () => {
                 <span className="text-2xl font-bold text-purple-600">1</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">파일 업로드</h3>
-              <p className="text-gray-600">변환할 DOCX 파일을 선택하거나 드래그하여 업로드하세요.</p>
+              <p className="text-gray-600">변환할 PPTX, PPT, ODP 파일을 선택하거나 드래그하여 업로드하세요.</p>
             </div>
             
             <div className="text-center">
@@ -334,7 +334,7 @@ const DocxPdfPage: React.FC = () => {
                 <span className="text-2xl font-bold text-purple-600">3</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">자동 변환 시작</h3>
-              <p className="text-gray-600">변환 버튼을 클릭하면 자동으로 DOCX가 PDF로 변환됩니다.</p>
+              <p className="text-gray-600">변환 버튼을 클릭하면 자동으로 PPTX가 PDF로 변환됩니다.</p>
             </div>
             
             <div className="text-center">
@@ -352,4 +352,4 @@ const DocxPdfPage: React.FC = () => {
   );
 };
 
-export default DocxPdfPage;
+export default PptxPdfPage;

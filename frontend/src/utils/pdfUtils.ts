@@ -22,6 +22,24 @@ function ensurePdfWorker() {
   }
 }
 
+// RFC5987 Content-Disposition 헤더에서 파일명 추출 (개선된 버전)
+export function safeGetFilename(res: Response, fallback: string): string {
+  const disp = res.headers.get('Content-Disposition') || '';
+  let fname = fallback;
+  
+  // filename*=UTF-8''... 형식 우선 파싱 (RFC5987)
+  const m = disp.match(/filename\*?=([^;]+)/i);
+  if (m) {
+    let v = m[1].trim();
+    if (v.startsWith("UTF-8''")) {
+      v = decodeURIComponent(v.slice(7));
+    }
+    fname = v.replace(/^"+|"+$/g, '');
+  }
+  
+  return fname || fallback;
+}
+
 // 직접 다운로드(직행 URL/프록시 URL 공통)
 export function triggerDirectDownload(url: string, filename?: string) {
   try {
@@ -42,6 +60,18 @@ export function triggerDirectDownload(url: string, filename?: string) {
   }, 300);
 }
 
+// Blob 다운로드 함수 (개선된 파일명 처리)
+export function downloadBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename; // 서버가 내려준 파일명 그대로 사용
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export async function getPdfPageCount(file: File): Promise<number> {
   ensurePdfWorker();
   const buf = await file.arrayBuffer();
@@ -60,15 +90,13 @@ export async function directPostAndDownload(url: string, form: FormData, fallbac
       : await res.text().catch(() => "");
     throw new Error(msg || `요청 실패(${res.status})`);
   }
-  const cd = res.headers.get("content-disposition") || "";
-  const star = /filename\*\=UTF-8''([^;]+)/i.exec(cd);
-  const normal = /filename="?([^\";]+)"?/i.exec(cd);
-  const name = star?.[1] ? decodeURIComponent(star[1]) : (normal?.[1] || fallbackName);
+  
+  // 개선된 파일명 추출 사용
+  const name = safeGetFilename(res, fallbackName);
   const blob = await res.blob();
-  const href = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = href; a.download = name; a.style.display = "none";
-  document.body.appendChild(a); a.click(); a.remove();
-  setTimeout(() => URL.revokeObjectURL(href), 60_000);
+  
+  // 개선된 다운로드 함수 사용
+  downloadBlob(blob, name);
+  
   return name;
 }
