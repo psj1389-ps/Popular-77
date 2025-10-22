@@ -46,7 +46,7 @@ async function getErrorMessage(res: Response) {
 
 const DocxPdfPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
-  const [quality, setQuality] = useState<"low" | "standard" | "high">("standard");
+  const [quality, setQuality] = useState<"fast" | "standard">("fast");
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -251,28 +251,28 @@ const DocxPdfPage: React.FC = () => {
 
               {/* 변환 품질 선택 */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-3">변환 품질</label>
+                <label className="block text-sm font-medium text-gray-700 mb-3">변환 품질 선택:</label>
                 <div className="space-y-2">
-                  {[
-                    { value: 'low', label: '낮음 (빠른 변환)', desc: '파일 크기 작음' },
-                    { value: 'standard', label: '표준 (권장)', desc: '균형잡힌 품질과 크기' },
-                    { value: 'high', label: '높음 (최고 품질)', desc: '파일 크기 큼' }
-                  ].map((option) => (
-                    <label key={option.value} className="flex items-center p-3 border rounded-lg cursor-pointer hover:bg-gray-50">
-                      <input
-                        type="radio"
-                        name="quality"
-                        value={option.value}
-                        checked={quality === option.value}
-                        onChange={(e) => setQuality(e.target.value as "low" | "standard" | "high")}
-                        className="mr-3"
-                      />
-                      <div>
-                        <div className="font-medium text-gray-800">{option.label}</div>
-                        <div className="text-sm text-gray-500">{option.desc}</div>
-                      </div>
-                    </label>
-                  ))}
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="fast"
+                      checked={quality === "fast"}
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
+                    />
+                    <span>빠른 변환 (권장)</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="standard"
+                      checked={quality === "standard"}
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
+                    />
+                    <span>표준 변환</span>
+                  </label>
                 </div>
               </div>
 
@@ -301,6 +301,7 @@ const DocxPdfPage: React.FC = () => {
                       style={{ width: `${conversionProgress}%` }}
                     ></div>
                   </div>
+                  <div className="mt-2 text-sm text-gray-500">⏳ DOCX를 PDF로 변환 중...</div>
                 </div>
               )}
 
