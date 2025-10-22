@@ -1,7 +1,7 @@
 from flask import Flask, request, jsonify, send_file, render_template, make_response
 from flask_cors import CORS
 from werkzeug.exceptions import HTTPException
-import io, os, urllib.parse, tempfile, shutil, errno, logging
+import io, os, urllib.parse, tempfile, shutil, errno, logging, subprocess
 from uuid import uuid4
 from concurrent.futures import ThreadPoolExecutor
 import fitz  # PyMuPDF
@@ -394,6 +394,8 @@ def perform_xls_to_pdf_libreoffice(input_path, output_dir, timeout=120):
 
 def _find_soffice():
     """Find LibreOffice soffice binary"""
+    import glob
+    
     # Common paths where LibreOffice might be installed
     possible_paths = [
         "/usr/bin/soffice",
@@ -408,7 +410,6 @@ def _find_soffice():
             return path
         # Handle wildcard paths
         if "*" in path:
-            import glob
             matches = glob.glob(path)
             if matches:
                 app.logger.info(f"Found soffice at wildcard path: {matches[0]}")
