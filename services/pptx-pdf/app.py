@@ -60,38 +60,39 @@ def set_progress(job_id, p, msg=None):
         info["message"] = msg
 
 def send_download_memory(path: str, download_name: str, ctype: str):
-    if not path or not os.path.exists(path):
-        app.logger.error(f"Output file missing: {path}")
-        return jsonify({"error": "output file missing"}), 500
-    
+    """메모리에 파일을 로드하여 전송 후 원본 파일 삭제"""
     try:
-        # 파일 크기 확인
+        # 파일 존재 확인
+        if not os.path.exists(path):
+            app.logger.error(f"전송할 파일이 존재하지 않음: {path}")
+            return jsonify({"error": "파일을 찾을 수 없습니다"}), 404
+        
         file_size = os.path.getsize(path)
         if file_size == 0:
-            app.logger.error(f"Output file is empty: {path}")
-            return jsonify({"error": "output file is empty"}), 500
+            app.logger.error(f"전송할 파일이 비어있음: {path}")
+            return jsonify({"error": "파일이 비어있습니다"}), 500
+        
+        app.logger.info(f"파일 전송 시작: {download_name} ({file_size} bytes)")
         
         with open(path, "rb") as f:
             data = f.read()
         
-        if not data:
-            app.logger.error(f"Failed to read file data: {path}")
-            return jsonify({"error": "failed to read file data"}), 500
+        # 원본 파일 삭제
+        try:
+            os.remove(path)
+            app.logger.debug(f"전송 후 파일 삭제: {path}")
+        except Exception as e:
+            app.logger.warning(f"파일 삭제 실패: {path} - {e}")
         
-        resp = send_file(io.BytesIO(data), mimetype=ctype, as_attachment=True, download_name=download_name, conditional=False)
-        resp.direct_passthrough = False
-        resp.headers["Content-Length"] = str(len(data))
-        resp.headers["Cache-Control"] = "no-store, no-cache, must-revalidate"
-        resp.headers["Pragma"] = "no-cache"
-        resp.headers["Expires"] = "0"
-        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
+        response = make_response(data)
+        response.headers["Content-Type"] = ctype
+        response.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
         
-        app.logger.info(f"Successfully sending file: {download_name} ({file_size} bytes)")
-        return resp
-        
+        app.logger.info(f"파일 전송 완료: {download_name}")
+        return response
     except Exception as e:
-        app.logger.error(f"Error sending file {path}: {str(e)}")
-        return jsonify({"error": f"file send error: {str(e)}"}), 500
+        app.logger.error(f"파일 전송 실패: {path} - {e}")
+        return jsonify({"error": f"파일 전송 실패: {str(e)}"}), 500
 
 def safe_move(src: str, dst: str):
     os.makedirs(os.path.dirname(dst), exist_ok=True)
@@ -120,13 +121,20 @@ def adobe_context():
     if not ADOBE_AVAILABLE:
         raise ImportError("Adobe PDF Services SDK not available")
     
-    # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
-    client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
-    client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
-    
-    # v4.2.0 API - ServicePrincipalCredentials 사용
-    creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
-    return PDFServices(credentials=creds)
+    try:
+        # 두 네이밍 모두 지원(ADOBE* or PDF_SERVICES_*)
+        client_id = _env("ADOBE_CLIENT_ID", ["PDF_SERVICES_CLIENT_ID"])
+        client_secret = _env("ADOBE_CLIENT_SECRET", ["PDF_SERVICES_CLIENT_SECRET"])
+        
+        # v4.2.0 API - ServicePrincipalCredentials 사용
+        creds = ServicePrincipalCredentials(client_id=client_id, client_secret=client_secret)
+        return PDFServices(credentials=creds)
+    except KeyError as e:
+        app.logger.warning(f"Adobe 환경변수 누락: {str(e)}")
+        raise ImportError(f"Adobe 환경변수 설정 필요: {str(e)}")
+    except Exception as e:
+        app.logger.error(f"Adobe 컨텍스트 생성 실패: {str(e)}")
+        raise ImportError(f"Adobe 서비스 초기화 실패: {str(e)}")
 
 def _export_via_adobe(in_pdf_path: str, target: str, out_path: str):
     pdf_services = adobe_context()
@@ -242,9 +250,9 @@ def perform_pptx_conversion(in_path: str, base_name: str, scale: float = 1.0, jo
 def index():
     # 이 서비스 전용 텍스트/수치(템플릿에서 사용)
     page = {
-        "title": "PPTX to PDF Converter",
-        "subtitle": "PowerPoint 문서를 PDF로 안정적으로 변환",
-        "accept": ".ppt,.pptx",
+        "title": "PDF to PPTX Converter",
+        "subtitle": "PDF 문서를 PowerPoint로 안정적으로 변환",
+        "accept": ".pdf",
         "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "100"),
         "service": "pptx-pdf"
     }
@@ -318,7 +326,12 @@ def convert_async():
         except Exception as e:
             app.logger.exception("Adobe export failed; fallback to image-based.")
             set_progress(job_id, 50, "이미지 기반 폴백 변환 중")
-            out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
+            try:
+                out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=job_id)
+            except Exception as fallback_error:
+                app.logger.error(f"폴백 변환도 실패: {str(fallback_error)}")
+                JOBS[job_id] = {"status":"error","error":f"변환 실패: {str(fallback_error)}","progress":0,"message":"변환 실패"}
+                return
         
         JOBS[job_id] = {"status":"done","path":out_path,"name":name,"ctype":ctype,"progress":100,"message":"완료"}
         app.logger.info(f"비동기 변환 완료: {job_id} -> {name}")
@@ -374,15 +387,18 @@ def convert_sync():
     job_id = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
     
+    out_path = None
     try:
         f.save(in_path)
         
         # 업로드된 파일 확인
         if not os.path.exists(in_path):
+            app.logger.error(f"파일 업로드 실패: {f.filename}")
             return jsonify({"error": "파일 업로드 실패"}), 500
         
         upload_size = os.path.getsize(in_path)
         if upload_size == 0:
+            app.logger.error(f"업로드된 파일이 비어있음: {f.filename}")
             return jsonify({"error": "업로드된 파일이 비어있음"}), 400
         
         app.logger.info(f"파일 업로드 완료: {f.filename} ({upload_size} bytes)")
@@ -400,6 +416,7 @@ def convert_sync():
 
         try:
             if ADOBE_AVAILABLE:
+                app.logger.info("Adobe PDF Services를 사용하여 변환 시작")
                 out_path, name, ctype = perform_pptx_conversion_adobe(in_path, base_name)
             else:
                 raise ImportError("Adobe SDK not available")
@@ -407,17 +424,28 @@ def convert_sync():
             app.logger.warning(f"Adobe 변환 실패, 대체 방법 사용: {str(e)}")
             out_path, name, ctype = perform_pptx_conversion(in_path, base_name, scale=scale, job_id=None)
         
+        # 변환 결과 파일 확인
+        if not out_path or not os.path.exists(out_path):
+            app.logger.error(f"변환 결과 파일이 생성되지 않음: {out_path}")
+            return jsonify({"error": "변환 결과 파일 생성 실패"}), 500
+        
+        result_size = os.path.getsize(out_path)
+        app.logger.info(f"변환 완료: {name} ({result_size} bytes)")
+        
         return send_download_memory(out_path, name, ctype)
         
     except Exception as e:
         app.logger.error(f"변환 오류: {str(e)}")
         return jsonify({"error": f"변환 실패: {str(e)}"}), 500
     finally:
-        try: 
-            if os.path.exists(in_path):
-                os.remove(in_path)
-        except Exception as e:
-            app.logger.warning(f"임시 파일 삭제 실패: {str(e)}")
+        # 임시 파일들 정리
+        for temp_file in [in_path, out_path]:
+            if temp_file and os.path.exists(temp_file):
+                try:
+                    os.remove(temp_file)
+                    app.logger.debug(f"임시 파일 삭제: {temp_file}")
+                except Exception as e:
+                    app.logger.warning(f"임시 파일 삭제 실패 ({temp_file}): {str(e)}")
 
 # /api aliases (frontend uses /api paths only)
 @app.route("/api/pdf-pptx/health", methods=["GET", "HEAD"])
@@ -439,8 +467,22 @@ def _pptx_a_download(job_id): return job_download(job_id)
 def handle_exception(e):
     if isinstance(e, HTTPException):
         return e
-    app.logger.exception("Unhandled exception")
-    return jsonify({"error": "Internal server error"}), 500
+    
+    # 상세한 오류 로깅
+    import traceback
+    app.logger.error(f"Unhandled exception: {str(e)}")
+    app.logger.error(f"Exception type: {type(e).__name__}")
+    app.logger.error(f"Traceback: {traceback.format_exc()}")
+    
+    # 개발 모드에서는 상세 오류 정보 반환
+    if app.debug:
+        return jsonify({
+            "error": "Internal server error",
+            "details": str(e),
+            "type": type(e).__name__
+        }), 500
+    else:
+        return jsonify({"error": "Internal server error"}), 500
 
 if __name__ == "__main__":
     port = int(os.environ.get("PORT", 10000))
