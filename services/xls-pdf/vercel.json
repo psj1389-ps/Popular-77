@@ -1,0 +1,19 @@
+{
+  "version": 2,
+  "buildCommand": "npm ci && npm run build",
+  "outputDirectory": "dist",
+  "rewrites": [
+    { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
+    { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-jh3s.onrender.com/$1" },
+    { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
+    { "source": "/api/pdf-svg/(.*)", "destination": "https://pdf-svg.onrender.com/$1" },
+    { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
+    { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
+    { "source": "/api/pdf-xls/(.*)", "destination": "https://pdf-xls.onrender.com/$1" },
+    { "source": "/api/pdf-pptx/(.*)", "destination": "https://pdf-pptx.onrender.com/$1" },
+    { "source": "/api/pdf-tiff/(.*)", "destination": "https://pdf-tiff.onrender.com/$1" },
+    { "source": "/api/pdf-image/(.*)", "destination": "https://pdf-image-service.onrender.com/$1" },
+    { "source": "/tools/(.*)", "destination": "/index.html" },
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
