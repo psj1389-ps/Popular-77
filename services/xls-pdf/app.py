@@ -37,11 +37,14 @@ except ImportError as e:
 app = Flask(__name__, template_folder="templates", static_folder="static")
 logging.basicConfig(level=logging.INFO)
 
-# 프로덕션 설정
+# 최대 업로드 크기 설정 (60MB)
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
 
-# 동시성 제어 세마포어
+# 동시성 제어 (메모리 사용량 제한)
 SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
+
+# 타임아웃 설정
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
@@ -49,7 +52,7 @@ CORS(app, resources={r"/*": {"origins": [
     "https://www.77-tools.xyz",
     "https://popular-77.vercel.app",
     "https://popular-77-xbqq.onrender.com"
-], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"]}})
+], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -86,16 +89,37 @@ def set_progress(job_id, p, msg=None):
         info["message"] = msg
 
 def send_download_memory(path: str, download_name: str, ctype: str):
+    """메모리 효율적인 파일 다운로드 - 스트리밍 사용"""
     if not path or not os.path.exists(path):
         return jsonify({"error":"output file missing"}), 500
-    with open(path, "rb") as f:
-        data = f.read()
-    resp = send_file(io.BytesIO(data), mimetype=ctype, as_attachment=True, download_name=download_name, conditional=False)
-    resp.direct_passthrough = False
-    resp.headers["Content-Length"] = str(len(data))
-    resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{urllib.parse.quote(download_name)}"
-    return resp
+    
+    try:
+        # 파일 크기 확인
+        file_size = os.path.getsize(path)
+        
+        # 스트리밍 응답으로 메모리 사용량 최적화
+        resp = send_file(
+            path, 
+            mimetype=ctype, 
+            as_attachment=True, 
+            download_name=download_name,
+            conditional=True  # 조건부 요청 지원
+        )
+        
+        # RFC5987 호환 헤더 설정
+        ascii_name = ascii_fallback(download_name)
+        resp.headers["Content-Disposition"] = (
+            f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{urllib.parse.quote(download_name)}'
+        )
+        resp.headers["Content-Length"] = str(file_size)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        
+        return resp
+    except Exception as e:
+        logging.error(f"Download error: {e}")
+        return jsonify({"error": "Download failed"}), 500
 
 def _env(key: str, alt: list[str] = []):
     import os

@@ -15,11 +15,14 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO)
 app = Flask(__name__, template_folder="templates", static_folder="static")
 
-# 프로덕션 설정
+# 최대 업로드 크기 설정 (60MB)
 app.config["MAX_CONTENT_LENGTH"] = int(os.getenv("MAX_CONTENT_LENGTH_MB", "60")) * 1024 * 1024
 
-# 동시성 제어 세마포어
+# 동시성 제어 (메모리 사용량 제한)
 SEMA = Semaphore(int(os.getenv("MAX_CONCURRENCY", "1")))
+
+# 타임아웃 설정
+app.config["SEND_FILE_MAX_AGE_DEFAULT"] = 0
 
 CORS(app, resources={r"/*": {"origins": [
     "http://localhost:5173",
@@ -27,7 +30,7 @@ CORS(app, resources={r"/*": {"origins": [
     "https://www.77-tools.xyz",
     "https://popular-77.vercel.app",
     "https://popular-77-xbqq.onrender.com"
-], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"]}})
+], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -61,32 +64,43 @@ def _is_pdf(path: str) -> bool:
         return False
 
 def _send_download(path: str, download_name: str):
-    if not os.path.exists(path):
-        return jsonify({"error": "output not found"}), 500
-    with open(path, "rb") as f:
-        data = f.read()
-    resp = send_file(
-        io.BytesIO(data),
-        as_attachment=True,
-        download_name=download_name,
-        mimetype="application/pdf",
-    )
-    resp.direct_passthrough = False
-    resp.headers["Content-Length"] = str(len(data))
-    resp.headers["Cache-Control"] = "no-store"
-    
-    # RFC 5987 표준에 따른 한글/유니코드 파일명 인코딩
+    """메모리 효율적인 파일 다운로드 - 스트리밍 사용"""
     try:
-        # ASCII 파일명인지 확인
-        download_name.encode('ascii')
-        # ASCII인 경우 기본 형식 사용
-        resp.headers["Content-Disposition"] = f'attachment; filename="{download_name}"'
-    except UnicodeEncodeError:
-        # 유니코드 파일명인 경우 RFC 5987 형식 사용
-        encoded_filename = quote(download_name, safe='')
-        resp.headers["Content-Disposition"] = f"attachment; filename*=UTF-8''{encoded_filename}"
-    
-    return resp
+        if not os.path.exists(path):
+            app.logger.error(f"전송할 파일이 존재하지 않음: {path}")
+            return jsonify({"error": "파일을 찾을 수 없습니다"}), 404
+        
+        file_size = os.path.getsize(path)
+        if file_size == 0:
+            app.logger.error(f"전송할 파일이 비어있음: {path}")
+            return jsonify({"error": "파일이 비어있습니다"}), 500
+        
+        app.logger.info(f"파일 전송 시작: {download_name} ({file_size} bytes)")
+        
+        # 스트리밍 응답으로 메모리 사용량 최적화
+        resp = send_file(
+            path,
+            as_attachment=True,
+            download_name=download_name,
+            mimetype="application/pdf",
+            conditional=True  # 조건부 요청 지원
+        )
+        
+        # RFC5987 호환 헤더 설정
+        ascii_name = ascii_fallback(download_name)
+        resp.headers["Content-Disposition"] = (
+            f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(download_name)}'
+        )
+        resp.headers["Content-Length"] = str(file_size)
+        resp.headers["Cache-Control"] = "no-cache, no-store, must-revalidate"
+        resp.headers["Pragma"] = "no-cache"
+        resp.headers["Expires"] = "0"
+        
+        app.logger.info(f"파일 전송 완료: {download_name}")
+        return resp
+    except Exception as e:
+        app.logger.error(f"파일 전송 실패: {path} - {e}")
+        return jsonify({"error": f"파일 전송 실패: {str(e)}"}), 500
 
 
 def _find_soffice():

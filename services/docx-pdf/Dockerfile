@@ -22,10 +22,11 @@ COPY . .
 # 포트 설정
 EXPOSE 10000
 
+# 메모리 제한 설정 (환경 변수)
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
+ENV MALLOC_TRIM_THRESHOLD_=100000
+ENV MALLOC_MMAP_THRESHOLD_=100000
+
 # gunicorn을 사용한 프로덕션 실행
-CMD ["python", "-m", "gunicorn", "app:app", \
-     "-b", "0.0.0.0:${PORT:-10000}", \
-     "-k", "sync", "-w", "1", "--threads", "1", \
-     "--timeout", "600", "--graceful-timeout", "30", "--keep-alive", "15", \
-     "--max-requests", "200", "--max-requests-jitter", "40", \
-     "--worker-tmp-dir=/dev/shm"]
+CMD ["sh", "-c", "exec python -m gunicorn app:app -b 0.0.0.0:${PORT:-10000} -k sync -w 1 --threads 1 --timeout 900 --graceful-timeout 60 --keep-alive 30 --max-requests 100 --max-requests-jitter 20 --worker-tmp-dir=/dev/shm --worker-connections=50 --limit-request-line=4096 --limit-request-fields=100"]
