@@ -137,26 +137,26 @@ def diag_pip():
 
 @app.post("/convert")
 def convert_sync():
-    f = request.files.get("file") or request.files.get("document")
-    if not f:
-        return jsonify({"error":"file field is required"}), 400
-
-    in_name = f.filename or "input.pptx"  # pptx 기본값
-    base, ext = os.path.splitext(os.path.basename(in_name))
-    ext = ext.lower()
-    if ext not in ALLOWED_EXTS:
-        return jsonify({"error": f"unsupported extension: {ext}"}), 415
-
-    jid      = uuid4().hex
-    in_path  = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
-    tmp_out  = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
-    out_name = f"{base}.pdf"                    # 원본 파일명 기반의 .pdf
-    final_out= os.path.join(OUTPUTS_DIR, out_name)
-
-    f.save(in_path)
     try:
-        perform_libreoffice(in_path, tmp_out)   # pdf:impress_pdf_Export 필터 사용
+        f = request.files.get("file") or request.files.get("document")
+        if not f:
+            return jsonify({"error":"file field is required"}), 400
 
+        in_name = f.filename or "input.pptx"
+        base, ext = os.path.splitext(os.path.basename(in_name))
+        ext = ext.lower()
+        if ext not in ALLOWED_EXTS:
+            return jsonify({"error": f"unsupported extension: {ext}"}), 415
+
+        jid      = uuid4().hex
+        in_path  = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
+        tmp_out  = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+        out_name = f"{base}.pdf"                         # 원본 기반
+        final_out= os.path.join(OUTPUTS_DIR, out_name)
+
+        f.save(in_path)
+        # 변환(필터 명시: ppt/pptx는 impress_pdf_Export)
+        perform_libreoffice(in_path, tmp_out)
         if not _is_pdf(tmp_out):
             raise RuntimeError("Output is not a valid PDF")
 
@@ -164,14 +164,10 @@ def convert_sync():
             if os.path.exists(final_out): os.remove(final_out)
             os.replace(tmp_out, final_out)
 
-        # 스트리밍으로 전송(메모리 절약) + Content-Disposition에 확실히 파일명 지정
         size = os.path.getsize(final_out)
         resp = send_file(
-            final_out,
-            as_attachment=True,
-            download_name=out_name,             # 기본 파일명
-            mimetype="application/pdf",
-            conditional=False
+            final_out, as_attachment=True, download_name=out_name,
+            mimetype="application/pdf", conditional=False
         )
         resp.headers["Content-Length"] = str(size)
         return _set_pdf_disposition(resp, out_name)
@@ -182,6 +178,19 @@ def convert_sync():
     finally:
         try: os.remove(in_path)
         except: pass
+
+@app.post("/test-name")
+def test_name():
+    """헤더/파일명만 테스트(LO 호출 없이)"""
+    try:
+        name = (request.form.get("name") or "한글 이름 테스트") + ".pdf"
+        data = b"%PDF-1.4\n%test\n"  # 작은 가짜 PDF 헤더
+        resp = send_file(io.BytesIO(data), as_attachment=True, download_name=name, mimetype="application/pdf")
+        resp.headers["Content-Length"] = str(len(data))
+        return _set_pdf_disposition(resp, name)
+    except Exception as e:
+        logging.exception("test-name failed")
+        return jsonify({"error": str(e)}), 500
 
 def _index_response():
     page = {
