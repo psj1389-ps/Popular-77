@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": [
     "https://www.77-tools.xyz",
     "https://popular-77.vercel.app",
     "https://popular-77-xbqq.onrender.com"
-], "expose_headers": ["Content-Disposition", "X-Download-Filename"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
+], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -44,13 +44,17 @@ def ascii_fallback(name: str) -> str:
     return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
 
 def _set_pdf_disposition(resp, pdf_name: str):
+    # CR/LF/쌍따옴표 삭제(헤더 인젝션/파싱 오류 방지)
     safe = pdf_name.replace('"','').replace('\r','').replace('\n','')
+    ascii_name = ascii_fallback(safe)
+    utf8_name = quote(safe, safe="")  # RFC5987로 퍼센트 인코딩
     resp.headers["Content-Disposition"] = (
-        f'attachment; filename="{ascii_fallback(safe)}"; filename*=UTF-8\'\'{quote(safe)}'
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
     )
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
-    resp.headers["X-Download-Filename"] = safe
+    # 커스텀 헤더 제거 (X-Download-Filename 등)
+    resp.headers.pop("X-Download-Filename", None)
     return resp
 
 def _is_pdf(path: str) -> bool:
