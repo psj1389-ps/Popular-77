@@ -104,20 +104,49 @@ const XlsPdfPage: React.FC = () => {
     setConvertedFileUrl(null);
     setConvertedFileName('');
     setIsConverting(true);
-    setConversionProgress(10);
+    setConversionProgress(0);
+
+    // 부드러운 진행률 애니메이션을 위한 함수
+    const smoothProgressUpdate = (targetProgress: number, duration: number = 1000) => {
+      return new Promise<void>((resolve) => {
+        const startProgress = conversionProgress;
+        const progressDiff = targetProgress - startProgress;
+        const startTime = Date.now();
+        
+        const updateProgress = () => {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(elapsed / duration, 1);
+          const easeOutProgress = 1 - Math.pow(1 - progress, 3); // ease-out 효과
+          const currentProgress = startProgress + (progressDiff * easeOutProgress);
+          
+          setConversionProgress(Math.round(currentProgress));
+          
+          if (progress < 1) {
+            requestAnimationFrame(updateProgress);
+          } else {
+            resolve();
+          }
+        };
+        
+        requestAnimationFrame(updateProgress);
+      });
+    };
 
     const form = new FormData();
     form.append("file", selectedFile);
     form.append("quality", quality);
 
     try {
-      setConversionProgress(30);
+      // 초기 진행률을 천천히 15%까지 증가
+      await smoothProgressUpdate(15, 800);
+      
       const response = await fetch(`${API_BASE}/convert`, {
         method: "POST",
         body: form,
       });
 
-      setConversionProgress(70);
+      // 요청 완료 후 45%까지 증가
+      await smoothProgressUpdate(45, 1200);
 
       if (!response.ok) {
         const errorText = await getErrorMessage(response);
@@ -127,7 +156,8 @@ const XlsPdfPage: React.FC = () => {
         return;
       }
 
-      setConversionProgress(90);
+      // 응답 처리 중 75%까지 증가
+      await smoothProgressUpdate(75, 1000);
 
       const blob = await response.blob();
       if (blob.size === 0) {
@@ -137,6 +167,9 @@ const XlsPdfPage: React.FC = () => {
         return;
       }
 
+      // 파일 처리 중 95%까지 증가
+      await smoothProgressUpdate(95, 800);
+
       const filename = safeGetFilename(response, 
         selectedFile.name.replace(/\.(xlsx?|ods)$/i, '.pdf')
       );
@@ -145,7 +178,9 @@ const XlsPdfPage: React.FC = () => {
       setConvertedFileUrl(URL.createObjectURL(blob));
       setSuccessMessage(`변환 완료! 파일명: ${filename}로 다운로드됩니다.`);
       setShowSuccessMessage(true);
-      setConversionProgress(100);
+      
+      // 최종 완료까지 부드럽게 증가
+      await smoothProgressUpdate(100, 500);
 
       // 자동 다운로드
       downloadBlob(blob, filename);
