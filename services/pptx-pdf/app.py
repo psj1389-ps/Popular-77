@@ -1,6 +1,6 @@
 from flask import Flask, request, jsonify, send_file, make_response, render_template, redirect
 from flask_cors import CORS
-import os, io, sys, logging, subprocess, shlex
+import os, io, sys, logging, subprocess, shlex, shutil
 from uuid import uuid4
 from urllib.parse import quote
 import unicodedata
@@ -46,58 +46,64 @@ def ascii_fallback(name: str) -> str:
 
 def _set_pdf_disposition(resp, pdf_name: str):
     # RFC5987 (UTF-8) + ASCII fallback를 동시 제공 (브라우저 호환성 최고)
-    # 공백은 %20로, 따옴표/개행 제거
-    safe_name = pdf_name.replace('"', '').replace('\r', '').replace('\n', '')
-    ascii_name = ascii_fallback(safe_name)
-    utf8_name = quote(safe_name, safe="")  # 한글/공백/기호 모두 퍼센트 인코딩
+    safe = pdf_name.replace('"','').replace('\r','').replace('\n','')
     resp.headers["Content-Disposition"] = (
-        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
+        f'attachment; filename="{ascii_fallback(safe)}"; filename*=UTF-8\'\'{quote(safe)}'
     )
-    # (선택) 파일명 파싱이 까다로운 클라이언트 대비
-    resp.headers["X-Download-Filename"] = safe_name
     resp.headers["Cache-Control"] = "no-store"
     resp.headers["X-Content-Type-Options"] = "nosniff"
+    resp.headers["X-Download-Filename"] = safe
     return resp
 
 def _is_pdf(path: str) -> bool:
-    """PDF 파일 시그니처 검증"""
     try:
-        with open(path, 'rb') as f:
-            return f.read(4) == b'%PDF'
-    except:
-        return False
+        with open(path,"rb") as f: return f.read(4) == b"%PDF"
+    except: return False
 
 def _find_soffice():
-    """Find LibreOffice soffice executable"""
-    import shutil
     return shutil.which("soffice") or shutil.which("libreoffice") or "/usr/bin/soffice"
 
 def perform_libreoffice(in_path: str, out_pdf_path: str):
-    """Convert presentation to PDF using LibreOffice"""
     soffice = _find_soffice()
-    if not soffice:
-        raise RuntimeError("LibreOffice not found")
-    
-    outdir = os.path.dirname(out_pdf_path)
-    os.makedirs(outdir, exist_ok=True)
-    
+    if not soffice: raise RuntimeError("LibreOffice not found")
+
+    outdir = os.path.dirname(out_pdf_path); os.makedirs(outdir, exist_ok=True)
     ext = os.path.splitext(in_path)[1].lower()
-    filters = {
-        ".ppt": "impress_pdf_Export",
-        ".pptx": "impress_pdf_Export",
-    }
-    conv = f"pdf:{filters.get(ext, 'pdf')}"
-    
-    cmd = f'{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to {conv} --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}'
-    logging.info(f"[LO] cmd={cmd}")
-    
-    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    # ppt/pptx는 Impress 필터
+    filters = {".ppt":"impress_pdf_Export", ".pptx":"impress_pdf_Export"}
+    conv = f"pdf:{filters.get(ext,'impress_pdf_Export')}"
+
+    # 옵션 강화(헤드리스/복구/락/디폴트 비활성)
+    cmd = [
+        soffice, "--headless", "--invisible",
+        "--nologo", "--nofirststartwizard", "--norestore",
+        "--nolockcheck", "--nodefault",
+        "--convert-to", conv, "--outdir", outdir, in_path
+    ]
+    # 환경변수: HOME=/tmp (LO가 사용자 디렉터리 필요로 할 때 오류 예방)
+    env = os.environ.copy()
+    env.setdefault("HOME", "/tmp")
+    env.setdefault("SAL_USE_VCL", "svp")
+    env.setdefault("OOO_DISABLE_RECOVERY", "1")
+
+    logging.info("[LO] cmd=%s", " ".join(shlex.quote(x) for x in cmd))
+    p = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    logging.info("[LO] rc=%s", p.returncode)
+    if p.stdout: logging.info("[LO] stdout=%s", p.stdout[:4000])
+    if p.stderr: logging.warning("[LO] stderr=%s", p.stderr[:4000])
+
     if p.returncode != 0:
-        raise RuntimeError(p.stderr.decode("utf-8", "ignore"))
-    
+        raise RuntimeError(f"soffice rc={p.returncode}, err={p.stderr[:800]}")
+
     produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
     if not os.path.exists(produced):
         raise RuntimeError(f"PDF not produced: {produced}")
+    # out_pdf_path로 통일
+    if produced != out_pdf_path:
+        if os.path.exists(out_pdf_path): os.remove(out_pdf_path)
+        os.replace(produced, out_pdf_path)
+    
+
 
 
 
@@ -137,10 +143,10 @@ def diag_pip():
 
 @app.post("/convert")
 def convert_sync():
+    in_path = None
     try:
         f = request.files.get("file") or request.files.get("document")
-        if not f:
-            return jsonify({"error":"file field is required"}), 400
+        if not f: return jsonify({"error":"file field is required"}), 400
 
         in_name = f.filename or "input.pptx"
         base, ext = os.path.splitext(os.path.basename(in_name))
@@ -151,11 +157,10 @@ def convert_sync():
         jid      = uuid4().hex
         in_path  = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
         tmp_out  = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
-        out_name = f"{base}.pdf"                         # 원본 기반
+        out_name = f"{base}.pdf"
         final_out= os.path.join(OUTPUTS_DIR, out_name)
 
         f.save(in_path)
-        # 변환(필터 명시: ppt/pptx는 impress_pdf_Export)
         perform_libreoffice(in_path, tmp_out)
         if not _is_pdf(tmp_out):
             raise RuntimeError("Output is not a valid PDF")
@@ -165,19 +170,22 @@ def convert_sync():
             os.replace(tmp_out, final_out)
 
         size = os.path.getsize(final_out)
-        resp = send_file(
-            final_out, as_attachment=True, download_name=out_name,
-            mimetype="application/pdf", conditional=False
-        )
+        resp = send_file(final_out, as_attachment=True, download_name=out_name,
+                         mimetype="application/pdf", conditional=False)
         resp.headers["Content-Length"] = str(size)
         return _set_pdf_disposition(resp, out_name)
-
     except Exception as e:
         logging.exception("conversion failed")
-        return jsonify({"error": str(e)}), 500
+        # 변환 오류를 프런트에서 바로 볼 수 있도록 상세 반환
+        return jsonify({
+            "error": str(e),
+            "hint": "see logs for [LO] rc/stdout/stderr"
+        }), 500
     finally:
-        try: os.remove(in_path)
-        except: pass
+        try:
+            if in_path and os.path.exists(in_path): os.remove(in_path)
+        except Exception:
+            pass
 
 @app.post("/test-name")
 def test_name():
