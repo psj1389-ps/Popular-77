@@ -27,6 +27,18 @@ os.makedirs(OUTPUTS_DIR, exist_ok=True)
 
 ALLOWED_EXTS = {".ppt", ".pptx"}
 
+SERVICE_NAME = os.getenv("SERVICE_DIR", "pptx-pdf")
+
+def _accept_from_allowed():
+    # ALLOWED_EXTS = {".ppt",".pptx"} 같은 세트가 서비스별로 이미 있습니다.
+    return ",".join(sorted(ALLOWED_EXTS))
+
+_titles = {
+    "docx-pdf": "DOCX to PDF Converter",
+    "pptx-pdf": "PPTX to PDF Converter",
+    "xls-pdf": "XLS/XLSX to PDF Converter",
+}
+
 def ascii_fallback(name: str) -> str:
     """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
     a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
@@ -83,26 +95,24 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
 
 @app.get("/")
 def index_page():
-    # 서비스별 맞춤값
     page = {
-        "title": "PPTX to PDF Converter",
+        "title": _titles.get(SERVICE_NAME, "File to PDF Converter"),
         "subtitle": "문서를 PDF로 안정적으로 변환",
-        "accept": ".ppt,.pptx",
-        "service": "pptx-pdf",
+        "accept": _accept_from_allowed(),  # 예: .ppt,.pptx
+        "service": SERVICE_NAME,
         "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "60"),
     }
     try:
         resp = make_response(render_template("index.html", page=page))
     except Exception:
-        # templates/index.html이 없어도 동작하는 최소 폼(임시)
-        html = f"""
-<!doctype html><meta charset="utf-8">
+        # templates/index.html이 없어도 최소 폼을 띄우는 폴백
+        html = f"""<!doctype html><meta charset="utf-8">
 <h2>{page['title']}</h2>
 <form action="/convert" method="post" enctype="multipart/form-data">
 <input type="file" name="file" accept="{page['accept']}" required>
 <button type="submit">Convert</button>
 </form>
-<p>Health: <a href="/health">/health</a> · Max {page['max_mb']}MB</p>
+<p><a href="/health">/health</a> · Max {page['max_mb']}MB</p>
 """
         resp = make_response(html, 200)
     resp.headers["Cache-Control"] = "no-store"
