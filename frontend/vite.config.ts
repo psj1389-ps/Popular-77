@@ -44,6 +44,21 @@ export default defineConfig({
   ],
   server: {
     proxy: {
+      "/api/pdf-doc": {
+        target: "http://localhost:10000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-doc/, "")
+      },
+      "/api/pdf-pptx": {
+        target: "http://localhost:10000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-pptx/, "")
+      },
+      "/api/pdf-xls": {
+        target: "http://localhost:10000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/pdf-xls/, "")
+      },
       "/api/pdf-tiff": {
         target: "http://localhost:5008",
         changeOrigin: true,
