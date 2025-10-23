@@ -172,12 +172,7 @@ def convert_sync():
         except:
             pass
 
-@app.get("/index.html")
-def index_html():
-    return redirect("/")
-
-@app.route("/", methods=["GET", "HEAD"])
-def index_page():
+def _index_response():
     page = {
         "title": _titles.get(SERVICE_NAME, "File to PDF Converter"),
         "subtitle": "문서를 PDF로 안정적으로 변환",
@@ -188,7 +183,7 @@ def index_page():
     try:
         resp = make_response(render_template("index.html", page=page))
     except Exception:
-        # templates/index.html이 없어도 동작하는 간단 폼
+        # templates/index.html이 없어도 동작하는 폴백 HTML
         html = f"""
 <!doctype html><meta charset="utf-8">
 <h2>{page['title']}</h2>
@@ -202,10 +197,24 @@ def index_page():
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
+@app.get("/index.html")
+def index_html():
+    return redirect("/")
+
+@app.route("/", methods=["GET", "HEAD"])
+def _root_index():
+    return _index_response()
+
 @app.errorhandler(404)
-def _not_found(e):
-    if request.path == "/":
-        return index_page()
+def _spa_rewrite(e):
+    if request.method in ("GET", "HEAD"):
+        # API 경로는 폴백하지 않고 404 유지
+        if request.path.startswith(("/health", "/convert", "/routes")):
+            return make_response({"error": "not found", "path": request.path}, 404)
+        # HTML을 원할 때만 index로 (Accept 헤더 체크하면 더 안전)
+        accept = request.headers.get("Accept", "")
+        if "text/html" in accept or "*/*" in accept:
+            return _index_response()
     return make_response({"error": "not found", "path": request.path}, 404)
 
 @app.route("/routes", methods=["GET"])
