@@ -1,4 +1,4 @@
-import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon, ImageIcon, Shapes, Camera, Monitor, Film, Palette, Images, Zap } from 'lucide-react';
+import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon, ImageIcon, Shapes, Camera, Monitor, Film, Palette, Images, Zap, Expand, Minimize2, Type, Sparkles, Languages, FileImage, Play, Download, Subtitles, Minimize, Scissors } from 'lucide-react';
 import { Tool } from '../types';
 
 interface PopularToolsProps {
@@ -234,15 +234,24 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-green-50 p-6 rounded-lg hover:bg-green-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">이미지 리사이저</h4>
+              <div className="flex items-center mb-2">
+                <Expand className="w-6 h-6 text-green-600 mr-2" />
+                <h4 className="font-semibold text-lg">이미지 리사이저</h4>
+              </div>
               <p className="text-gray-600">이미지 크기를 조정하고 최적화합니다.</p>
             </div>
             <div className="bg-green-50 p-6 rounded-lg hover:bg-green-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">이미지 압축</h4>
+              <div className="flex items-center mb-2">
+                <Minimize2 className="w-6 h-6 text-green-600 mr-2" />
+                <h4 className="font-semibold text-lg">이미지 압축</h4>
+              </div>
               <p className="text-gray-600">이미지 파일 크기를 줄여 최적화합니다.</p>
             </div>
             <div className="bg-green-50 p-6 rounded-lg hover:bg-green-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">이미지 변환</h4>
+              <div className="flex items-center mb-2">
+                <RefreshCw className="w-6 h-6 text-green-600 mr-2" />
+                <h4 className="font-semibold text-lg">이미지 변환</h4>
+              </div>
               <p className="text-gray-600">다양한 이미지 형식 간 변환을 지원합니다.</p>
             </div>
           </div>
@@ -255,15 +264,24 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">AI 텍스트 생성</h4>
+              <div className="flex items-center mb-2">
+                <Type className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-lg">AI 텍스트 생성</h4>
+              </div>
               <p className="text-gray-600">인공지능을 활용한 텍스트 생성 도구입니다.</p>
             </div>
             <div className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">AI 이미지 생성</h4>
+              <div className="flex items-center mb-2">
+                <Sparkles className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-lg">AI 이미지 생성</h4>
+              </div>
               <p className="text-gray-600">텍스트 설명으로 이미지를 생성합니다.</p>
             </div>
             <div className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">AI 번역</h4>
+              <div className="flex items-center mb-2">
+                <Languages className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-lg">AI 번역</h4>
+              </div>
               <p className="text-gray-600">고품질 AI 번역 서비스를 제공합니다.</p>
             </div>
           </div>
@@ -276,19 +294,31 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             <div className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">JPG 변환</h4>
+              <div className="flex items-center mb-2">
+                <FileImage className="w-6 h-6 text-indigo-600 mr-2" />
+                <h4 className="font-semibold text-lg">JPG 변환</h4>
+              </div>
               <p className="text-gray-600">다양한 형식을 JPG로 변환합니다.</p>
             </div>
             <div className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">PNG 변환</h4>
+              <div className="flex items-center mb-2">
+                <Image className="w-6 h-6 text-indigo-600 mr-2" />
+                <h4 className="font-semibold text-lg">PNG 변환</h4>
+              </div>
               <p className="text-gray-600">이미지를 PNG 형식으로 변환합니다.</p>
             </div>
             <div className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">WebP 변환</h4>
+              <div className="flex items-center mb-2">
+                <Zap className="w-6 h-6 text-indigo-600 mr-2" />
+                <h4 className="font-semibold text-lg">WebP 변환</h4>
+              </div>
               <p className="text-gray-600">최신 WebP 형식으로 변환합니다.</p>
             </div>
             <div className="bg-indigo-50 p-6 rounded-lg hover:bg-indigo-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">GIF 변환</h4>
+              <div className="flex items-center mb-2">
+                <Play className="w-6 h-6 text-indigo-600 mr-2" />
+                <h4 className="font-semibold text-lg">GIF 변환</h4>
+              </div>
               <p className="text-gray-600">애니메이션 GIF로 변환합니다.</p>
             </div>
           </div>
@@ -340,15 +370,24 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">유튜브 다운로더</h4>
+              <div className="flex items-center mb-2">
+                <Download className="w-6 h-6 text-red-600 mr-2" />
+                <h4 className="font-semibold text-lg">유튜브 다운로더</h4>
+              </div>
               <p className="text-gray-600">유튜브 영상을 다운로드합니다.</p>
             </div>
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">썸네일 추출</h4>
+              <div className="flex items-center mb-2">
+                <ImageIcon className="w-6 h-6 text-red-600 mr-2" />
+                <h4 className="font-semibold text-lg">썸네일 추출</h4>
+              </div>
               <p className="text-gray-600">유튜브 영상의 썸네일을 추출합니다.</p>
             </div>
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">자막 추출</h4>
+              <div className="flex items-center mb-2">
+                <Subtitles className="w-6 h-6 text-red-600 mr-2" />
+                <h4 className="font-semibold text-lg">자막 추출</h4>
+              </div>
               <p className="text-gray-600">유튜브 영상의 자막을 추출합니다.</p>
             </div>
           </div>
@@ -361,15 +400,24 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
             <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">동영상 압축</h4>
+              <div className="flex items-center mb-2">
+                <Minimize className="w-6 h-6 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-lg">동영상 압축</h4>
+              </div>
               <p className="text-gray-600">동영상 파일 크기를 줄여 최적화합니다.</p>
             </div>
             <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">동영상 변환</h4>
+              <div className="flex items-center mb-2">
+                <Video className="w-6 h-6 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-lg">동영상 변환</h4>
+              </div>
               <p className="text-gray-600">다양한 동영상 형식 간 변환을 지원합니다.</p>
             </div>
             <div className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105">
-              <h4 className="font-semibold text-lg mb-2">동영상 자르기</h4>
+              <div className="flex items-center mb-2">
+                <Scissors className="w-6 h-6 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-lg">동영상 자르기</h4>
+              </div>
               <p className="text-gray-600">원하는 길이로 동영상을 자릅니다.</p>
             </div>
           </div>
