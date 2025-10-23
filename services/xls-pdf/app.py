@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, make_response, render_template
+from flask import Flask, request, jsonify, send_file, make_response, render_template, redirect, url_for
 from flask_cors import CORS
 import os, io, sys, logging, subprocess, shlex
 from uuid import uuid4
@@ -82,17 +82,30 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
         raise RuntimeError(f"PDF not produced: {produced}")
 
 @app.get("/")
-def index():
+def index_page():
+    # 서비스별 맞춤값
     page = {
         "title": "XLS to PDF Converter",
-        "subtitle": "Excel 스프레드시트를 PDF로 안정적으로 변환",
+        "subtitle": "문서를 PDF로 안정적으로 변환",
         "accept": ".xls,.xlsx",
+        "service": "xls-pdf",
         "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "60"),
-        "service": "xls-pdf"
     }
-    resp = make_response(render_template("index.html", page=page))
+    try:
+        resp = make_response(render_template("index.html", page=page))
+    except Exception:
+        # templates/index.html이 없어도 동작하는 최소 폼(임시)
+        html = f"""
+<!doctype html><meta charset="utf-8">
+<h2>{page['title']}</h2>
+<form action="/convert" method="post" enctype="multipart/form-data">
+<input type="file" name="file" accept="{page['accept']}" required>
+<button type="submit">Convert</button>
+</form>
+<p>Health: <a href="/health">/health</a> · Max {page['max_mb']}MB</p>
+"""
+        resp = make_response(html, 200)
     resp.headers["Cache-Control"] = "no-store"
-    resp.headers["Pragma"] = "no-cache"
     return resp
 
 @app.get("/health")
@@ -174,7 +187,11 @@ def convert_sync():
 
 @app.get("/index.html")
 def index_html():
-    return render_template("index.html")
+    return redirect("/")
+
+@app.get("/routes")
+def list_routes():
+    return {"routes": [f"{r.rule} {','.join(r.methods)}" for r in app.url_map.iter_rules()]}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
