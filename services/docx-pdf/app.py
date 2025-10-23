@@ -208,10 +208,10 @@ def _not_found(e):
         return index_page()
     return make_response({"error": "not found", "path": request.path}, 404)
 
-@app.get("/routes")
+@app.route("/routes", methods=["GET"])
 def list_routes():
     return {"routes": [f"{r.rule} {','.join(sorted(r.methods))}" for r in app.url_map.iter_rules()]}
 
 if __name__ == "__main__":
-    port = int(os.getenv("PORT", "10000"))
+    port = int(os.getenv("PORT", "10001"))
     app.run(host="0.0.0.0", port=port)

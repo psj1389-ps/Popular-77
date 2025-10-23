@@ -208,7 +208,7 @@ def _not_found(e):
         return index_page()
     return make_response({"error": "not found", "path": request.path}, 404)
 
-@app.get("/routes")
+@app.route("/routes", methods=["GET"])
 def list_routes():
     return {"routes": [f"{r.rule} {','.join(sorted(r.methods))}" for r in app.url_map.iter_rules()]}
 
