@@ -28,13 +28,19 @@ export function safeGetFilename(res: Response, fallback: string): string {
   let fname = fallback;
   
   // filename*=UTF-8''... 형식 우선 파싱 (RFC5987)
-  const m = disp.match(/filename\*?=([^;]+)/i);
-  if (m) {
-    let v = m[1].trim();
-    if (v.startsWith("UTF-8''")) {
-      v = decodeURIComponent(v.slice(7));
+  const utf8Match = disp.match(/filename\*=UTF-8''([^;]+)/i);
+  if (utf8Match) {
+    try {
+      fname = decodeURIComponent(utf8Match[1]);
+    } catch (e) {
+      console.warn('Failed to decode UTF-8 filename:', e);
     }
-    fname = v.replace(/^"+|"+$/g, '');
+  } else {
+    // 일반 filename= 형식 파싱
+    const normalMatch = disp.match(/filename=([^;]+)/i);
+    if (normalMatch) {
+      fname = normalMatch[1].replace(/^"+|"+$/g, '');
+    }
   }
   
   return fname || fallback;

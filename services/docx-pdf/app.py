@@ -154,8 +154,9 @@ def convert_sync():
     jid = uuid4().hex
     in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
     tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+    # 원본 파일명을 유지하여 PDF 파일명 생성
     out_name = f"{base}.pdf"
-    final_out = os.path.join(OUTPUTS_DIR, out_name)
+    final_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
 
     f.save(in_path)
     try:
@@ -163,10 +164,7 @@ def convert_sync():
         if not _is_pdf(tmp_out):
             raise RuntimeError("Output is not a valid PDF")
         
-        if tmp_out != final_out:
-            if os.path.exists(final_out):
-                os.remove(final_out)
-            os.replace(tmp_out, final_out)
+        # tmp_out과 final_out이 같으므로 이동 불필요
 
         size = os.path.getsize(final_out)
         resp = send_file(final_out, as_attachment=True, download_name=out_name,

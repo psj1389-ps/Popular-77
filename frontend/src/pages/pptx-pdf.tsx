@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { safeGetFilename, downloadBlob } from '@/utils/pdfUtils';
 
 const API_BASE = import.meta.env.PROD 
-  ? "https://pptx-pdf-service.onrender.com" 
+  ? "https://popular-77-xbqq.onrender.com" 
   : "http://127.0.0.1:11000";
 
 const formatFileSize = (bytes: number) => {

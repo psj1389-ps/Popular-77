@@ -3,7 +3,7 @@ import { Helmet } from 'react-helmet-async';
 import { safeGetFilename, downloadBlob } from '@/utils/pdfUtils';
 
 const API_BASE = import.meta.env.PROD 
-  ? "https://xls-pdf-service.onrender.com" 
+  ? "https://xls-pdf-docker.onrender.com" 
   : "http://127.0.0.1:12000";
 
 const formatFileSize = (bytes: number) => {
