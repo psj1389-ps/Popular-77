@@ -320,7 +320,7 @@ const XlsPdfPage: React.FC = () => {
               )}
 
               {/* 변환 진행률 표시 */}
-              {isConverting && (
+              {isConverting && !showSuccessMessage && (
                 <div className="mb-4">
                   <div className="flex justify-between items-center mb-2">
                     <span className="text-sm font-medium text-blue-700">변환 진행률</span>
