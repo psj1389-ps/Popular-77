@@ -17,7 +17,7 @@ CORS(app, resources={r"/*": {"origins": [
     "https://www.77-tools.xyz",
     "https://popular-77.vercel.app",
     "https://popular-77-xbqq.onrender.com"
-], "expose_headers": ["Content-Disposition"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
+], "expose_headers": ["Content-Disposition", "X-Download-Filename"], "methods": ["GET","POST","OPTIONS"], "allow_headers": ["Content-Type"], "supports_credentials": False}})
 
 BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 UPLOADS_DIR = os.path.join(BASE_DIR, "uploads")
@@ -39,18 +39,24 @@ _titles = {
     "xls-pdf": "XLS/XLSX to PDF Converter",
 }
 
-def _ascii_fallback(name: str) -> str:
-    # 한글/특수문자 → ASCII 대체, 위험문자 제거
-    a = unicodedata.normalize("NFKD", name).encode("ascii","ignore").decode("ascii") or "converted.pdf"
-    return "".join(c for c in a if c.isalnum() or c in "._- ") or "converted.pdf"
+def ascii_fallback(name: str) -> str:
+    # 한글/특수문자를 제거한 ASCII 대체 + 안전 문자만 유지
+    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
+    return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
 
 def _set_pdf_disposition(resp, pdf_name: str):
-    # RFC5987 + ASCII fallback 동시 제공 (브라우저 호환성)
+    # RFC5987 (UTF-8) + ASCII fallback를 동시 제공 (브라우저 호환성 최고)
+    # 공백은 %20로, 따옴표/개행 제거
+    safe_name = pdf_name.replace('"', '').replace('\r', '').replace('\n', '')
+    ascii_name = ascii_fallback(safe_name)
+    utf8_name = quote(safe_name, safe="")  # 한글/공백/기호 모두 퍼센트 인코딩
     resp.headers["Content-Disposition"] = (
-        f'attachment; filename="{_ascii_fallback(pdf_name)}"; '
-        f"filename*=UTF-8''{quote(pdf_name)}"
+        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{utf8_name}'
     )
+    # (선택) 파일명 파싱이 까다로운 클라이언트 대비
+    resp.headers["X-Download-Filename"] = safe_name
     resp.headers["Cache-Control"] = "no-store"
+    resp.headers["X-Content-Type-Options"] = "nosniff"
     return resp
 
 def _is_pdf(path: str) -> bool:
