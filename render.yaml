@@ -206,3 +206,19 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.6
     healthCheckPath: /health
+
+  # PPTX to PDF Service
+  - type: web
+    name: pptx-pdf-service
+    env: python
+    rootDir: services/pptx-pdf
+    buildCommand: pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: PYTHON_VERSION
+        value: 3.12.6
+    healthCheckPath: /health

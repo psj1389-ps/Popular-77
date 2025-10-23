@@ -70,34 +70,13 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
     if not soffice: raise RuntimeError("LibreOffice not found")
     outdir = os.path.dirname(out_pdf_path); os.makedirs(outdir, exist_ok=True)
     ext = os.path.splitext(in_path)[1].lower()
-    conv = "pdf:impress_pdf_Export"  # PPT/PPTX는 Impress 필터 고정
-    cmd = [
-        soffice, "--headless", "--invisible", "--nologo",
-        "--nofirststartwizard", "--norestore", "--nolockcheck", "--nodefault",
-        "--convert-to", conv, "--outdir", outdir, in_path
-    ]
-    env = os.environ.copy()
-    env.setdefault("HOME", "/tmp")
-    env.setdefault("SAL_USE_VCL", "svp")
-    env.setdefault("OOO_DISABLE_RECOVERY", "1")
-
-    logging.info("[LO] cmd=%s", " ".join(shlex.quote(x) for x in cmd))
-    p = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-    logging.info("[LO] rc=%s", p.returncode)
-    if p.stdout: logging.info("[LO] stdout=%s", p.stdout[:4000])
-    if p.stderr: logging.warning("[LO] stderr=%s", p.stderr[:4000])
-
-    if p.returncode != 0:
-        raise RuntimeError(f"soffice rc={p.returncode}, err={p.stderr[:800]}")
-
-    produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
-    if not os.path.exists(produced):
-        raise RuntimeError(f"PDF not produced: {produced}")
-
-    if produced != out_pdf_path:
-        if os.path.exists(out_pdf_path): os.remove(out_pdf_path)
-        os.replace(produced, out_pdf_path)
-
+    
+    # PPT/PPTX 파일에 대해 올바른 필터 사용
+    if ext in ['.ppt', '.pptx']:
+        conv = "pdf"  # 간단한 pdf 필터 사용
+    else:
+        conv = "pdf"
+    
     # 옵션 강화(헤드리스/복구/락/디폴트 비활성)
     cmd = [
         soffice, "--headless", "--invisible",
@@ -123,6 +102,7 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
     produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
     if not os.path.exists(produced):
         raise RuntimeError(f"PDF not produced: {produced}")
+    
     # out_pdf_path로 통일
     if produced != out_pdf_path:
         if os.path.exists(out_pdf_path): os.remove(out_pdf_path)

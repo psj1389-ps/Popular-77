@@ -1,0 +1,10 @@
+libreoffice
+libreoffice-writer
+libreoffice-calc
+libreoffice-impress
+libreoffice-draw
+libreoffice-base
+libreoffice-math
+fonts-liberation
+fonts-dejavu-core
+fonts-noto-cjk
