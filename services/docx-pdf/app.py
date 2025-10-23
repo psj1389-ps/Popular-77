@@ -183,7 +183,6 @@ def _index_response():
     try:
         resp = make_response(render_template("index.html", page=page))
     except Exception:
-        # templates/index.html이 없어도 동작하는 폴백 HTML
         html = f"""
 <!doctype html><meta charset="utf-8">
 <h2>{page['title']}</h2>
@@ -197,27 +196,23 @@ def _index_response():
     resp.headers["Cache-Control"] = "no-store"
     return resp
 
-@app.get("/index.html")
-def index_html():
-    return redirect("/")
-
+# 1) 루트는 index로
 @app.route("/", methods=["GET", "HEAD"])
 def _root_index():
     return _index_response()
 
-@app.errorhandler(404)
-def _spa_rewrite(e):
-    if request.method in ("GET", "HEAD"):
-        # API 경로는 폴백하지 않고 404 유지
-        if request.path.startswith(("/health", "/convert", "/routes")):
-            return make_response({"error": "not found", "path": request.path}, 404)
-        # HTML을 원할 때만 index로 (Accept 헤더 체크하면 더 안전)
-        accept = request.headers.get("Accept", "")
-        if "text/html" in accept or "*/*" in accept:
-            return _index_response()
-    return make_response({"error": "not found", "path": request.path}, 404)
+# 2) 캐치올 리라이트: 등록되지 않은 GET/HEAD 경로는 index로 폴백
+@app.route("/<path:path>", methods=["GET", "HEAD"])
+def _catch_all(path):
+    # API/정적 경로는 리라이트하지 않음
+    protected = ("/health", "/convert", "/routes", "/static", "/favicon.ico")
+    if any(("/" + path).startswith(p) for p in protected):
+        from flask import abort
+        abort(404)
+    return _index_response()
 
-@app.route("/routes", methods=["GET"])
+# (선택) 라우트 목록으로 등록 여부 확인
+@app.get("/routes")
 def list_routes():
     return {"routes": [f"{r.rule} {','.join(sorted(r.methods))}" for r in app.url_map.iter_rules()]}
 

@@ -388,7 +388,7 @@
             <p>Word 문서를 PDF로 안정적으로 변환</p>
         </div>
         
-        <form id="uploadForm" action="/upload" method="post" enctype="multipart/form-data">
+        <form id="uploadForm" action="/convert" method="post" enctype="multipart/form-data">
             <div class="upload-area" id="uploadArea">
                 <div id="uploadText">
                     <h3>DOCX 파일을 선택하세요</h3>
@@ -529,7 +529,7 @@
             try {
                 console.log('변환 요청 시작:', selectedFile.name, '품질:', quality);
                 
-                const response = await fetch('/upload', {
+                const response = await fetch('/convert', {
                     method: 'POST',
                     body: formData
                 });
