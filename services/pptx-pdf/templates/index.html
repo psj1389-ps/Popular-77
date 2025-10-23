@@ -429,29 +429,49 @@
                 clearInterval(progressInterval);
                 progressFill.style.width = '100%';
                 
+                console.log('Response status:', response.status);
+                console.log('Response headers:', response.headers);
+                console.log('Content-Type:', response.headers.get('Content-Type'));
+                
                 if (!response.ok) {
-                    return response.json().then(err => {
-                        throw new Error(err.error || '변환 중 오류가 발생했습니다.');
-                    });
-                }
-                
-                // 파일명 추출
-                const contentDisposition = response.headers.get('Content-Disposition');
-                let filename = 'converted.pdf';
-                
-                if (contentDisposition) {
-                    const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
-                    if (filenameMatch) {
-                        filename = decodeURIComponent(filenameMatch[1]);
+                    // 에러 응답은 JSON 형태로 처리
+                    const contentType = response.headers.get('Content-Type');
+                    if (contentType && contentType.includes('application/json')) {
+                        return response.json().then(err => {
+                            throw new Error(err.error || '변환 중 오류가 발생했습니다.');
+                        });
                     } else {
-                        const fallbackMatch = contentDisposition.match(/filename="(.+)"/);
-                        if (fallbackMatch) {
-                            filename = fallbackMatch[1];
-                        }
+                        // JSON이 아닌 에러 응답 처리
+                        return response.text().then(text => {
+                            throw new Error(text || '변환 중 오류가 발생했습니다.');
+                        });
                     }
                 }
                 
-                return response.blob().then(blob => ({ blob, filename }));
+                // 성공 응답은 파일 스트림으로 처리
+                const contentType = response.headers.get('Content-Type');
+                if (contentType && contentType.includes('application/pdf')) {
+                    // 파일명 추출
+                    const contentDisposition = response.headers.get('Content-Disposition');
+                    let filename = 'converted.pdf';
+                    
+                    if (contentDisposition) {
+                        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
+                        if (filenameMatch) {
+                            filename = decodeURIComponent(filenameMatch[1]);
+                        } else {
+                            const fallbackMatch = contentDisposition.match(/filename="(.+)"/);
+                            if (fallbackMatch) {
+                                filename = fallbackMatch[1];
+                            }
+                        }
+                    }
+                    
+                    return response.blob().then(blob => ({ blob, filename }));
+                } else {
+                    // 예상치 못한 응답 타입
+                    throw new Error('예상치 못한 응답 형태입니다.');
+                }
             })
             .then(({ blob, filename }) => {
                 // 파일 다운로드
