@@ -1,4 +1,4 @@
-from flask import Flask, request, jsonify, send_file, make_response, render_template, redirect, url_for
+from flask import Flask, request, jsonify, send_file, make_response, render_template, redirect
 from flask_cors import CORS
 import os, io, sys, logging, subprocess, shlex
 from uuid import uuid4
@@ -93,30 +93,7 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
     if not os.path.exists(produced):
         raise RuntimeError(f"PDF not produced: {produced}")
 
-@app.get("/")
-def index_page():
-    page = {
-        "title": _titles.get(SERVICE_NAME, "File to PDF Converter"),
-        "subtitle": "문서를 PDF로 안정적으로 변환",
-        "accept": _accept_from_allowed(),  # 예: .doc,.docx
-        "service": SERVICE_NAME,
-        "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "60"),
-    }
-    try:
-        resp = make_response(render_template("index.html", page=page))
-    except Exception:
-        # templates/index.html이 없어도 최소 폼을 띄우는 폴백
-        html = f"""<!doctype html><meta charset="utf-8">
-<h2>{page['title']}</h2>
-<form action="/convert" method="post" enctype="multipart/form-data">
-<input type="file" name="file" accept="{page['accept']}" required>
-<button type="submit">Convert</button>
-</form>
-<p><a href="/health">/health</a> · Max {page['max_mb']}MB</p>
-"""
-        resp = make_response(html, 200)
-    resp.headers["Cache-Control"] = "no-store"
-    return resp
+
 
 @app.get("/health")
 def health():
@@ -199,9 +176,41 @@ def convert_sync():
 def index_html():
     return redirect("/")
 
+@app.route("/", methods=["GET", "HEAD"])
+def index_page():
+    page = {
+        "title": _titles.get(SERVICE_NAME, "File to PDF Converter"),
+        "subtitle": "문서를 PDF로 안정적으로 변환",
+        "accept": _accept_from_allowed(),
+        "service": SERVICE_NAME,
+        "max_mb": os.getenv("MAX_CONTENT_LENGTH_MB", "60"),
+    }
+    try:
+        resp = make_response(render_template("index.html", page=page))
+    except Exception:
+        # templates/index.html이 없어도 동작하는 간단 폼
+        html = f"""
+<!doctype html><meta charset="utf-8">
+<h2>{page['title']}</h2>
+<form action="/convert" method="post" enctype="multipart/form-data">
+<input type="file" name="file" accept="{page['accept']}" required>
+<button type="submit">Convert</button>
+</form>
+<p><a href="/health">/health</a> · Max {page['max_mb']}MB</p>
+"""
+        resp = make_response(html, 200)
+    resp.headers["Cache-Control"] = "no-store"
+    return resp
+
+@app.errorhandler(404)
+def _not_found(e):
+    if request.path == "/":
+        return index_page()
+    return make_response({"error": "not found", "path": request.path}, 404)
+
 @app.get("/routes")
 def list_routes():
-    return {"routes": [f"{r.rule} {','.join(r.methods)}" for r in app.url_map.iter_rules()]}
+    return {"routes": [f"{r.rule} {','.join(sorted(r.methods))}" for r in app.url_map.iter_rules()]}
 
 if __name__ == "__main__":
     port = int(os.getenv("PORT", "10000"))
