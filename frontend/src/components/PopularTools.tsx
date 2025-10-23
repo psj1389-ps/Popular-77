@@ -1,4 +1,4 @@
-import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon } from 'lucide-react';
+import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon, ImageIcon, Shapes, Camera, Monitor, Film, Palette, Images, Zap } from 'lucide-react';
 import { Tool } from '../types';
 
 interface PopularToolsProps {
@@ -107,7 +107,10 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               onClick={() => window.open('https://popular-77.vercel.app/tools/pdf-doc', '_blank')}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to DOCX</h4>
+              <div className="flex items-center mb-2">
+                <FileText className="w-6 h-6 text-blue-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to DOCX</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 DOCX로 변환합니다.</p>
             </div>
 
@@ -115,77 +118,110 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               onClick={() => window.location.href = '/tools/pdf-pptx'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to PPTX</h4>
+              <div className="flex items-center mb-2">
+                <Presentation className="w-6 h-6 text-orange-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to PPTX</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 PPTX로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-xls'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to Excel</h4>
+              <div className="flex items-center mb-2">
+                <FileSpreadsheet className="w-6 h-6 text-green-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to Excel</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 Excel 스프레드시트로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-jpg'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to JPG</h4>
+              <div className="flex items-center mb-2">
+                <Image className="w-6 h-6 text-red-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to JPG</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 JPG 이미지로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-png'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to PNG</h4>
+              <div className="flex items-center mb-2">
+                <ImageIcon className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to PNG</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 PNG 이미지로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-svg'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to SVG</h4>
+              <div className="flex items-center mb-2">
+                <Shapes className="w-6 h-6 text-teal-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to SVG</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 SVG 벡터 방식으로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-tiff'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to TIFF</h4>
+              <div className="flex items-center mb-2">
+                <Camera className="w-6 h-6 text-amber-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to TIFF</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 TIFF 이미지로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-bmp'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to BMP</h4>
+              <div className="flex items-center mb-2">
+                <Monitor className="w-6 h-6 text-gray-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to BMP</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 BMP 이미지로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-gif'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to GIF</h4>
+              <div className="flex items-center mb-2">
+                <Film className="w-6 h-6 text-pink-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to GIF</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 GIF 애니메이션으로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-ai'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to AI</h4>
+              <div className="flex items-center mb-2">
+                <Palette className="w-6 h-6 text-yellow-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to AI</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 AI(일러스트레이터) 형식으로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-image'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to Image</h4>
+              <div className="flex items-center mb-2">
+                <Images className="w-6 h-6 text-lime-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to Image</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 다양한 Image로 변환합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/pdf-vector'}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105"
             >
-              <h4 className="font-semibold text-lg mb-2">PDF to Vector</h4>
+              <div className="flex items-center mb-2">
+                <Zap className="w-6 h-6 text-indigo-600 mr-2" />
+                <h4 className="font-semibold text-lg">PDF to Vector</h4>
+              </div>
               <p className="text-gray-600">PDF 파일을 다양한 Vector방식으로 변환합니다.</p>
             </div>
           </div>
