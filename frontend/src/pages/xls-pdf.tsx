@@ -161,12 +161,12 @@ const XlsPdfPage: React.FC = () => {
     <>
       <Helmet>
         <title>XLS → PDF 변환기 - 77-tools.xyz</title>
-        <meta name="description" content="XLS, XLSX, ODS 파일을 PDF로 무료 변환. 빠르고 안전한 온라인 스프레드시트 변환 도구." />
+        <meta name="description" content="XLS, XLSX, ODS 스프레드시트를 PDF로 무료 변환. 빠르고 안전한 온라인 문서 변환 도구." />
       </Helmet>
       
       <div className="w-full bg-white">
-      {/* 상단 초록색 배경 섹션 */}
-      <div className="bg-gradient-to-r from-green-600 to-emerald-600 text-white py-20 px-4 text-center relative overflow-hidden">
+      {/* 상단 보라색 배경 섹션 */}
+      <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
         {/* 애니메이션 배경 패턴 */}
         <div 
           className="absolute inset-0 opacity-30"
@@ -179,7 +179,7 @@ const XlsPdfPage: React.FC = () => {
         
         <div className="container mx-auto relative z-10">
             <div className="flex justify-center items-center gap-4 mb-4">
-              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
+              <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2M9 7a2 2 0 012-2h2a2 2 0 012 2m0 10V7m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" /></svg>
               <h1 className="text-4xl font-bold">XLS → PDF 변환기</h1>
             </div>
             <p className="text-lg opacity-90 max-w-2xl mx-auto">
@@ -207,9 +207,10 @@ const XlsPdfPage: React.FC = () => {
           {!selectedFile ? (
             // 파일 선택 전 UI
             <div 
-              className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors"
               onDrop={handleDrop}
               onDragOver={handleDragOver}
+              className="border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors"
+              onClick={() => fileInputRef.current?.click()}
             >
               <input 
                 ref={fileInputRef} 
@@ -218,77 +219,91 @@ const XlsPdfPage: React.FC = () => {
                 onChange={handleFileChange} 
                 className="hidden" 
               />
-              <button 
-                onClick={() => fileInputRef.current?.click()}
-                className="w-full h-full"
-              >
-                <p className="font-semibold text-gray-700">파일을 선택하세요</p>
-                <p className="text-sm text-gray-500 mt-1">XLS, XLSX, ODS 파일을 클릭하여 선택하거나 드래그하여 업로드 (최대 100MB)</p>
-              </button>
+              <div className="flex flex-col items-center">
+                <svg className="w-12 h-12 text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
+                </svg>
+                <p className="font-semibold text-gray-700">Excel 파일을 선택하세요</p>
+                <p className="text-sm text-gray-500 mt-1">Excel(XLSX, XLS) 파일을 클릭하여 선택 (최대 200MB)</p>
+              </div>
             </div>
           ) : (
             // 파일 선택 후 UI
             <div className="space-y-6">
               {/* 선택된 파일 정보 */}
               <div className="bg-gray-50 p-4 rounded-lg">
-                <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
-                <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
-              </div>
-              
-              {/* 변환 품질 선택 */}
-              <div className="space-y-2">
-                <p className="font-medium text-gray-800">변환 품질 선택:</p>
-                <div className="space-y-2">
-                  <label className="flex items-center">
-                    <input 
-                      type="radio" 
-                      name="quality" 
-                      value="fast" 
-                      checked={quality === 'fast'} 
-                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")} 
-                      className="w-4 h-4 text-blue-600" 
-                    />
-                    <span className="ml-2 text-gray-700">빠른 변환 (품질이 낮지만 빠름)</span>
-                  </label>
-                  <label className="flex items-center">
-                    <input 
-                      type="radio" 
-                      name="quality" 
-                      value="standard" 
-                      checked={quality === 'standard'} 
-                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")} 
-                      className="w-4 h-4 text-blue-600" 
-                    />
-                    <span className="ml-2 text-gray-700">표준 품질 (권장)</span>
-                  </label>
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="font-medium text-gray-800">{selectedFile.name}</p>
+                    <p className="text-sm text-gray-500">{formatFileSize(selectedFile.size)}</p>
+                  </div>
+                  <div className="text-green-600">
+                    <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
                 </div>
               </div>
 
-              {/* 진행률 표시 */}
-              {isConverting && (
-                <div className="w-full bg-gray-200 rounded-full h-2.5">
-                  <div 
-                    className="bg-blue-600 h-2.5 rounded-full transition-all duration-300" 
-                    style={{ width: `${conversionProgress}%` }}
-                  ></div>
+              {/* 변환 품질 선택 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-3">변환 품질 선택:</label>
+                <div className="space-y-2">
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="fast"
+                      checked={quality === "fast"}
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
+                    />
+                    <span>빠른 변환 (권장)</span>
+                  </label>
+                  <label className="flex items-center gap-2">
+                    <input
+                      type="radio"
+                      name="quality"
+                      value="standard"
+                      checked={quality === "standard"}
+                      onChange={(e) => setQuality(e.target.value as "fast" | "standard")}
+                    />
+                    <span>표준 변환</span>
+                  </label>
                 </div>
-              )}
+              </div>
 
               {/* 성공 메시지 */}
               {showSuccessMessage && (
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4">
                   <div className="flex items-center">
-                    <svg className="w-5 h-5 mr-2 text-green-600" fill="currentColor" viewBox="0 0 20 20">
-                      <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
+                    <svg className="w-5 h-5 text-green-600 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
                     </svg>
-                    <p className="text-green-800">{successMessage}</p>
+                    <p className="text-green-800 font-medium">{successMessage}</p>
                   </div>
                 </div>
               )}
 
-              {/* 버튼 그룹 */}
+              {/* 진행률 바 */}
+              {isConverting && (
+                <div className="space-y-2">
+                  <div className="flex justify-between text-sm text-gray-600">
+                    <span>변환 진행률</span>
+                    <span>{conversionProgress}%</span>
+                  </div>
+                  <div className="w-full bg-gray-200 rounded-full h-2">
+                    <div 
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full transition-all duration-300"
+                      style={{ width: `${conversionProgress}%` }}
+                    ></div>
+                  </div>
+                  <div className="mt-2 text-sm text-gray-500">⏳ XLS를 PDF로 변환 중...</div>
+                </div>
+              )}
+
+              {/* 버튼 영역 */}
               <div className="flex gap-4">
-                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #059669 0%, #047857 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #10b981 0%, #059669 100%)'}>
+                <button onClick={handleConvert} disabled={isConverting} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
                   {isConverting ? '변환 중...' : 'PDF로 변환하기'}
                 </button>
                 <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
@@ -302,7 +317,7 @@ const XlsPdfPage: React.FC = () => {
         </div>
       </div>
 
-      {/* 스프레드시트 변환 가이드 섹션 */}
+      {/* 문서 변환 가이드 섹션 */}
       <div className="bg-gray-50 py-16">
         <div className="max-w-4xl mx-auto px-4">
           <div className="text-center mb-12">
@@ -316,32 +331,32 @@ const XlsPdfPage: React.FC = () => {
           
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">1</span>
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-purple-600">1</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">파일 업로드</h3>
               <p className="text-gray-600">변환할 XLS, XLSX, ODS 파일을 선택하거나 드래그하여 업로드하세요.</p>
             </div>
             
             <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">2</span>
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-purple-600">2</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">변환 품질 선택</h3>
               <p className="text-gray-600">용도에 맞는 PDF 품질을 선택하세요. 표준 품질을 권장합니다.</p>
             </div>
             
             <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">3</span>
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-purple-600">3</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">자동 변환 시작</h3>
               <p className="text-gray-600">변환 버튼을 클릭하면 자동으로 XLS가 PDF로 변환됩니다.</p>
             </div>
             
             <div className="text-center">
-              <div className="bg-green-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
-                <span className="text-2xl font-bold text-green-600">4</span>
+              <div className="bg-purple-100 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
+                <span className="text-2xl font-bold text-purple-600">4</span>
               </div>
               <h3 className="text-xl font-semibold text-gray-800 mb-2">변환된 파일 다운로드</h3>
               <p className="text-gray-600">변환이 완료되면 PDF 파일이 자동으로 다운로드됩니다.</p>
