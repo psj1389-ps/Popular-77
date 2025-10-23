@@ -82,12 +82,22 @@ def perform_libreoffice(in_path: str, out_pdf_path: str):
     }
     conv = f"pdf:{filters.get(ext, 'pdf')}"
     
+    # Use environment variable to set proper encoding for Windows
+    env = os.environ.copy()
+    env['LANG'] = 'en_US.UTF-8'
+    env['LC_ALL'] = 'en_US.UTF-8'
+    
     cmd = f'{shlex.quote(soffice)} --headless --nologo --nofirststartwizard --convert-to {conv} --outdir {shlex.quote(outdir)} {shlex.quote(in_path)}'
     logging.info(f"[LO] cmd={cmd}")
     
-    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+    p = subprocess.run(cmd, shell=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, env=env)
     if p.returncode != 0:
-        raise RuntimeError(p.stderr.decode("utf-8", "ignore"))
+        error_msg = p.stderr.decode("utf-8", "ignore").strip()
+        if not error_msg:
+            error_msg = p.stdout.decode("utf-8", "ignore").strip()
+        if not error_msg:
+            error_msg = f"LibreOffice conversion failed with return code {p.returncode}"
+        raise RuntimeError(error_msg)
     
     produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
     if not os.path.exists(produced):
