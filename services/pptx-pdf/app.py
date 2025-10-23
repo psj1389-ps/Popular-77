@@ -40,12 +40,10 @@ _titles = {
 }
 
 def ascii_fallback(name: str) -> str:
-    # 한글/특수문자를 제거한 ASCII 대체 + 안전 문자만 유지
-    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
+    a = unicodedata.normalize("NFKD", name).encode("ascii","ignore").decode("ascii") or "converted.pdf"
     return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
 
 def _set_pdf_disposition(resp, pdf_name: str):
-    # RFC5987 (UTF-8) + ASCII fallback를 동시 제공 (브라우저 호환성 최고)
     safe = pdf_name.replace('"','').replace('\r','').replace('\n','')
     resp.headers["Content-Disposition"] = (
         f'attachment; filename="{ascii_fallback(safe)}"; filename*=UTF-8\'\'{quote(safe)}'
@@ -66,12 +64,35 @@ def _find_soffice():
 def perform_libreoffice(in_path: str, out_pdf_path: str):
     soffice = _find_soffice()
     if not soffice: raise RuntimeError("LibreOffice not found")
-
     outdir = os.path.dirname(out_pdf_path); os.makedirs(outdir, exist_ok=True)
     ext = os.path.splitext(in_path)[1].lower()
-    # ppt/pptx는 Impress 필터
-    filters = {".ppt":"impress_pdf_Export", ".pptx":"impress_pdf_Export"}
-    conv = f"pdf:{filters.get(ext,'impress_pdf_Export')}"
+    conv = "pdf:impress_pdf_Export"  # PPT/PPTX는 Impress 필터 고정
+    cmd = [
+        soffice, "--headless", "--invisible", "--nologo",
+        "--nofirststartwizard", "--norestore", "--nolockcheck", "--nodefault",
+        "--convert-to", conv, "--outdir", outdir, in_path
+    ]
+    env = os.environ.copy()
+    env.setdefault("HOME", "/tmp")
+    env.setdefault("SAL_USE_VCL", "svp")
+    env.setdefault("OOO_DISABLE_RECOVERY", "1")
+
+    logging.info("[LO] cmd=%s", " ".join(shlex.quote(x) for x in cmd))
+    p = subprocess.run(cmd, env=env, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+    logging.info("[LO] rc=%s", p.returncode)
+    if p.stdout: logging.info("[LO] stdout=%s", p.stdout[:4000])
+    if p.stderr: logging.warning("[LO] stderr=%s", p.stderr[:4000])
+
+    if p.returncode != 0:
+        raise RuntimeError(f"soffice rc={p.returncode}, err={p.stderr[:800]}")
+
+    produced = os.path.join(outdir, os.path.splitext(os.path.basename(in_path))[0] + ".pdf")
+    if not os.path.exists(produced):
+        raise RuntimeError(f"PDF not produced: {produced}")
+
+    if produced != out_pdf_path:
+        if os.path.exists(out_pdf_path): os.remove(out_pdf_path)
+        os.replace(produced, out_pdf_path)
 
     # 옵션 강화(헤드리스/복구/락/디폴트 비활성)
     cmd = [
@@ -147,12 +168,9 @@ def convert_sync():
     try:
         f = request.files.get("file") or request.files.get("document")
         if not f: return jsonify({"error":"file field is required"}), 400
-
         in_name = f.filename or "input.pptx"
-        base, ext = os.path.splitext(os.path.basename(in_name))
-        ext = ext.lower()
-        if ext not in ALLOWED_EXTS:
-            return jsonify({"error": f"unsupported extension: {ext}"}), 415
+        base, ext = os.path.splitext(os.path.basename(in_name)); ext = ext.lower()
+        if ext not in ALLOWED_EXTS: return jsonify({"error": f"unsupported extension: {ext}"}), 415
 
         jid      = uuid4().hex
         in_path  = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
@@ -162,8 +180,7 @@ def convert_sync():
 
         f.save(in_path)
         perform_libreoffice(in_path, tmp_out)
-        if not _is_pdf(tmp_out):
-            raise RuntimeError("Output is not a valid PDF")
+        if not _is_pdf(tmp_out): raise RuntimeError("Output is not a valid PDF")
 
         if tmp_out != final_out:
             if os.path.exists(final_out): os.remove(final_out)
@@ -174,13 +191,10 @@ def convert_sync():
                          mimetype="application/pdf", conditional=False)
         resp.headers["Content-Length"] = str(size)
         return _set_pdf_disposition(resp, out_name)
+
     except Exception as e:
         logging.exception("conversion failed")
-        # 변환 오류를 프런트에서 바로 볼 수 있도록 상세 반환
-        return jsonify({
-            "error": str(e),
-            "hint": "see logs for [LO] rc/stdout/stderr"
-        }), 500
+        return jsonify({"error": str(e)}), 500
     finally:
         try:
             if in_path and os.path.exists(in_path): os.remove(in_path)

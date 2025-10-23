@@ -451,23 +451,17 @@
                 // 성공 응답은 파일 스트림으로 처리
                 const contentType = response.headers.get('Content-Type');
                 if (contentType && contentType.includes('application/pdf')) {
-                    // 파일명 추출
-                    const contentDisposition = response.headers.get('Content-Disposition');
-                    let filename = 'converted.pdf';
-                    
-                    if (contentDisposition) {
-                        const filenameMatch = contentDisposition.match(/filename\*=UTF-8''(.+)/);
-                        if (filenameMatch) {
-                            filename = decodeURIComponent(filenameMatch[1]);
-                        } else {
-                            const fallbackMatch = contentDisposition.match(/filename="(.+)"/);
-                            if (fallbackMatch) {
-                                filename = fallbackMatch[1];
-                            }
-                        }
+                    // 파일명 추출 - 한글 파일명이 덮어쓰이지 않도록 개선
+                    const disp = response.headers.get('Content-Disposition') || '';
+                    let fname = 'converted.pdf';
+                    const m = disp.match(/filename\*?=([^;]+)/i);
+                    if (m) {
+                        let v = m[1].trim();
+                        if (v.startsWith("UTF-8''")) v = decodeURIComponent(v.slice(7));
+                        fname = v.replace(/^"+|"+$/g, '');
                     }
                     
-                    return response.blob().then(blob => ({ blob, filename }));
+                    return response.blob().then(blob => ({ blob, filename: fname }));
                 } else {
                     // 예상치 못한 응답 타입
                     throw new Error('예상치 못한 응답 형태입니다.');
