@@ -269,20 +269,23 @@ const DocxPdfPage: React.FC = () => {
                 </div>
               )}
 
-              {/* 진행률 바 */}
+              {/* 변환 진행률 표시 */}
               {isConverting && (
-                <div className="space-y-2">
-                  <div className="flex justify-between text-sm text-gray-600">
-                    <span>변환 진행률</span>
-                    <span>{conversionProgress}%</span>
+                <div className="mb-4">
+                  <div className="flex justify-between items-center mb-2">
+                    <span className="text-sm font-medium text-blue-700">변환 진행률</span>
+                    <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-gray-200 rounded-full h-2.5">
                     <div 
-                      className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2 rounded-full transition-all duration-300"
+                      className="bg-gradient-to-r from-purple-600 to-indigo-600 h-2.5 rounded-full transition-all duration-300 ease-out"
                       style={{ width: `${conversionProgress}%` }}
                     ></div>
                   </div>
-                  <div className="mt-2 text-sm text-gray-500">⏳ DOCX를 PDF로 변환 중...</div>
+                  <div className="flex items-center justify-center mt-3">
+                    <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mr-2"></div>
+                    <span className="text-sm text-gray-600">변환 중입니다... 잠시만 기다려주세요.</span>
+                  </div>
                 </div>
               )}
 
