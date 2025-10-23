@@ -39,16 +39,16 @@ _titles = {
     "xls-pdf": "XLS/XLSX to PDF Converter",
 }
 
-def ascii_fallback(name: str) -> str:
-    """유니코드 파일명을 ASCII로 변환하여 안전한 파일명 생성"""
-    a = unicodedata.normalize("NFKD", name).encode("ascii", "ignore").decode("ascii") or "converted.pdf"
-    return "".join(c for c in a if c.isalnum() or c in ".- ") or "converted.pdf"
+def _ascii_fallback(name: str) -> str:
+    # 한글/특수문자 → ASCII 대체, 위험문자 제거
+    a = unicodedata.normalize("NFKD", name).encode("ascii","ignore").decode("ascii") or "converted.pdf"
+    return "".join(c for c in a if c.isalnum() or c in "._- ") or "converted.pdf"
 
 def _set_pdf_disposition(resp, pdf_name: str):
-    """RFC 5987 + ASCII fallback으로 Content-Disposition 헤더 설정"""
-    ascii_name = ascii_fallback(pdf_name)
+    # RFC5987 + ASCII fallback 동시 제공 (브라우저 호환성)
     resp.headers["Content-Disposition"] = (
-        f'attachment; filename="{ascii_name}"; filename*=UTF-8\'\'{quote(pdf_name)}'
+        f'attachment; filename="{_ascii_fallback(pdf_name)}"; '
+        f"filename*=UTF-8''{quote(pdf_name)}"
     )
     resp.headers["Cache-Control"] = "no-store"
     return resp
@@ -133,44 +133,49 @@ def diag_pip():
 def convert_sync():
     f = request.files.get("file") or request.files.get("document")
     if not f:
-        return jsonify({"error": "file field is required"}), 400
+        return jsonify({"error":"file field is required"}), 400
 
-    name = f.filename or "input"
-    base, ext = os.path.splitext(os.path.basename(name))
+    in_name = f.filename or "input.pptx"  # pptx 기본값
+    base, ext = os.path.splitext(os.path.basename(in_name))
     ext = ext.lower()
     if ext not in ALLOWED_EXTS:
         return jsonify({"error": f"unsupported extension: {ext}"}), 415
 
-    jid = uuid4().hex
-    in_path = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
-    tmp_out = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
-    out_name = f"{base}.pdf"
-    final_out = os.path.join(OUTPUTS_DIR, out_name)
+    jid      = uuid4().hex
+    in_path  = os.path.join(UPLOADS_DIR, f"{jid}{ext}")
+    tmp_out  = os.path.join(OUTPUTS_DIR, f"{jid}.pdf")
+    out_name = f"{base}.pdf"                    # 원본 파일명 기반의 .pdf
+    final_out= os.path.join(OUTPUTS_DIR, out_name)
 
     f.save(in_path)
     try:
-        perform_libreoffice(in_path, tmp_out)
+        perform_libreoffice(in_path, tmp_out)   # pdf:impress_pdf_Export 필터 사용
+
         if not _is_pdf(tmp_out):
             raise RuntimeError("Output is not a valid PDF")
-        
+
         if tmp_out != final_out:
-            if os.path.exists(final_out):
-                os.remove(final_out)
+            if os.path.exists(final_out): os.remove(final_out)
             os.replace(tmp_out, final_out)
 
+        # 스트리밍으로 전송(메모리 절약) + Content-Disposition에 확실히 파일명 지정
         size = os.path.getsize(final_out)
-        resp = send_file(final_out, as_attachment=True, download_name=out_name,
-                        mimetype="application/pdf", conditional=False)
+        resp = send_file(
+            final_out,
+            as_attachment=True,
+            download_name=out_name,             # 기본 파일명
+            mimetype="application/pdf",
+            conditional=False
+        )
         resp.headers["Content-Length"] = str(size)
         return _set_pdf_disposition(resp, out_name)
+
     except Exception as e:
         logging.exception("conversion failed")
         return jsonify({"error": str(e)}), 500
     finally:
-        try:
-            os.remove(in_path)
-        except:
-            pass
+        try: os.remove(in_path)
+        except: pass
 
 def _index_response():
     page = {
