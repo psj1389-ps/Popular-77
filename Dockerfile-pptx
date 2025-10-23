@@ -6,7 +6,7 @@ ENV PIP_NO_CACHE_DIR=1
 ENV PIP_ROOT_USER_ACTION=ignore
 ENV SAL_USE_VCL=svp
 ENV OOO_DISABLE_RECOVERY=1
-HOME=/tmp
+ENV HOME=/tmp
 RUN apt-get update && apt-get install -y --no-install-recommends libreoffice-impress fonts-liberation fonts-noto-cjk && apt-get clean && rm -rf /var/lib/apt/lists/*
 WORKDIR /app
 COPY services/pptx-pdf/requirements.txt /tmp/requirements.txt
