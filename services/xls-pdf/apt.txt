@@ -1,0 +1,5 @@
+libreoffice-calc
+libreoffice-writer
+libreoffice-impress
+fonts-liberation
+fonts-noto-cjk
