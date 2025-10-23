@@ -2,7 +2,9 @@ import React, { useState, useRef, useEffect } from 'react';
 import { Helmet } from 'react-helmet-async';
 import { safeGetFilename, downloadBlob } from '@/utils/pdfUtils';
 
-const API_BASE = "http://127.0.0.1:12000";
+const API_BASE = import.meta.env.PROD 
+  ? "https://xls-pdf-service.onrender.com" 
+  : "http://127.0.0.1:12000";
 
 const formatFileSize = (bytes: number) => {
   if (bytes === 0) return '0 Bytes';
