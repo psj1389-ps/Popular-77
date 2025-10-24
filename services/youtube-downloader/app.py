@@ -218,6 +218,9 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
             po_tokens.append(f"web.gvs+{YT_PO_TOKEN_WEB_GVS}")
         if YT_PO_TOKEN_WEB_PLAYER:
             po_tokens.append(f"web.player+{YT_PO_TOKEN_WEB_PLAYER}")
+    elif player_client == "web_safari":
+        # yt-dlp는 web_safari 클라이언트명을 인식하지 않을 수 있으므로 실제 전달은 web로 하고 UA만 Safari로 설정
+        youtube_args["player_client"] = ["web"]
     if po_tokens:
         youtube_args["po_token"] = po_tokens
     if YT_VISITOR_DATA:
