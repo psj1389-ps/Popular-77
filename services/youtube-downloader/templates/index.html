@@ -512,7 +512,6 @@
         
         <div class="loading" id="loading">
             <div class="spinner"></div>
-            <p>로딩 중입니다... 잠시만 기다려주세요.</p>
          </div>
         
         <div class="error" id="errorMsg"></div>
@@ -698,7 +697,6 @@
             document.getElementById('downloadBtn').disabled = true;
             document.getElementById('downloadBtn').textContent = '다운로드 준비 중...';
             document.getElementById('loading').style.display = 'block';
-            document.getElementById('loading').textContent = '로딩중입니다... 잠시만 기다려주세요.';
             hideMessages();
 
             const response = await fetch('/get_video_info', {
