@@ -189,7 +189,10 @@ def get_video_info_with_fallback(url, attempt=1, max_attempts=3):
             'extract_flat': False,
             'user_agent': USER_AGENT,
             'http_headers': {
-                'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                'User-Agent': USER_AGENT,
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Origin': 'https://www.youtube.com',
+                'Referer': 'https://www.youtube.com/',
                 'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                 'Accept-Encoding': 'gzip, deflate, br',
                 'DNT': '1',
@@ -205,14 +208,16 @@ def get_video_info_with_fallback(url, attempt=1, max_attempts=3):
             },
             'sleep_interval': 1,
             'max_sleep_interval': 5,
+            'retries': 3,
             'extractor_retries': 3,
             'extractor_args': {
                 'youtube': {
-                    'player_client': config['player_clients'],
+                    'player_client': ['android'],  # android만 우선 사용
                     'skip': config['skip_formats']
                 }
             },
             'geo_bypass': True,
+            'force_ipv4': True,
             'socket_timeout': 30,
             'fragment_retries': 5,
             'retry_sleep_functions': {'http': lambda n: min(2 ** n, 30)},
@@ -305,7 +310,10 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'user_agent': USER_AGENT,
                 'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                    'User-Agent': USER_AGENT,
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Origin': 'https://www.youtube.com',
+                    'Referer': 'https://www.youtube.com/',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'DNT': '1',
@@ -321,11 +329,12 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 },
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['android', 'web', 'ios', 'tv', 'mweb'],
+                        'player_client': ['android'],  # android만 우선 사용
                         'skip': ['hls', 'dash']
                     }
                 },
                 'geo_bypass': True,
+                'force_ipv4': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -349,7 +358,10 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'user_agent': USER_AGENT,
                 'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                    'User-Agent': USER_AGENT,
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Origin': 'https://www.youtube.com',
+                    'Referer': 'https://www.youtube.com/',
                     'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
                     'Accept-Encoding': 'gzip, deflate, br',
                     'DNT': '1',
@@ -365,11 +377,12 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 },
                 'extractor_args': {
                     'youtube': {
-                        'player_client': ['android', 'web', 'ios', 'tv', 'mweb'],
+                        'player_client': ['android'],  # android만 우선 사용
                         'skip': ['hls', 'dash']
                     }
                 },
                 'geo_bypass': True,
+                'force_ipv4': True,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
@@ -705,6 +718,47 @@ def debug_cookies():
     except Exception as e:
         return jsonify({
             "has_secrets_file": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/debug-cookies/summary')
+def debug_cookie_summary():
+    """쿠키 파일 내용 분석 및 핵심 쿠키 검증 엔드포인트"""
+    try:
+        p = COOKIES_SRC
+        if not (p and os.path.exists(p)):
+            return jsonify({"exists": False, "path": p})
+        
+        lines = open(p, "r", encoding="utf-8", errors="ignore").read().splitlines()
+        domains, names, bad = set(), set(), 0
+        
+        for ln in lines:
+            if not ln or ln.startswith("#"):
+                continue
+            parts = ln.split("\t")
+            if len(parts) < 7:
+                bad += 1
+                continue
+            domain, incl, path, secure, exp, name, value = parts[:7]
+            domains.add(domain.strip())
+            names.add(name.strip())
+        
+        need_domain = {".google.com", "accounts.google.com", ".youtube.com"}
+        need_any_name = {"SAPISID", "__Secure-3PAPISID"}  # 둘 중 하나는 꼭 필요
+        
+        return jsonify({
+            "exists": True,
+            "path": p,
+            "lines": len(lines),
+            "invalid_lines": bad,
+            "domains_present": sorted(domains),
+            "has_google_domain": bool(need_domain & domains),
+            "has_key_cookie": bool(need_any_name & names),
+            "key_cookies_present": sorted(need_any_name & names),
+        })
+    except Exception as e:
+        return jsonify({
+            "exists": False,
             "error": str(e)
         }), 500
 
