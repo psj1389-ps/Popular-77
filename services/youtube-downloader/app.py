@@ -144,20 +144,17 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
         
         if format_type == 'mp3':
             ydl_opts = {
-                'format': 'bestaudio/best',
                 'outtmpl': '%(id)s.%(ext)s',
+                'format': 'bestaudio/best',
                 'noplaylist': True,
                 'overwrites': True,
-                'nopart': True,
+                'quiet': True,
+                'no_warnings': True,
+                'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'cookiefile': cookie_path,
+                'cookiefile': cookie_path,  # /tmp 사본
                 'user_agent': USER_AGENT,
-                'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9'
-                },
-                'sleep_interval': 1,
-                'max_sleep_interval': 5,
-                'extractor_retries': 3,
+                'http_headers': {'Accept-Language': 'en-US,en;q=0.9'},
                 'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
                 'geo_bypass': True,
                 'postprocessors': [{
@@ -172,25 +169,20 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
             }
         else:
             ydl_opts = {
-                'format': DEFAULT_FORMAT,
                 'outtmpl': '%(id)s.%(ext)s',
+                'format': DEFAULT_FORMAT,
+                'merge_output_format': MERGE_FORMAT,
                 'noplaylist': True,
                 'overwrites': True,
-                'nopart': True,
+                'quiet': True,
+                'no_warnings': True,
+                'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'merge_output_format': MERGE_FORMAT,
-                'cookiefile': cookie_path,
+                'cookiefile': cookie_path,  # /tmp 사본
                 'user_agent': USER_AGENT,
-                'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9'
-                },
-                'sleep_interval': 1,
-                'max_sleep_interval': 5,
-                'extractor_retries': 3,
+                'http_headers': {'Accept-Language': 'en-US,en;q=0.9'},
                 'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
                 'geo_bypass': True,
-                'concurrent_fragment_downloads': 1,
-                'socket_timeout': 30,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
@@ -402,12 +394,12 @@ def health_check():
 def debug_cookies():
     """쿠키 파일 상태 확인 엔드포인트"""
     try:
-        p = COOKIES_FILE
+        p = COOKIES_SRC
         ok = bool(p and os.path.exists(p))
         size = os.path.getsize(p) if ok else 0
         
         return jsonify({
-            "has_cookies": ok,
+            "has_secrets_file": ok,
             "path": p,
             "size": size,
             "user_agent": USER_AGENT,
@@ -417,7 +409,7 @@ def debug_cookies():
         })
     except Exception as e:
         return jsonify({
-            "has_cookies": False,
+            "has_secrets_file": False,
             "error": str(e)
         }), 500
 
