@@ -1,0 +1,14 @@
+.git
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.log
+**/*.tmp
+*.mp4
+*.mkv
+*.webm
+services/youtube-downloader/uploads/
+services/youtube-downloader/outputs/
+services/youtube-downloader/_archive/
+**/_archive/**
