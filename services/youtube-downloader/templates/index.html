@@ -1,0 +1,851 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>YouTube 동영상 다운로더</title>
+    <style>
+        body{font-family:Arial;background:#f5f5f5;margin:0;padding:0}
+        
+        /* 🔥 헤더 스타일 (1번 그림 스타일) */
+        .main-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .main-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .header-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-title {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header-subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin: 10px 0 0 0;
+            font-weight: 300;
+        }
+        
+        /* 네비게이션 관련 스타일 제거 또는 주석 처리 */
+        /*
+        .header-nav {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+        
+        .nav-item {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            color: white;
+        }
+        */
+        
+        /* 반응형 디자인에서 네비게이션 관련 부분도 제거 */
+        @media (max-width: 768px) {
+            .header-title { font-size: 2em; }
+            /* .header-nav { flex-direction: column; gap: 10px; } */
+            .footer-content { grid-template-columns: 1fr; }
+            .footer-features { justify-content: center; }
+        }
+        
+        .nav-item {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            color: white;
+        }
+        
+        /* 메인 컨테이너 조정 */
+        .container{max-width:600px;margin:20px auto;background:white;border-radius:10px;padding:30px;box-shadow:0 4px 6px rgba(0,0,0,0.1)}
+        .header{text-align:center;margin-bottom:30px}
+        .upload-area{border:2px dashed #ddd;padding:40px;text-align:center;border-radius:10px;cursor:pointer}
+        .upload-area:hover{border-color:#007bff;background:#f8f9ff}
+        .file-input{display:none}
+        .btn{background:#007bff;color:white;border:none;padding:12px 24px;border-radius:5px;cursor:pointer;font-size:16px}
+        .btn:hover{background:#0056b3}
+        .btn:disabled{background:#6c757d;cursor:not-allowed}
+        .file-info{background:#f8f9fa;padding:15px;border-radius:5px;margin-top:15px;display:none}
+        .quality-options{margin:15px 0;display:none}
+        .quality-options label{display:block;margin:5px 0}
+        .error{background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;margin-top:10px;display:none}
+        .success{background:#d4edda;color:#155724;padding:10px;border-radius:5px;margin-top:10px;display:none}
+        .loading{display:none;text-align:center;margin-top:20px}
+        .spinner{border:4px solid #f3f3f3;border-top:4px solid #007bff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        .reset-btn{background:#6c757d;margin-left:10px}
+        .reset-btn:hover{background:#545b62}
+        .button-group{display:flex;justify-content:center;gap:10px;margin-top:15px}
+        
+        /* 🔥 풋터 스타일 (헤더와 동일한 색상 적용) */
+        .main-footer {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-top: 50px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .main-footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #e74c3c, #f39c12, #2ecc71, #9b59b6);
+            background-size: 300% 100%;
+            animation: rainbow 3s ease infinite;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .footer-section h3 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            position: relative;
+        }
+        
+        .footer-section h3::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 30px;
+            height: 2px;
+            background: white;
+        }
+        
+        .footer-section p, .footer-section li {
+            color: white;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .footer-section ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .footer-section a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-section a:hover {
+            color: #f0f0f0;
+        }
+        
+        .footer-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .feature-tag {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid #34495e;
+            margin-top: 30px;
+            padding-top: 20px;
+            text-align: center;
+            color: white;
+        }
+        
+        .footer-social {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .social-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(52, 152, 219, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3498db;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .social-icon:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+        
+        .social-icon:active {
+            transform: translateY(0px);
+        }
+        
+        /* 네비게이션 아이콘들 스타일 */
+        .nav-icons-container {
+            position: absolute;
+            top: -80px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+        
+        .nav-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            text-decoration: none;
+        }
+        
+        .nav-icon:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+            color: white;
+        }
+        
+        /* 기존 롤오버 아이콘 스타일 (호환성 유지) */
+        .rollover-icon {
+            position: absolute;
+            top: -60px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            z-index: 10;
+        }
+        
+        .rollover-icon:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+        }
+        
+        .rollover-icon:active {
+            transform: translateY(-2px) scale(1.05);
+        }
+        
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .header-title { font-size: 2em; }
+            .header-nav { flex-direction: column; gap: 10px; }
+            .footer-content { grid-template-columns: 1fr; }
+            .footer-features { justify-content: center; }
+            .nav-icons-container { right: 10px; top: -60px; gap: 10px; }
+            .nav-icon { width: 40px; height: 40px; font-size: 16px; }
+            .rollover-icon { right: 10px; top: -50px; width: 40px; height: 40px; font-size: 20px; }
+        }
+        
+        /* 진행률 표시 스타일 */
+        #progressContainer {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            display: none;
+        }
+        
+        .progress-wrapper {
+            text-align: center;
+        }
+        
+        .progress-message {
+            font-size: 16px;
+            color: #495057;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background-image: linear-gradient(
+                -45deg,
+                rgba(255, 255, 255, .2) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, .2) 50%,
+                rgba(255, 255, 255, .2) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 50px 50px;
+            animation: move 2s linear infinite;
+        }
+        
+        @keyframes move {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 50px 50px;
+            }
+        }
+        
+        .progress-percent {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 🔥 헤더 섹션 (1번 그림 스타일) -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="header-logo">
+                <div class="logo-icon">📺</div>
+                <div style="position: relative;">
+                    <!-- 네비게이션 아이콘들 -->
+                    <div class="nav-icons-container">
+                        <a href="#" class="nav-icon" title="홈페이지">🏠</a>
+                        <a href="#" class="nav-icon" title="설정">⚙️</a>
+                        <a href="#" class="nav-icon" title="도움말">❓</a>
+                        <a href="#uploadArea" class="nav-icon" title="파일 업로드">📤</a>
+                    </div>
+                    <h1 class="header-title">YouTube 동영상 다운로더</h1>
+                    <p class="header-subtitle">YouTube 동영상을 고화질로 다운로드하세요. 다양한 품질과 형식을 지원합니다.</p>
+                </div>
+            </div>
+            
+            <!-- 네비게이션 메뉴 제거 -->
+            <!-- <nav class="header-nav">
+                <a href="#" class="nav-item">서비스</a>
+                <a href="#" class="nav-item">지원</a>
+                <a href="#" class="nav-item">PDF 변환</a>
+                <a href="#" class="nav-item">배치 처리</a>
+                <a href="#" class="nav-item">도움말</a>
+                <a href="#" class="nav-item">문의하기</a>
+                <a href="#" class="nav-item">개인정보처리방침</a>
+            </nav> -->
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <div class="container">
+        <div class="header">
+            <h2>YouTube 동영상 다운로더</h2>
+            <h4>고화질 동영상 다운로드</h4>
+        </div>
+        
+        <form id="downloadForm">
+            <div class="upload-area" id="urlArea">
+                <div id="urlText">
+                    <strong>YouTube URL을 입력하세요</strong>
+                    <p>YouTube 동영상 링크를 붙여넣기 하세요</p>
+                </div>
+                <input type="url" id="urlInput" placeholder="https://www.youtube.com/watch?v=..." 
+                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; margin-top: 10px;">
+            </div>
+        </form>
+        
+        <div class="file-info" id="videoInfo" style="display: block;">
+            <div id="videoThumbnail" style="text-align: center; margin-bottom: 15px;"></div>
+            <div id="videoTitle"></div>
+            <div id="videoDuration"></div>
+            <div id="videoUploader"></div>
+            
+            <div class="quality-options" id="qualityOptions" style="display: block;">
+                <h4>다운로드 옵션:</h4>
+                
+                <!-- 품질 선택 -->
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">품질 선택:</label>
+                    <label><input type="radio" name="quality" value="best"> 최고 품질</label>
+                    <label><input type="radio" name="quality" value="720p" checked> 720p HD</label>
+                    <label><input type="radio" name="quality" value="480p"> 480p</label>
+                    <label><input type="radio" name="quality" value="360p"> 360p</label>
+                </div>
+                
+                <!-- 형식 선택 -->
+                <div style="margin-bottom: 15px;">
+                    <label style="display: block; margin-bottom: 5px; font-weight: bold;">형식 선택:</label>
+                    <label><input type="radio" name="format" value="mp4" checked> MP4 (동영상)</label>
+                    <label><input type="radio" name="format" value="mp3"> MP3 (오디오만)</label>
+                </div>
+            </div>
+            
+            <div class="button-group">
+                <button class="btn" id="downloadBtn" onclick="downloadVideo()">다운로드</button>
+                <button class="btn reset-btn" id="resetBtn" onclick="resetUrl()">초기화</button>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+            <p>로딩 중입니다... 잠시만 기다려주세요.</p>
++            <p>로딩중입니다... 잠시만 기다려주세요.</p>
+         </div>
+        
+        <div class="error" id="errorMsg"></div>
+        <div class="success" id="successMsg"></div>
+    </div>
+
+    <!-- 🔥 풋터 섹션 (2번 그림 스타일) -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>서비스</h3>
+                <ul>
+                    <li><a href="#">YouTube 다운로드</a></li>
+                    <li><a href="#">배치 다운로드</a></li>
+                    <li><a href="#">API 서비스</a></li>
+                    <li><a href="#">프리미엄 플랜</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3>지원</h3>
+                <ul>
+                    <li><a href="#">도움말</a></li>
+                    <li><a href="#">문의하기</a></li>
+                    <li><a href="#">FAQ</a></li>
+                    <li><a href="#">기술 지원</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3>주요 기능</h3>
+                <div class="footer-features">
+                    <span class="feature-tag">✨ 고화질 다운로드</span>
+                    <span class="feature-tag">✨ 다양한 형식 지원</span>
+                    <span class="feature-tag">✨ 빠른 처리</span>
+                    <span class="feature-tag">MP4 다운로드</span>
+                    <span class="feature-tag">MP3 추출</span>
+                    <span class="feature-tag">무료 서비스</span>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h3>회사 정보</h3>
+                <p>YouTube 동영상 다운로드 전문 서비스</p>
+                <p>📧 psj1389@gmail.com</p>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <div class="footer-social">
+                <a href="mailto:psj1389@gmail.com" class="social-icon" title="이메일 문의">📧</a>
+                <a href="#" class="social-icon" title="Facebook">📘</a>
+                <a href="#" class="social-icon" title="Twitter">🐦</a>
+                <a href="#" class="social-icon" title="Instagram">📷</a>
+            </div>
+            <p>&copy; 2024 YouTube Video Downloader. All rights reserved. | <a href="#">개인정보처리방침</a> | <a href="#">이용약관</a></p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUrl = null;
+        let videoInfo = null;
+
+        // URL 입력 필드 이벤트 리스너
+        document.getElementById('urlInput').addEventListener('input', function(e) {
+            const url = e.target.value.trim();
++            // 입력이 진행되면 에러/성공 메시지 숨김
++            hideMessages();
+             if (url && isValidYouTubeUrl(url)) {
+                 currentUrl = url;
+                 // 로딩 표시
+                 document.getElementById('loading').style.display = 'block';
+                 getVideoInfo(url).finally(() => {
+                     document.getElementById('loading').style.display = 'none';
+                 });
+             } else {
+                 resetVideoInfo();
+             }
+         });
+
+        // 시간 포맷 함수
+        function formatDuration(seconds) {
+            if (!seconds) return '알 수 없음';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // YouTube URL 유효성 검사
+        function isValidYouTubeUrl(url) {
+            const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)[a-zA-Z0-9_-]{11}/;
+            return youtubeRegex.test(url);
+        }
+
+        // 동영상 정보 가져오기
+        async function getVideoInfo(url) {
+            try {
+                const response = await fetch('/get_video_info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.video_info) {
+                        videoInfo = data.video_info;
+                        displayVideoInfo(videoInfo);
+                    } else {
+                        showError(data.error || '동영상 정보를 가져올 수 없습니다.');
+                    }
+                } else {
+                    const error = await response.json();
+                    showError(error.error || '동영상 정보를 가져올 수 없습니다.');
+                }
+            } catch (error) {
+                console.error('Error fetching video info:', error);
+                showError('동영상 정보를 가져오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 동영상 정보 표시
+        function displayVideoInfo(info) {
+            // 썸네일 표시
+            const thumbnailDiv = document.getElementById('videoThumbnail');
+            if (info.thumbnail) {
+                thumbnailDiv.innerHTML = `<img src="${info.thumbnail}" alt="Video Thumbnail" style="max-width: 300px; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+            } else {
+                thumbnailDiv.innerHTML = '';
+            }
+            
+            document.getElementById('videoTitle').textContent = `제목: ${info.title}`;
+            document.getElementById('videoDuration').textContent = `길이: ${formatDuration(info.duration)}`;
+            document.getElementById('videoUploader').textContent = `업로더: ${info.uploader}`;
+            hideMessages();
+        }
+
+        // 동영상 정보 초기화
+        function resetVideoInfo() {
+            // 정보 영역은 유지하면서 기본값으로 초기화
+            document.getElementById('videoInfo').style.display = 'block';
+            document.getElementById('qualityOptions').style.display = 'block';
+            document.getElementById('videoThumbnail').innerHTML = '';
+            document.getElementById('videoTitle').textContent = '제목: -';
+            document.getElementById('videoDuration').textContent = '길이: -';
+            document.getElementById('videoUploader').textContent = '업로더: -';
+            videoInfo = null;
+        }
+
+        // 동영상 다운로드
+        async function downloadVideo() {
+            // URL이 없으면 자동으로 입력 필드에서 가져오기
+            const urlInput = document.getElementById('urlInput');
+            const inputUrl = urlInput.value.trim();
+            
+            if (inputUrl && isValidYouTubeUrl(inputUrl)) {
+                currentUrl = inputUrl;
+                // 비디오 정보가 없으면 먼저 가져오기
+                if (!videoInfo) {
+                    await getVideoInfo(currentUrl);
+                }
+            }
+            
+            if (!currentUrl || !isValidYouTubeUrl(currentUrl)) {
+                showError('유효한 YouTube URL을 입력해주세요.');
+                urlInput.focus();
+                return;
+            }
+
+            const quality = document.querySelector('input[name="quality"]:checked')?.value || '720p';
+            const format = document.querySelector('input[name="format"]:checked')?.value || 'mp4';
+
+            // UI 업데이트 - 즉시 응답 시스템
+            document.getElementById('downloadBtn').disabled = true;
+            document.getElementById('downloadBtn').textContent = '다운로드 준비 중...';
+            document.getElementById('loading').style.display = 'block';
+            document.getElementById('loading').textContent = '로딩중입니다... 잠시만 기다려주세요.';
+            hideMessages();
+
+            const response = await fetch('/get_video_info', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify({
+                    url: currentUrl,
+                    quality: quality,
+                    format: format
+                })
+            });
+
+            updateProgress('다운로드 중...', 50);
+
+            if (response.ok) {
+                const result = await response.json();
+                
+                if (result.success && result.download_url) {
+                    updateProgress('다운로드 완료! 파일을 준비하고 있습니다...', 90);
+                    
+                    // 파일 다운로드 시작
+                    const fileResponse = await fetch(result.download_url);
+                    const blob = await fileResponse.blob();
+                    // 헤더의 파일명 우선 사용 (없으면 백엔드 제공 파일명 사용)
+                    const finalFilename = getFilenameFromHeader(fileResponse, result.filename);
+                    // 표시용 파일명은 선택한 형식 확장자를 강제하여 표기
+                    const selectedExt = format === 'mp3' ? '.mp3' : '.mp4';
+                    const baseName = finalFilename.replace(/\.[^.\s]+$/, '');
+                    const displayFilename = baseName + selectedExt;
+                    
+                    updateProgress('파일 다운로드 중...', 100);
+                    
+                    downloadBlob(blob, finalFilename);
+                    showSuccess(`다운로드 완료! ${displayFilename} 파일이 다운로드됩니다.`);
+                    hideProgress();
+                 } else {
+                     throw new Error(result.error || '다운로드 중 오류가 발생했습니다.');
+                 }
+            } else {
+                const error = await response.json();
+                throw new Error(error.error || '다운로드 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 진행률 표시 함수들
+        function showProgress(message) {
+            let progressContainer = document.getElementById('progressContainer');
+            if (!progressContainer) {
+                progressContainer = document.createElement('div');
+                progressContainer.id = 'progressContainer';
+                progressContainer.innerHTML = `
+                    <div class="progress-wrapper">
+                        <div class="progress-message" id="progressMessage">${message}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-percent" id="progressPercent">0%</div>
+                    </div>
+                `;
+                document.querySelector('.container').appendChild(progressContainer);
+            }
+            progressContainer.style.display = 'block';
+        }
+
+        function updateProgress(message, percent) {
+            const progressMessage = document.getElementById('progressMessage');
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            
+            if (progressMessage) progressMessage.textContent = message;
+            if (progressFill) progressFill.style.width = `${percent}%`;
+            if (progressPercent) progressPercent.textContent = `${percent}%`;
+        }
+
+        function hideProgress() {
+            const progressContainer = document.getElementById('progressContainer');
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        // URL 초기화
+        function resetUrl() {
+            currentUrl = null;
+            videoInfo = null;
+            document.getElementById('urlInput').value = '';
+            // 정보/옵션 영역은 계속 표시되도록 유지
+            document.getElementById('videoInfo').style.display = 'block';
+            document.getElementById('qualityOptions').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('downloadBtn').textContent = '다운로드';
+            
+            // 옵션 초기화 (기본값으로 복원)
+            const q720 = document.querySelector('input[name="quality"][value="720p"]');
+            if (q720) q720.checked = true;
+            const fmp4 = document.querySelector('input[name="format"][value="mp4"]');
+            if (fmp4) fmp4.checked = true;
+
+            // 표시 텍스트 초기화
+            document.getElementById('videoThumbnail').innerHTML = '';
+            document.getElementById('videoTitle').textContent = '제목: -';
+            document.getElementById('videoDuration').textContent = '길이: -';
+            document.getElementById('videoUploader').textContent = '업로더: -';
+
+            hideProgress();
+            hideMessages();
+        }
+
+        // 파일명 추출 함수
+        function getFilenameFromHeader(response, defaultName) {
+            const contentDisposition = response.headers.get('Content-Disposition');
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    return filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            return defaultName;
+        }
+
+        // Blob 다운로드 함수
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            const successDiv = document.getElementById('successMsg');
+            successDiv.textContent = msg;
+            successDiv.style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+    </script>
+    <script src="{{ url_for('static', filename='js/download-utils.js') }}"></script>
+</body>
+</html>
