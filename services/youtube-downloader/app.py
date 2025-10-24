@@ -17,9 +17,15 @@ app = Flask(__name__)
 # 환경변수 설정
 UA_WEB_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 UA_ANDROID_DEFAULT = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+UA_IOS_DEFAULT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
+UA_TV_DEFAULT = UA_WEB_DEFAULT
+UA_MWEB_DEFAULT = UA_WEB_DEFAULT
 
 UA_WEB = os.getenv("YT_USER_AGENT_WEB", UA_WEB_DEFAULT)
 UA_ANDROID = os.getenv("YT_USER_AGENT_ANDROID", UA_ANDROID_DEFAULT)
+UA_IOS = os.getenv("YT_USER_AGENT_IOS", UA_IOS_DEFAULT)
+UA_TV = os.getenv("YT_USER_AGENT_TV", UA_TV_DEFAULT)
+UA_MWEB = os.getenv("YT_USER_AGENT_MWEB", UA_MWEB_DEFAULT)
 USER_AGENT = os.getenv("YT_USER_AGENT", UA_WEB_DEFAULT)  # 하위 호환성을 위해 유지
 COOKIES_SRC = os.getenv("YT_COOKIES_FILE", "/etc/secrets/cookies.txt")
 MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
@@ -156,18 +162,34 @@ def _cookie_copy_to_tmp() -> str:
 def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: bool = False):
     """클라이언트별 yt-dlp 옵션 빌드"""
     headers = {"Accept-Language": "en-US,en;q=0.9"}
-    
-    if player_client in ("web", "web_embedded", "mweb", "tv"):
+    ua = UA_WEB
+
+    if player_client == "web":
         ua = UA_WEB
         headers.update({
             "User-Agent": ua,
             "Origin": "https://www.youtube.com",
             "Referer": "https://www.youtube.com/",
         })
-    else:
+    elif player_client == "mweb":
+        ua = UA_MWEB
+        headers.update({
+            "User-Agent": ua,
+            "Origin": "https://www.youtube.com",
+            "Referer": "https://www.youtube.com/",
+        })
+    elif player_client == "android":
         ua = UA_ANDROID
-        headers.update({"User-Agent": ua})  # Origin/Referer 제거
-    
+        headers.update({"User-Agent": ua})
+    elif player_client == "ios":
+        ua = UA_IOS
+        headers.update({"User-Agent": ua})
+    elif player_client == "tv":
+        ua = UA_TV
+        headers.update({"User-Agent": ua})
+    else:
+        headers.update({"User-Agent": ua})
+
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -180,7 +202,12 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
         "geo_bypass": True,
         "noplaylist": True,
     }
-    
+
+    # 프록시 설정 (옵션)
+    proxy = os.getenv("YT_PROXY")
+    if proxy:
+        opts["proxy"] = proxy
+
     # 쿠키 필수 사용 정책
     if use_cookies:
         cookie_file = _cookie_copy_to_tmp()
@@ -188,7 +215,7 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
             opts["cookiefile"] = cookie_file
         else:
             print(f"WARNING: Cookie file not available for {player_client} client")
-    
+
     # 디버그 모드 (첫 번째 시도에서만)
     if enable_debug:
         opts.update({
@@ -196,34 +223,20 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
             "verbose": True
         })
         print(f"DEBUG: Enabled debug mode for {player_client} client")
-    
+
     return opts
 
-def get_video_info_with_fallback(url, attempt=1, max_attempts=3):
+def get_video_info_with_fallback(url, attempt=1, max_attempts=4):
     """폴백 전략을 사용한 YouTube 비디오 정보 가져오기"""
-    
-    # 새로운 재시도 순서: web_embedded → android → web (모든 시도에서 쿠키 사용)
+
+    # 새로운 재시도 순서: web → android → ios → tv (모든 시도에서 쿠키 사용)
     fallback_configs = [
-        # 첫 번째 시도: web_embedded 클라이언트 + 쿠키 + 디버그
-        {
-            'player_client': 'web_embedded',
-            'use_cookies': True,
-            'enable_debug': True
-        },
-        # 두 번째 시도: android 클라이언트 + 쿠키
-        {
-            'player_client': 'android',
-            'use_cookies': True,
-            'enable_debug': False
-        },
-        # 세 번째 시도: web 클라이언트 + 쿠키
-        {
-            'player_client': 'web',
-            'use_cookies': True,
-            'enable_debug': False
-        }
+        {"player_client": "web", "use_cookies": True, "enable_debug": True},
+        {"player_client": "android", "use_cookies": True, "enable_debug": False},
+        {"player_client": "ios", "use_cookies": True, "enable_debug": False},
+        {"player_client": "tv", "use_cookies": True, "enable_debug": False},
     ]
-    
+
     config = fallback_configs[attempt - 1]
     
     try:
@@ -739,6 +752,18 @@ def debug_yt():
         return jsonify({
             "error": str(e)
         }), 500
+
+@app.route('/debug-ua')
+def debug_ua():
+    import os
+    return jsonify({
+        "web": os.getenv("YT_USER_AGENT_WEB"),
+        "android": os.getenv("YT_USER_AGENT_ANDROID"),
+        "ios": os.getenv("YT_USER_AGENT_IOS"),
+        "tv": os.getenv("YT_USER_AGENT_TV"),
+        "mweb": os.getenv("YT_USER_AGENT_MWEB"),
+        "single_USER_AGENT": os.getenv("YT_USER_AGENT"),
+    })
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5000, debug=True)
