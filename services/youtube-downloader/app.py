@@ -18,12 +18,14 @@ app = Flask(__name__)
 UA_WEB_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 UA_ANDROID_DEFAULT = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
 UA_IOS_DEFAULT = "Mozilla/5.0 (iPhone; CPU iPhone OS 16_5 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.5 Mobile/15E148 Safari/604.1"
+UA_SAFARI_DEFAULT = "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15"
 UA_TV_DEFAULT = UA_WEB_DEFAULT
 UA_MWEB_DEFAULT = UA_WEB_DEFAULT
 
 UA_WEB = os.getenv("YT_USER_AGENT_WEB", UA_WEB_DEFAULT)
 UA_ANDROID = os.getenv("YT_USER_AGENT_ANDROID", UA_ANDROID_DEFAULT)
 UA_IOS = os.getenv("YT_USER_AGENT_IOS", UA_IOS_DEFAULT)
+UA_SAFARI = os.getenv("YT_USER_AGENT_SAFARI", UA_SAFARI_DEFAULT)
 UA_TV = os.getenv("YT_USER_AGENT_TV", UA_TV_DEFAULT)
 UA_MWEB = os.getenv("YT_USER_AGENT_MWEB", UA_MWEB_DEFAULT)
 USER_AGENT = os.getenv("YT_USER_AGENT", UA_WEB_DEFAULT)  # 하위 호환성을 위해 유지
@@ -32,6 +34,7 @@ YT_PO_TOKEN_MWEB_GVS = os.getenv("YT_PO_TOKEN_MWEB_GVS")
 YT_PO_TOKEN_MWEB_PLAYER = os.getenv("YT_PO_TOKEN_MWEB_PLAYER")
 YT_PO_TOKEN_WEB_GVS = os.getenv("YT_PO_TOKEN_WEB_GVS")
 YT_PO_TOKEN_WEB_PLAYER = os.getenv("YT_PO_TOKEN_WEB_PLAYER")
+YT_VISITOR_DATA = os.getenv("YT_VISITOR_DATA")
 COOKIES_SRC = os.getenv("YT_COOKIES_FILE", "/etc/secrets/cookies.txt")
 MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
 DEFAULT_FORMAT = os.getenv("YT_FORMAT", "bv*+ba/b[ext=mp4]/b")
@@ -176,6 +179,13 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
             "Origin": "https://www.youtube.com",
             "Referer": "https://www.youtube.com/",
         })
+    elif player_client == "web_safari":
+        ua = UA_SAFARI
+        headers.update({
+            "User-Agent": ua,
+            "Origin": "https://www.youtube.com",
+            "Referer": "https://www.youtube.com/",
+        })
     elif player_client == "mweb":
         ua = UA_MWEB
         headers.update({
@@ -210,11 +220,15 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
             po_tokens.append(f"web.player+{YT_PO_TOKEN_WEB_PLAYER}")
     if po_tokens:
         youtube_args["po_token"] = po_tokens
+    if YT_VISITOR_DATA:
+        youtube_args["visitor_data"] = [YT_VISITOR_DATA]
 
     # youtubetab에도 동일한 player_client/po_token 적용
     youtubetab_args = {"player_client": youtube_args["player_client"]}
     if po_tokens:
         youtubetab_args["po_token"] = po_tokens
+    if YT_VISITOR_DATA:
+        youtubetab_args["visitor_data"] = [YT_VISITOR_DATA]
 
     opts = {
         "quiet": True,
@@ -258,6 +272,7 @@ def get_video_info_with_fallback(url, attempt=1, max_attempts=4):
     # mweb을 항상 포함하고 마지막은 tv로 확장
     fallback_configs = [
         {"player_client": "web", "use_cookies": True, "enable_debug": True},
+        {"player_client": "web_safari", "use_cookies": True, "enable_debug": False},
         {"player_client": "android", "use_cookies": True, "enable_debug": False},
         {"player_client": "ios", "use_cookies": True, "enable_debug": False},
         {"player_client": "mweb", "use_cookies": True, "enable_debug": False},
@@ -786,6 +801,7 @@ def debug_ua():
     import os
     return jsonify({
         "web": os.getenv("YT_USER_AGENT_WEB"),
+        "web_safari": os.getenv("YT_USER_AGENT_SAFARI"),
         "android": os.getenv("YT_USER_AGENT_ANDROID"),
         "ios": os.getenv("YT_USER_AGENT_IOS"),
         "tv": os.getenv("YT_USER_AGENT_TV"),

@@ -238,3 +238,40 @@ services:
       - key: PYTHON_VERSION
         value: 3.12.6
     healthCheckPath: /health
+
+  # YouTube Downloader Service
+  - type: web
+    name: youtube-downloader-service
+    runtime: docker
+    dockerfilePath: services/youtube-downloader/Dockerfile
+    dockerContext: services/youtube-downloader
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: YT_COOKIES_FILE
+        value: /etc/secrets/cookies.txt
+      - key: YT_USER_AGENT_WEB
+        value: ""
+      - key: YT_USER_AGENT_SAFARI
+        value: ""
+      - key: YT_USER_AGENT_ANDROID
+        value: ""
+      - key: YT_USER_AGENT_IOS
+        value: ""
+      - key: YT_USER_AGENT_MWEB
+        value: ""
+      - key: YT_USER_AGENT_TV
+        value: ""
+      - key: YT_PO_TOKEN_MWEB_GVS
+        value: ""
+      - key: YT_PO_TOKEN_MWEB_PLAYER
+        value: ""
+      - key: YT_PO_TOKEN_WEB_GVS
+        value: ""
+      - key: YT_PO_TOKEN_WEB_PLAYER
+        value: ""
+      - key: YT_VISITOR_DATA
+        value: ""
+    healthCheckPath: /health
