@@ -63,6 +63,59 @@ def extract_video_id(url):
             return match.group(1)
     return None
 
+def validate_cookie_file(cookie_path):
+    """쿠키 파일 유효성 검사"""
+    if not cookie_path or not os.path.exists(cookie_path):
+        return False, "Cookie file not found"
+    
+    try:
+        with open(cookie_path, 'r', encoding='utf-8') as f:
+            content = f.read()
+            
+        if not content.strip():
+            return False, "Cookie file is empty"
+            
+        # Netscape 형식 확인
+        lines = content.strip().split('\n')
+        valid_cookies = 0
+        youtube_cookies = 0
+        
+        for line in lines:
+            line = line.strip()
+            if not line or line.startswith('#'):
+                continue
+                
+            parts = line.split('\t')
+            if len(parts) >= 7:
+                domain = parts[0]
+                expiry = parts[4]
+                
+                valid_cookies += 1
+                
+                # YouTube/Google 도메인 확인
+                if any(d in domain for d in ['.youtube.com', '.google.com', 'accounts.google.com']):
+                    youtube_cookies += 1
+                    
+                # 만료일 확인 (Unix timestamp)
+                try:
+                    import time
+                    if expiry.isdigit() and int(expiry) < time.time():
+                        print(f"WARNING: Cookie for {domain} has expired")
+                except:
+                    pass
+        
+        if valid_cookies == 0:
+            return False, "No valid cookies found in file"
+            
+        if youtube_cookies == 0:
+            return False, "No YouTube/Google cookies found"
+            
+        print(f"Cookie validation: {valid_cookies} total cookies, {youtube_cookies} YouTube/Google cookies")
+        return True, f"Valid cookie file with {youtube_cookies} YouTube cookies"
+        
+    except Exception as e:
+        return False, f"Cookie file validation error: {str(e)}"
+
 def _cookie_copy_to_tmp() -> str:
     """읽기 전용 쿠키 파일을 /tmp로 복사하여 쓰기 가능하게 만들기"""
     try:
@@ -76,11 +129,18 @@ def _cookie_copy_to_tmp() -> str:
             print(f"WARNING: Cookie file is empty at {COOKIES_SRC}")
             return None
             
+        # 쿠키 파일 유효성 검사
+        is_valid, message = validate_cookie_file(COOKIES_SRC)
+        if not is_valid:
+            print(f"WARNING: Cookie validation failed: {message}")
+            return None
+            
         dst = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
         os.makedirs(os.path.dirname(dst), exist_ok=True)
         shutil.copyfile(COOKIES_SRC, dst)
         os.chmod(dst, 0o600)
         print(f"Cookie file copied successfully from {COOKIES_SRC} to {dst}")
+        print(f"Cookie validation: {message}")
         return dst
     except Exception as e:
         print(f"ERROR: Failed to copy cookie file: {e}")
@@ -88,10 +148,40 @@ def _cookie_copy_to_tmp() -> str:
 
 
 
-def get_video_info(url):
-    """YouTube 비디오 정보 가져오기"""
+def get_video_info_with_fallback(url, attempt=1, max_attempts=3):
+    """폴백 전략을 사용한 YouTube 비디오 정보 가져오기"""
+    
+    # 시도별 다른 설정
+    fallback_configs = [
+        # 첫 번째 시도: 기본 설정 + 쿠키
+        {
+            'player_clients': ['android', 'web', 'ios', 'tv', 'mweb'],
+            'use_cookies': True,
+            'skip_formats': ['hls', 'dash']
+        },
+        # 두 번째 시도: 안드로이드만 + 쿠키 없이
+        {
+            'player_clients': ['android'],
+            'use_cookies': False,
+            'skip_formats': []
+        },
+        # 세 번째 시도: 웹만 + 임베드 모드
+        {
+            'player_clients': ['web'],
+            'use_cookies': False,
+            'skip_formats': [],
+            'embed_mode': True
+        }
+    ]
+    
+    config = fallback_configs[attempt - 1]
+    
     try:
-        cookie_path = _cookie_copy_to_tmp()  # 쿠키 파일을 /tmp로 복사
+        print(f"==> 비디오 정보 추출 시도 {attempt}/{max_attempts}")
+        
+        cookie_path = None
+        if config['use_cookies']:
+            cookie_path = _cookie_copy_to_tmp()
         
         ydl_opts = {
             'quiet': True,
@@ -99,25 +189,47 @@ def get_video_info(url):
             'extract_flat': False,
             'user_agent': USER_AGENT,
             'http_headers': {
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate',
+                'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate, br',
                 'DNT': '1',
                 'Upgrade-Insecure-Requests': '1',
+                'Sec-Fetch-Dest': 'document',
+                'Sec-Fetch-Mode': 'navigate',
+                'Sec-Fetch-Site': 'none',
+                'Sec-Fetch-User': '?1',
+                'Cache-Control': 'max-age=0',
+                'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                'sec-ch-ua-mobile': '?0',
+                'sec-ch-ua-platform': '"Windows"',
             },
             'sleep_interval': 1,
             'max_sleep_interval': 5,
             'extractor_retries': 3,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
+            'extractor_args': {
+                'youtube': {
+                    'player_client': config['player_clients'],
+                    'skip': config['skip_formats']
+                }
+            },
             'geo_bypass': True,
-            'socket_timeout': 20,
+            'socket_timeout': 30,
+            'fragment_retries': 5,
+            'retry_sleep_functions': {'http': lambda n: min(2 ** n, 30)},
         }
+        
+        # 임베드 모드 설정
+        if config.get('embed_mode'):
+            ydl_opts['extractor_args']['youtube']['embed'] = True
         
         # 쿠키 파일이 있는 경우에만 추가
         if cookie_path:
             ydl_opts['cookiefile'] = cookie_path
+            print(f"==> 쿠키 사용: {cookie_path}")
         else:
-            print("WARNING: Proceeding without cookies - may encounter bot detection")
+            print("==> 쿠키 없이 진행")
+        
+        print(f"==> 플레이어 클라이언트: {config['player_clients']}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -137,6 +249,7 @@ def get_video_info(url):
                             'filesize': fmt.get('filesize')
                         })
             
+            print(f"==> 비디오 정보 추출 성공 (시도 {attempt})")
             return {
                 'title': info.get('title', '알 수 없음'),
                 'duration': info.get('duration', 0),
@@ -146,9 +259,23 @@ def get_video_info(url):
                 'thumbnail': info.get('thumbnail', ''),
                 'formats': formats[:10]  # 처음 10개 포맷만 반환
             }
+            
     except Exception as e:
-        print(f"비디오 정보 추출 오류: {str(e)}")
-        return None
+        print(f"==> 시도 {attempt} 실패: {str(e)}")
+        
+        # 다음 시도가 가능한 경우
+        if attempt < max_attempts:
+            print(f"==> 다음 전략으로 재시도...")
+            import time
+            time.sleep(2)  # 2초 대기
+            return get_video_info_with_fallback(url, attempt + 1, max_attempts)
+        else:
+            print(f"==> 모든 시도 실패")
+            return None
+
+def get_video_info(url):
+    """YouTube 비디오 정보 가져오기 (폴백 전략 사용)"""
+    return get_video_info_with_fallback(url)
 
 def download_youtube_video(url, quality='medium', format_type='mp4'):
     """YouTube 비디오 다운로드"""
@@ -178,13 +305,26 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'user_agent': USER_AGENT,
                 'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate',
+                    'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
                     'DNT': '1',
                     'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Cache-Control': 'max-age=0',
+                    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"',
                 },
-                'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web', 'ios', 'tv', 'mweb'],
+                        'skip': ['hls', 'dash']
+                    }
+                },
                 'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
@@ -209,13 +349,26 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'user_agent': USER_AGENT,
                 'http_headers': {
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate',
+                    'Accept-Language': 'en-US,en;q=0.9,ko;q=0.8',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate, br',
                     'DNT': '1',
                     'Upgrade-Insecure-Requests': '1',
+                    'Sec-Fetch-Dest': 'document',
+                    'Sec-Fetch-Mode': 'navigate',
+                    'Sec-Fetch-Site': 'none',
+                    'Sec-Fetch-User': '?1',
+                    'Cache-Control': 'max-age=0',
+                    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
+                    'sec-ch-ua-mobile': '?0',
+                    'sec-ch-ua-platform': '"Windows"',
                 },
-                'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
+                'extractor_args': {
+                    'youtube': {
+                        'player_client': ['android', 'web', 'ios', 'tv', 'mweb'],
+                        'skip': ['hls', 'dash']
+                    }
+                },
                 'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
@@ -316,7 +469,15 @@ def download_youtube():
         filename, error = download_youtube_video(url, quality, format_type)
         
         if error:
-            return jsonify({'error': error}), 500
+            return jsonify({
+                'error': error,
+                'suggestions': [
+                    '쿠키 파일이 최신인지 확인해주세요',
+                    '브라우저에서 YouTube에 로그인한 상태로 쿠키를 다시 내보내기 해보세요',
+                    '다른 품질이나 형식으로 시도해보세요',
+                    '/debug-cookies-content 엔드포인트에서 쿠키 상태를 확인해보세요'
+                ]
+            }), 500
         
         if filename:
             return jsonify({
@@ -349,7 +510,15 @@ def get_video_info_route():
         # 비디오 정보 가져오기
         video_info = get_video_info(url)
         if not video_info:
-            return jsonify({'error': '비디오 정보를 가져올 수 없습니다.'}), 400
+            return jsonify({
+                'error': '비디오 정보를 가져올 수 없습니다.',
+                'suggestions': [
+                    '쿠키 파일이 최신인지 확인해주세요',
+                    '브라우저에서 YouTube에 로그인한 상태로 쿠키를 다시 내보내기 해보세요',
+                    '잠시 후 다시 시도해보세요',
+                    '/debug-cookies-content 엔드포인트에서 쿠키 상태를 확인해보세요'
+                ]
+            }), 400
         
         return jsonify({
             'success': True,
@@ -359,6 +528,91 @@ def get_video_info_route():
     except Exception as e:
         print(f"비디오 정보 조회 중 오류: {str(e)}")
         return jsonify({'error': f'서버 오류: {str(e)}'}), 500
+
+@app.route('/debug-cookies-content')
+def debug_cookies_content():
+    """쿠키 파일 내용 디버깅"""
+    try:
+        if not os.path.exists(COOKIES_SRC):
+            return jsonify({
+                'error': f'Cookie file not found at {COOKIES_SRC}',
+                'exists': False
+            })
+        
+        file_size = os.path.getsize(COOKIES_SRC)
+        if file_size == 0:
+            return jsonify({
+                'error': 'Cookie file is empty',
+                'exists': True,
+                'size': 0
+            })
+        
+        # 쿠키 파일 유효성 검사
+        is_valid, message = validate_cookie_file(COOKIES_SRC)
+        
+        # 쿠키 도메인 정보 수집
+        domains = []
+        cookie_count = 0
+        youtube_count = 0
+        
+        try:
+            with open(COOKIES_SRC, 'r', encoding='utf-8') as f:
+                content = f.read()
+                
+            lines = content.strip().split('\n')
+            for line in lines:
+                line = line.strip()
+                if not line or line.startswith('#'):
+                    continue
+                    
+                parts = line.split('\t')
+                if len(parts) >= 7:
+                    domain = parts[0]
+                    expiry = parts[4]
+                    cookie_count += 1
+                    
+                    # 만료일 확인
+                    import time
+                    is_expired = False
+                    try:
+                        if expiry.isdigit() and int(expiry) < time.time():
+                            is_expired = True
+                    except:
+                        pass
+                    
+                    # YouTube/Google 도메인 확인
+                    is_youtube = any(d in domain for d in ['.youtube.com', '.google.com', 'accounts.google.com'])
+                    if is_youtube:
+                        youtube_count += 1
+                    
+                    domains.append({
+                        'domain': domain,
+                        'is_youtube': is_youtube,
+                        'is_expired': is_expired,
+                        'expiry': expiry
+                    })
+        
+        except Exception as e:
+            return jsonify({
+                'error': f'Failed to read cookie file: {str(e)}',
+                'exists': True,
+                'size': file_size
+            })
+        
+        return jsonify({
+            'exists': True,
+            'size': file_size,
+            'is_valid': is_valid,
+            'validation_message': message,
+            'total_cookies': cookie_count,
+            'youtube_cookies': youtube_count,
+            'domains': domains[:20]  # 처음 20개 도메인만 표시
+        })
+        
+    except Exception as e:
+        return jsonify({
+            'error': f'Debug error: {str(e)}'
+        })
 
 @app.route('/download-file/<filename>')
 def download_file(filename):
