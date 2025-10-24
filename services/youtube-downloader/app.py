@@ -4,6 +4,8 @@ import json
 import yt_dlp
 import subprocess
 import base64
+import shutil
+import tempfile
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
@@ -11,8 +13,8 @@ app = Flask(__name__)
 
 # 환경변수 설정
 UA_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-COOKIES_FILE = os.getenv("YT_COOKIES_FILE")  # /etc/secrets/cookies.txt
 USER_AGENT = os.getenv("YT_USER_AGENT", UA_DEFAULT)
+COOKIES_SRC = os.getenv("YT_COOKIES_FILE", "/etc/secrets/cookies.txt")
 MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
 DEFAULT_FORMAT = os.getenv("YT_FORMAT", "bv*+ba/b[ext=mp4]/b")
 MERGE_FORMAT = os.getenv("YT_MERGE", "mp4")
@@ -61,18 +63,28 @@ def extract_video_id(url):
             return match.group(1)
     return None
 
+def _cookie_copy_to_tmp() -> str:
+    """읽기 전용 쿠키 파일을 /tmp로 복사하여 쓰기 가능하게 만들기"""
+    dst = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
+    os.makedirs(os.path.dirname(dst), exist_ok=True)
+    shutil.copyfile(COOKIES_SRC, dst)
+    os.chmod(dst, 0o600)
+    return dst
+
 
 
 def get_video_info(url):
     """YouTube 비디오 정보 가져오기"""
     try:
+        cookie_path = _cookie_copy_to_tmp()  # 쿠키 파일을 /tmp로 복사
+        
         ydl_opts = {
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'cookiefile': COOKIES_FILE,
+            'cookiefile': cookie_path,
+            'user_agent': USER_AGENT,
             'http_headers': {
-                'User-Agent': USER_AGENT,
                 'Accept-Language': 'en-US,en;q=0.9'
             },
             'sleep_interval': 1,
@@ -80,6 +92,7 @@ def get_video_info(url):
             'extractor_retries': 3,
             'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
             'geo_bypass': True,
+            'socket_timeout': 20,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -127,6 +140,8 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
             format_selector = 'best[height<=480]'
 
         # yt-dlp 옵션 설정: 파일명은 %(id)s.%(ext)s 로 일관 생성
+        cookie_path = _cookie_copy_to_tmp()  # 쿠키 파일을 /tmp로 복사
+        
         if format_type == 'mp3':
             ydl_opts = {
                 'format': 'bestaudio/best',
@@ -135,9 +150,9 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'overwrites': True,
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'cookiefile': COOKIES_FILE,
+                'cookiefile': cookie_path,
+                'user_agent': USER_AGENT,
                 'http_headers': {
-                    'User-Agent': USER_AGENT,
                     'Accept-Language': 'en-US,en;q=0.9'
                 },
                 'sleep_interval': 1,
@@ -164,9 +179,9 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'merge_output_format': MERGE_FORMAT,
-                'cookiefile': COOKIES_FILE,
+                'cookiefile': cookie_path,
+                'user_agent': USER_AGENT,
                 'http_headers': {
-                    'User-Agent': USER_AGENT,
                     'Accept-Language': 'en-US,en;q=0.9'
                 },
                 'sleep_interval': 1,
@@ -174,6 +189,8 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'extractor_retries': 3,
                 'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
                 'geo_bypass': True,
+                'concurrent_fragment_downloads': 1,
+                'socket_timeout': 30,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
