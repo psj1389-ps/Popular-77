@@ -6,14 +6,21 @@ import subprocess
 import base64
 import shutil
 import tempfile
+import sys
+import ssl
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
+from yt_dlp.version import __version__ as YDL_VERSION
 
 app = Flask(__name__)
 
 # 환경변수 설정
-UA_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
-USER_AGENT = os.getenv("YT_USER_AGENT", UA_DEFAULT)
+UA_WEB_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+UA_ANDROID_DEFAULT = "Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36"
+
+UA_WEB = os.getenv("YT_USER_AGENT_WEB", UA_WEB_DEFAULT)
+UA_ANDROID = os.getenv("YT_USER_AGENT_ANDROID", UA_ANDROID_DEFAULT)
+USER_AGENT = os.getenv("YT_USER_AGENT", UA_WEB_DEFAULT)  # 하위 호환성을 위해 유지
 COOKIES_SRC = os.getenv("YT_COOKIES_FILE", "/etc/secrets/cookies.txt")
 MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
 DEFAULT_FORMAT = os.getenv("YT_FORMAT", "bv*+ba/b[ext=mp4]/b")
@@ -146,95 +153,100 @@ def _cookie_copy_to_tmp() -> str:
         print(f"ERROR: Failed to copy cookie file: {e}")
         return None
 
-
+def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: bool = False):
+    """클라이언트별 yt-dlp 옵션 빌드"""
+    headers = {"Accept-Language": "en-US,en;q=0.9"}
+    
+    if player_client in ("web", "web_embedded", "mweb", "tv"):
+        ua = UA_WEB
+        headers.update({
+            "User-Agent": ua,
+            "Origin": "https://www.youtube.com",
+            "Referer": "https://www.youtube.com/",
+        })
+    else:
+        ua = UA_ANDROID
+        headers.update({"User-Agent": ua})  # Origin/Referer 제거
+    
+    opts = {
+        "quiet": True,
+        "no_warnings": True,
+        "force_ipv4": True,
+        "retries": 3,
+        "extractor_retries": 3,
+        "user_agent": ua,
+        "http_headers": headers,
+        "extractor_args": {"youtube": {"player_client": [player_client]}},
+        "geo_bypass": True,
+        "noplaylist": True,
+    }
+    
+    # 쿠키 필수 사용 정책
+    if use_cookies:
+        cookie_file = _cookie_copy_to_tmp()
+        if cookie_file:
+            opts["cookiefile"] = cookie_file
+        else:
+            print(f"WARNING: Cookie file not available for {player_client} client")
+    
+    # 디버그 모드 (첫 번째 시도에서만)
+    if enable_debug:
+        opts.update({
+            "write_pages": True,
+            "verbose": True
+        })
+        print(f"DEBUG: Enabled debug mode for {player_client} client")
+    
+    return opts
 
 def get_video_info_with_fallback(url, attempt=1, max_attempts=3):
     """폴백 전략을 사용한 YouTube 비디오 정보 가져오기"""
     
-    # 시도별 다른 설정
+    # 새로운 재시도 순서: web_embedded → android → web (모든 시도에서 쿠키 사용)
     fallback_configs = [
-        # 첫 번째 시도: 기본 설정 + 쿠키
+        # 첫 번째 시도: web_embedded 클라이언트 + 쿠키 + 디버그
         {
-            'player_clients': ['android', 'web', 'ios', 'tv', 'mweb'],
+            'player_client': 'web_embedded',
             'use_cookies': True,
-            'skip_formats': ['hls', 'dash']
+            'enable_debug': True
         },
-        # 두 번째 시도: 안드로이드만 + 쿠키 없이
+        # 두 번째 시도: android 클라이언트 + 쿠키
         {
-            'player_clients': ['android'],
-            'use_cookies': False,
-            'skip_formats': []
+            'player_client': 'android',
+            'use_cookies': True,
+            'enable_debug': False
         },
-        # 세 번째 시도: 웹만 + 임베드 모드
+        # 세 번째 시도: web 클라이언트 + 쿠키
         {
-            'player_clients': ['web'],
-            'use_cookies': False,
-            'skip_formats': [],
-            'embed_mode': True
+            'player_client': 'web',
+            'use_cookies': True,
+            'enable_debug': False
         }
     ]
     
     config = fallback_configs[attempt - 1]
     
     try:
-        print(f"==> 비디오 정보 추출 시도 {attempt}/{max_attempts}")
+        print(f"==> 비디오 정보 추출 시도 {attempt}/{max_attempts} - {config['player_client']} 클라이언트")
         
-        cookie_path = None
-        if config['use_cookies']:
-            cookie_path = _cookie_copy_to_tmp()
+        # build_ydl_opts 함수 사용
+        ydl_opts = build_ydl_opts(
+            player_client=config['player_client'],
+            use_cookies=config['use_cookies'],
+            enable_debug=config['enable_debug']
+        )
         
-        ydl_opts = {
-            'quiet': True,
-            'no_warnings': True,
+        # 추가 옵션 설정
+        ydl_opts.update({
             'extract_flat': False,
-            'user_agent': USER_AGENT,
-            'http_headers': {
-                'User-Agent': USER_AGENT,
-                'Accept-Language': 'en-US,en;q=0.9',
-                'Origin': 'https://www.youtube.com',
-                'Referer': 'https://www.youtube.com/',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                'Accept-Encoding': 'gzip, deflate, br',
-                'DNT': '1',
-                'Upgrade-Insecure-Requests': '1',
-                'Sec-Fetch-Dest': 'document',
-                'Sec-Fetch-Mode': 'navigate',
-                'Sec-Fetch-Site': 'none',
-                'Sec-Fetch-User': '?1',
-                'Cache-Control': 'max-age=0',
-                'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                'sec-ch-ua-mobile': '?0',
-                'sec-ch-ua-platform': '"Windows"',
-            },
             'sleep_interval': 1,
             'max_sleep_interval': 5,
-            'retries': 3,
-            'extractor_retries': 3,
-            'extractor_args': {
-                'youtube': {
-                    'player_client': ['android'],  # android만 우선 사용
-                    'skip': config['skip_formats']
-                }
-            },
-            'geo_bypass': True,
-            'force_ipv4': True,
             'socket_timeout': 30,
             'fragment_retries': 5,
             'retry_sleep_functions': {'http': lambda n: min(2 ** n, 30)},
-        }
+        })
         
-        # 임베드 모드 설정
-        if config.get('embed_mode'):
-            ydl_opts['extractor_args']['youtube']['embed'] = True
-        
-        # 쿠키 파일이 있는 경우에만 추가
-        if cookie_path:
-            ydl_opts['cookiefile'] = cookie_path
-            print(f"==> 쿠키 사용: {cookie_path}")
-        else:
-            print("==> 쿠키 없이 진행")
-        
-        print(f"==> 플레이어 클라이언트: {config['player_clients']}")
+        print(f"==> 플레이어 클라이언트: {config['player_client']}")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -295,46 +307,15 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
         else:
             format_selector = 'best[height<=480]'
 
-        # yt-dlp 옵션 설정: 파일명은 %(id)s.%(ext)s 로 일관 생성
-        cookie_path = _cookie_copy_to_tmp()  # 쿠키 파일을 /tmp로 복사
-        
+        # build_ydl_opts 함수 사용 (쿠키 필수 사용)
         if format_type == 'mp3':
-            ydl_opts = {
+            ydl_opts = build_ydl_opts(player_client='web', use_cookies=True)
+            ydl_opts.update({
                 'outtmpl': '%(id)s.%(ext)s',
                 'format': 'bestaudio/best',
                 'noplaylist': True,
                 'overwrites': True,
-                'quiet': True,
-                'no_warnings': True,
-                'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'user_agent': USER_AGENT,
-                'http_headers': {
-                    'User-Agent': USER_AGENT,
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Origin': 'https://www.youtube.com',
-                    'Referer': 'https://www.youtube.com/',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'DNT': '1',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Cache-Control': 'max-age=0',
-                    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"Windows"',
-                },
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android'],  # android만 우선 사용
-                        'skip': ['hls', 'dash']
-                    }
-                },
-                'geo_bypass': True,
-                'force_ipv4': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -344,45 +325,16 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'postprocessor_args': {
                     'extractaudio+ffmpeg_o': ['-codec:a', 'libmp3lame', '-q:a', '2', '-id3v2_version', '3']
                 }
-            }
+            })
         else:
-            ydl_opts = {
+            ydl_opts = build_ydl_opts(player_client='web', use_cookies=True)
+            ydl_opts.update({
                 'outtmpl': '%(id)s.%(ext)s',
                 'format': DEFAULT_FORMAT,
                 'merge_output_format': MERGE_FORMAT,
                 'noplaylist': True,
                 'overwrites': True,
-                'quiet': True,
-                'no_warnings': True,
-                'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'user_agent': USER_AGENT,
-                'http_headers': {
-                    'User-Agent': USER_AGENT,
-                    'Accept-Language': 'en-US,en;q=0.9',
-                    'Origin': 'https://www.youtube.com',
-                    'Referer': 'https://www.youtube.com/',
-                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8',
-                    'Accept-Encoding': 'gzip, deflate, br',
-                    'DNT': '1',
-                    'Upgrade-Insecure-Requests': '1',
-                    'Sec-Fetch-Dest': 'document',
-                    'Sec-Fetch-Mode': 'navigate',
-                    'Sec-Fetch-Site': 'none',
-                    'Sec-Fetch-User': '?1',
-                    'Cache-Control': 'max-age=0',
-                    'sec-ch-ua': '"Not_A Brand";v="8", "Chromium";v="120", "Google Chrome";v="120"',
-                    'sec-ch-ua-mobile': '?0',
-                    'sec-ch-ua-platform': '"Windows"',
-                },
-                'extractor_args': {
-                    'youtube': {
-                        'player_client': ['android'],  # android만 우선 사용
-                        'skip': ['hls', 'dash']
-                    }
-                },
-                'geo_bypass': True,
-                'force_ipv4': True,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
@@ -395,14 +347,9 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                     'videoconvertor+ffmpeg_o': ['-c:v', 'libx264', '-preset', 'veryfast', '-c:a', 'aac', '-b:a', '192k', '-movflags', '+faststart'],
                     'videoremuxer+ffmpeg_o': ['-movflags', '+faststart']
                 }
-            }
+            })
 
-        # 쿠키 파일이 있는 경우에만 추가
-        if cookie_path:
-            ydl_opts['cookiefile'] = cookie_path
-            print(f"Using cookie file: {cookie_path}")
-        else:
-            print("WARNING: Proceeding without cookies - may encounter bot detection")
+        # 쿠키는 build_ydl_opts에서 이미 설정됨
 
         ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg-8.0-essentials_build', 'bin', 'ffmpeg.exe')
         if os.path.exists(ffmpeg_path):
@@ -745,6 +692,7 @@ def debug_cookie_summary():
         
         need_domain = {".google.com", "accounts.google.com", ".youtube.com"}
         need_any_name = {"SAPISID", "__Secure-3PAPISID"}  # 둘 중 하나는 꼭 필요
+        need_consent = {"CONSENT", "SOCS"}  # Consent 쿠키 확인
         
         return jsonify({
             "exists": True,
@@ -755,10 +703,40 @@ def debug_cookie_summary():
             "has_google_domain": bool(need_domain & domains),
             "has_key_cookie": bool(need_any_name & names),
             "key_cookies_present": sorted(need_any_name & names),
+            "has_consent_cookie": bool(need_consent & names),
+            "consent_cookies_present": sorted(need_consent & names),
         })
     except Exception as e:
         return jsonify({
             "exists": False,
+            "error": str(e)
+        }), 500
+
+@app.route('/debug-yt')
+def debug_yt():
+    """yt-dlp 버전 및 시스템 정보 확인 엔드포인트"""
+    try:
+        # Git HEAD 정보 가져오기 시도
+        git_head = "unknown"
+        try:
+            from yt_dlp.version import RELEASE_GIT_HEAD_SHORT
+            git_head = RELEASE_GIT_HEAD_SHORT
+        except ImportError:
+            # RELEASE_GIT_HEAD_SHORT가 없는 경우 다른 방법 시도
+            try:
+                import yt_dlp
+                git_head = getattr(yt_dlp.version, 'RELEASE_GIT_HEAD_SHORT', 'unknown')
+            except:
+                git_head = "unknown"
+        
+        return jsonify({
+            "yt_dlp_version": YDL_VERSION,
+            "git_head": git_head,
+            "python": sys.version.split()[0],
+            "openssl": ssl.OPENSSL_VERSION,
+        })
+    except Exception as e:
+        return jsonify({
             "error": str(e)
         }), 500
 
