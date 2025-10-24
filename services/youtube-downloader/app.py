@@ -3,10 +3,19 @@ import re
 import json
 import yt_dlp
 import subprocess
+import base64
 from flask import Flask, render_template, request, jsonify, send_file, Response
 from werkzeug.utils import secure_filename
 
 app = Flask(__name__)
+
+# 환경변수 설정
+UA_DEFAULT = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+USER_AGENT = os.getenv("YT_USER_AGENT", UA_DEFAULT)
+MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
+DEFAULT_FORMAT = os.getenv("YT_FORMAT", "bv*+ba/b[ext=mp4]/b")
+MERGE_FORMAT = os.getenv("YT_MERGE", "mp4")
+LEGAL_NOTICE_ENABLED = os.getenv("YT_LEGAL_NOTICE_ENABLED", "true").lower() == "true"
 
 # 업로드 및 출력 폴더 설정
 if os.environ.get('VERCEL'):
@@ -51,6 +60,37 @@ def extract_video_id(url):
             return match.group(1)
     return None
 
+def prepare_cookie_file():
+    """쿠키 파일 준비 - 우선순위: 파일 경로 > Base64 > 인라인"""
+    # 1. 파일 경로 우선
+    cf = os.getenv("YT_COOKIES_FILE")
+    if cf and os.path.isfile(cf):
+        return cf
+
+    # 2. Base64 인코딩된 쿠키
+    b64 = os.getenv("YT_COOKIES_B64")
+    inline = os.getenv("YT_COOKIES_INLINE")
+    if not (b64 or inline):
+        return None
+
+    # 쿠키 파일 저장 경로 결정
+    dest_dir = "/etc/yt" if os.access("/etc", os.W_OK) else "/tmp/yt"
+    os.makedirs(dest_dir, exist_ok=True)
+    dest = os.path.join(dest_dir, "cookies.txt")
+
+    try:
+        # Base64 디코딩 또는 인라인 텍스트 사용
+        data = base64.b64decode(b64) if b64 else inline.encode("utf-8")
+        with open(dest, "wb") as f:
+            f.write(data)
+        return dest
+    except Exception as e:
+        print(f"쿠키 파일 생성 오류: {e}")
+        return None
+
+# 쿠키 파일 경로 준비
+COOKIES_FILE = prepare_cookie_file()
+
 def get_video_info(url):
     """YouTube 비디오 정보 가져오기"""
     try:
@@ -59,12 +99,19 @@ def get_video_info(url):
             'no_warnings': True,
             'extract_flat': False,
             'http_headers': {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                'User-Agent': USER_AGENT,
+                'Accept-Language': 'en-US,en;q=0.9'
             },
             'sleep_interval': 1,
             'max_sleep_interval': 5,
             'extractor_retries': 3,
+            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+            'geo_bypass': True,
         }
+        
+        # 쿠키 파일이 있으면 추가
+        if COOKIES_FILE:
+            ydl_opts['cookiefile'] = COOKIES_FILE
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -120,11 +167,14 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'User-Agent': USER_AGENT,
+                    'Accept-Language': 'en-US,en;q=0.9'
                 },
                 'sleep_interval': 1,
                 'max_sleep_interval': 5,
                 'extractor_retries': 3,
+                'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+                'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -137,19 +187,22 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
             }
         else:
             ydl_opts = {
-                'format': 'best[ext=mp4]/bestvideo[ext=mp4]+bestaudio[ext=m4a]/best',
+                'format': DEFAULT_FORMAT,
                 'outtmpl': '%(id)s.%(ext)s',
                 'noplaylist': True,
                 'overwrites': True,
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'merge_output_format': 'mp4',
+                'merge_output_format': MERGE_FORMAT,
                 'http_headers': {
-                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                    'User-Agent': USER_AGENT,
+                    'Accept-Language': 'en-US,en;q=0.9'
                 },
                 'sleep_interval': 1,
                 'max_sleep_interval': 5,
                 'extractor_retries': 3,
+                'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+                'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
@@ -163,6 +216,10 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                     'videoremuxer+ffmpeg_o': ['-movflags', '+faststart']
                 }
             }
+
+        # 쿠키 파일이 있으면 추가
+        if COOKIES_FILE:
+            ydl_opts['cookiefile'] = COOKIES_FILE
 
         ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg-8.0-essentials_build', 'bin', 'ffmpeg.exe')
         if os.path.exists(ffmpeg_path):
@@ -354,6 +411,29 @@ def health_check():
     except Exception as e:
         return jsonify({
             "status": "error",
+            "error": str(e)
+        }), 500
+
+@app.route('/debug-cookies')
+def debug_cookies():
+    """쿠키 파일 상태 확인 엔드포인트"""
+    try:
+        p = COOKIES_FILE
+        ok = bool(p and os.path.exists(p))
+        size = os.path.getsize(p) if ok else 0
+        
+        return jsonify({
+            "has_cookies": ok,
+            "path": p,
+            "size": size,
+            "user_agent": USER_AGENT,
+            "format": DEFAULT_FORMAT,
+            "merge_format": MERGE_FORMAT,
+            "max_file_mb": MAX_FILE_MB
+        })
+    except Exception as e:
+        return jsonify({
+            "has_cookies": False,
             "error": str(e)
         }), 500
 
