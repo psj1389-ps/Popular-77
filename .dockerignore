@@ -1,14 +1,24 @@
+# VCS
 .git
+
+# Python caches
 **/__pycache__/
 **/*.pyc
 **/*.pyo
 **/*.pyd
+
+# Logs / temp
 **/*.log
 **/*.tmp
+
+# Large media
 *.mp4
 *.mkv
 *.webm
+
+# Archives we don't need in builds
+**/_archive/**
+
+# Service-specific folders we don't need
 services/youtube-downloader/uploads/
 services/youtube-downloader/outputs/
-services/youtube-downloader/_archive/
-**/_archive/**
