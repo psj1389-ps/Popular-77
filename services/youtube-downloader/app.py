@@ -180,8 +180,6 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
         ua = UA_MWEB
         headers.update({
             "User-Agent": ua,
-            "Origin": "https://www.youtube.com",
-            "Referer": "https://www.youtube.com/",
         })
     elif player_client == "android":
         ua = UA_ANDROID
@@ -213,6 +211,11 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
     if po_tokens:
         youtube_args["po_token"] = po_tokens
 
+    # youtubetab에도 동일한 player_client/po_token 적용
+    youtubetab_args = {"player_client": youtube_args["player_client"]}
+    if po_tokens:
+        youtubetab_args["po_token"] = po_tokens
+
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -221,7 +224,7 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
         "extractor_retries": 3,
         "user_agent": ua,
         "http_headers": headers,
-        "extractor_args": {"youtube": youtube_args},
+        "extractor_args": {"youtube": youtube_args, "youtubetab": youtubetab_args},
         "geo_bypass": True,
         "noplaylist": True,
     }
@@ -252,13 +255,13 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
 def get_video_info_with_fallback(url, attempt=1, max_attempts=4):
     """폴백 전략을 사용한 YouTube 비디오 정보 가져오기"""
 
-    # 조건부 마지막 시도: mweb(PO 토큰이 있을 때) 또는 tv
-    has_mweb_po = bool(YT_PO_TOKEN_MWEB_GVS or YT_PO_TOKEN_MWEB_PLAYER)
+    # mweb을 항상 포함하고 마지막은 tv로 확장
     fallback_configs = [
         {"player_client": "web", "use_cookies": True, "enable_debug": True},
         {"player_client": "android", "use_cookies": True, "enable_debug": False},
         {"player_client": "ios", "use_cookies": True, "enable_debug": False},
-        {"player_client": ("mweb" if has_mweb_po else "tv"), "use_cookies": True, "enable_debug": False},
+        {"player_client": "mweb", "use_cookies": True, "enable_debug": False},
+        {"player_client": "tv", "use_cookies": True, "enable_debug": False},
     ]
     max_attempts = len(fallback_configs)
 
