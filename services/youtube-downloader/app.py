@@ -58,6 +58,12 @@ def get_video_info(url):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
+            'http_headers': {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+            },
+            'sleep_interval': 1,
+            'max_sleep_interval': 5,
+            'extractor_retries': 3,
         }
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
@@ -113,6 +119,12 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'overwrites': True,
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                'sleep_interval': 1,
+                'max_sleep_interval': 5,
+                'extractor_retries': 3,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
                     'preferredcodec': 'mp3',
@@ -132,6 +144,12 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'nopart': True,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
                 'merge_output_format': 'mp4',
+                'http_headers': {
+                    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+                },
+                'sleep_interval': 1,
+                'max_sleep_interval': 5,
+                'extractor_retries': 3,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
                     'preferedformat': 'mp4',
