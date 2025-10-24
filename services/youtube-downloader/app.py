@@ -27,6 +27,11 @@ UA_IOS = os.getenv("YT_USER_AGENT_IOS", UA_IOS_DEFAULT)
 UA_TV = os.getenv("YT_USER_AGENT_TV", UA_TV_DEFAULT)
 UA_MWEB = os.getenv("YT_USER_AGENT_MWEB", UA_MWEB_DEFAULT)
 USER_AGENT = os.getenv("YT_USER_AGENT", UA_WEB_DEFAULT)  # 하위 호환성을 위해 유지
+# PO 토큰 환경변수 (mweb/web용)
+YT_PO_TOKEN_MWEB_GVS = os.getenv("YT_PO_TOKEN_MWEB_GVS")
+YT_PO_TOKEN_MWEB_PLAYER = os.getenv("YT_PO_TOKEN_MWEB_PLAYER")
+YT_PO_TOKEN_WEB_GVS = os.getenv("YT_PO_TOKEN_WEB_GVS")
+YT_PO_TOKEN_WEB_PLAYER = os.getenv("YT_PO_TOKEN_WEB_PLAYER")
 COOKIES_SRC = os.getenv("YT_COOKIES_FILE", "/etc/secrets/cookies.txt")
 MAX_FILE_MB = int(os.getenv("YT_MAX_FILE_MB", "200"))
 DEFAULT_FORMAT = os.getenv("YT_FORMAT", "bv*+ba/b[ext=mp4]/b")
@@ -190,6 +195,24 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
     else:
         headers.update({"User-Agent": ua})
 
+    # extractor_args 구성 (클라이언트 및 PO 토큰)
+    youtube_args = {"player_client": [player_client]}
+    po_tokens = []
+    if player_client == "mweb":
+        if YT_PO_TOKEN_MWEB_GVS:
+            po_tokens.append(f"mweb.gvs+{YT_PO_TOKEN_MWEB_GVS}")
+        if YT_PO_TOKEN_MWEB_PLAYER:
+            po_tokens.append(f"mweb.player+{YT_PO_TOKEN_MWEB_PLAYER}")
+        # 가이드에 맞춰 default+mweb 지정
+        youtube_args["player_client"] = ["default", "mweb"]
+    elif player_client == "web":
+        if YT_PO_TOKEN_WEB_GVS:
+            po_tokens.append(f"web.gvs+{YT_PO_TOKEN_WEB_GVS}")
+        if YT_PO_TOKEN_WEB_PLAYER:
+            po_tokens.append(f"web.player+{YT_PO_TOKEN_WEB_PLAYER}")
+    if po_tokens:
+        youtube_args["po_token"] = po_tokens
+
     opts = {
         "quiet": True,
         "no_warnings": True,
@@ -198,7 +221,7 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
         "extractor_retries": 3,
         "user_agent": ua,
         "http_headers": headers,
-        "extractor_args": {"youtube": {"player_client": [player_client]}},
+        "extractor_args": {"youtube": youtube_args},
         "geo_bypass": True,
         "noplaylist": True,
     }
@@ -229,13 +252,15 @@ def build_ydl_opts(player_client: str, use_cookies: bool = True, enable_debug: b
 def get_video_info_with_fallback(url, attempt=1, max_attempts=4):
     """폴백 전략을 사용한 YouTube 비디오 정보 가져오기"""
 
-    # 새로운 재시도 순서: web → android → ios → tv (모든 시도에서 쿠키 사용)
+    # 조건부 마지막 시도: mweb(PO 토큰이 있을 때) 또는 tv
+    has_mweb_po = bool(YT_PO_TOKEN_MWEB_GVS or YT_PO_TOKEN_MWEB_PLAYER)
     fallback_configs = [
         {"player_client": "web", "use_cookies": True, "enable_debug": True},
         {"player_client": "android", "use_cookies": True, "enable_debug": False},
         {"player_client": "ios", "use_cookies": True, "enable_debug": False},
-        {"player_client": "tv", "use_cookies": True, "enable_debug": False},
+        {"player_client": ("mweb" if has_mweb_po else "tv"), "use_cookies": True, "enable_debug": False},
     ]
+    max_attempts = len(fallback_configs)
 
     config = fallback_configs[attempt - 1]
     
