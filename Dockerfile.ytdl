@@ -14,10 +14,12 @@ RUN apt-get update \
 
 WORKDIR /app
 
-COPY requirements.txt /tmp/requirements.txt
+# 루트 컨텍스트에서 서비스 폴더의 requirements.txt를 복사
+COPY services/youtube-downloader/requirements.txt /tmp/requirements.txt
 RUN python -m pip install --upgrade pip \
  && pip install --no-cache-dir -r /tmp/requirements.txt
 
-COPY . /app/
+# 서비스 폴더 전체를 /app으로 복사
+COPY services/youtube-downloader/ /app/
 
 CMD ["sh","-c","python -m gunicorn app:app -b 0.0.0.0:${PORT:-10000} -k sync -w 1 --threads 1 --timeout 600 --graceful-timeout 30 --keep-alive 15 --worker-tmp-dir=/dev/shm"]

@@ -1,27 +1,24 @@
 # 기본적으로 전부 제외
 **
 
-# Dockerfile과 이 파일 자체는 포함
+# Dockerfile과 이 파일은 포함
 !Dockerfile.ytdl
 !.dockerignore
 
-# 서비스 폴더만 포함(상위 디렉토리부터 단계별 허용)
+# services와 서비스 폴더 포함
 !services/
 !services/youtube-downloader/
+!services/youtube-downloader/**
 
-# 서비스 내 필요한 소스만 포함
-!services/youtube-downloader/app.py
-!services/youtube-downloader/requirements.txt
-!services/youtube-downloader/.gitignore
-!services/youtube-downloader/.env.example
-
-# 템플릿/정적(필요 시 확장)
-!services/youtube-downloader/templates/
-!services/youtube-downloader/templates/index.html
-!services/youtube-downloader/static/
-!services/youtube-downloader/static/**
-
-# 굳이 포함 안 할 것(아카이브/업로드/출력물)은 제외 유지
+# 서비스 내에서도 불필요/대용량은 다시 제외
 services/youtube-downloader/_archive/**
 services/youtube-downloader/uploads/**
 services/youtube-downloader/outputs/**
+services/youtube-downloader/**/*.mp4
+services/youtube-downloader/**/*.mkv
+services/youtube-downloader/**/*.webm
+services/youtube-downloader/**/*.log
+services/youtube-downloader/**/*.tmp
+services/youtube-downloader/**/__pycache__/
+services/youtube-downloader/**/*.pyc
+services/youtube-downloader/**/*.pyo
