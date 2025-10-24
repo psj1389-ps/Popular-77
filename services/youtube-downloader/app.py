@@ -65,11 +65,26 @@ def extract_video_id(url):
 
 def _cookie_copy_to_tmp() -> str:
     """읽기 전용 쿠키 파일을 /tmp로 복사하여 쓰기 가능하게 만들기"""
-    dst = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
-    os.makedirs(os.path.dirname(dst), exist_ok=True)
-    shutil.copyfile(COOKIES_SRC, dst)
-    os.chmod(dst, 0o600)
-    return dst
+    try:
+        # 쿠키 파일 존재 여부 확인
+        if not os.path.exists(COOKIES_SRC):
+            print(f"WARNING: Cookie file not found at {COOKIES_SRC}")
+            return None
+            
+        # 쿠키 파일이 비어있는지 확인
+        if os.path.getsize(COOKIES_SRC) == 0:
+            print(f"WARNING: Cookie file is empty at {COOKIES_SRC}")
+            return None
+            
+        dst = os.path.join(tempfile.gettempdir(), "yt_cookies.txt")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copyfile(COOKIES_SRC, dst)
+        os.chmod(dst, 0o600)
+        print(f"Cookie file copied successfully from {COOKIES_SRC} to {dst}")
+        return dst
+    except Exception as e:
+        print(f"ERROR: Failed to copy cookie file: {e}")
+        return None
 
 
 
@@ -82,18 +97,27 @@ def get_video_info(url):
             'quiet': True,
             'no_warnings': True,
             'extract_flat': False,
-            'cookiefile': cookie_path,
             'user_agent': USER_AGENT,
             'http_headers': {
-                'Accept-Language': 'en-US,en;q=0.9'
+                'Accept-Language': 'en-US,en;q=0.9',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                'Accept-Encoding': 'gzip, deflate',
+                'DNT': '1',
+                'Upgrade-Insecure-Requests': '1',
             },
             'sleep_interval': 1,
             'max_sleep_interval': 5,
             'extractor_retries': 3,
-            'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+            'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
             'geo_bypass': True,
             'socket_timeout': 20,
         }
+        
+        # 쿠키 파일이 있는 경우에만 추가
+        if cookie_path:
+            ydl_opts['cookiefile'] = cookie_path
+        else:
+            print("WARNING: Proceeding without cookies - may encounter bot detection")
         
         with yt_dlp.YoutubeDL(ydl_opts) as ydl:
             info = ydl.extract_info(url, download=False)
@@ -152,10 +176,15 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'no_warnings': True,
                 'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'cookiefile': cookie_path,  # /tmp 사본
                 'user_agent': USER_AGENT,
-                'http_headers': {'Accept-Language': 'en-US,en;q=0.9'},
-                'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+                'http_headers': {
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
                 'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegExtractAudio',
@@ -178,10 +207,15 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                 'no_warnings': True,
                 'retries': 3,
                 'paths': {'home': OUTPUT_FOLDER, 'temp': TEMP_FOLDER},
-                'cookiefile': cookie_path,  # /tmp 사본
                 'user_agent': USER_AGENT,
-                'http_headers': {'Accept-Language': 'en-US,en;q=0.9'},
-                'extractor_args': {'youtube': {'player_client': ['android', 'web']}},
+                'http_headers': {
+                    'Accept-Language': 'en-US,en;q=0.9',
+                    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+                    'Accept-Encoding': 'gzip, deflate',
+                    'DNT': '1',
+                    'Upgrade-Insecure-Requests': '1',
+                },
+                'extractor_args': {'youtube': {'player_client': ['android', 'web', 'ios']}},
                 'geo_bypass': True,
                 'postprocessors': [{
                     'key': 'FFmpegVideoConvertor',
@@ -196,6 +230,13 @@ def download_youtube_video(url, quality='medium', format_type='mp4'):
                     'videoremuxer+ffmpeg_o': ['-movflags', '+faststart']
                 }
             }
+
+        # 쿠키 파일이 있는 경우에만 추가
+        if cookie_path:
+            ydl_opts['cookiefile'] = cookie_path
+            print(f"Using cookie file: {cookie_path}")
+        else:
+            print("WARNING: Proceeding without cookies - may encounter bot detection")
 
         ffmpeg_path = os.path.join(os.path.dirname(__file__), 'ffmpeg', 'ffmpeg-8.0-essentials_build', 'bin', 'ffmpeg.exe')
         if os.path.exists(ffmpeg_path):

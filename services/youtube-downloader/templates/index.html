@@ -699,7 +699,7 @@
             document.getElementById('loading').style.display = 'block';
             hideMessages();
 
-            const response = await fetch('/get_video_info', {
+            const response = await fetch('/download_video', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
