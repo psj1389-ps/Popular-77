@@ -50,6 +50,12 @@ const ToolsPreview: React.FC<ToolsPreviewProps> = ({ tools }) => {
   return (
     <section className="py-20 bg-gray-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {/* 베스트인기도구 제목 섹션 */}
+        <div className="text-center mb-12">
+          <h2 className="text-3xl font-bold text-gray-900 mb-4">베스트인기도구</h2>
+          <p className="text-xl text-gray-600 font-bold">가장 많이 사용되는 무료 온라인 도구들을 만나보세요</p>
+        </div>
+        
         {/* 도구 카드 그리드 */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
           {featuredTools.map((tool) => (
