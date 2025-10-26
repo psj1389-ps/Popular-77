@@ -1,4 +1,4 @@
-import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon, ImageIcon, Shapes, Camera, Monitor, Film, Palette, Images, Zap, Expand, Minimize2, Type, Sparkles, Languages, FileImage, Play, Download, Subtitles, Minimize, Scissors, Settings } from 'lucide-react';
+import { ArrowRight, Grid3X3, FileText, Image, Brain, RefreshCw, FileType, Youtube, Video, FileSpreadsheet, Presentation, FileTextIcon, ImageIcon, Shapes, Camera, Monitor, Film, Palette, Images, Zap, Expand, Minimize2, Type, Sparkles, Languages, FileImage, Play, Download, Subtitles, Minimize, Scissors, Settings, Wand2 } from 'lucide-react';
 import { Tool } from '../types';
 
 interface PopularToolsProps {
@@ -331,20 +331,20 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div 
               onClick={() => window.location.href = '/tools/image-converter'}
-              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
+              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
             >
               <div className="flex items-center mb-2">
-                <RefreshCw className="w-6 h-6 text-blue-600 mr-2" />
+                <RefreshCw className="w-6 h-6 text-yellow-600 mr-2" />
                 <h4 className="font-semibold text-lg">이미지 변환</h4>
               </div>
               <p className="text-gray-600 flex-grow">다양한 이미지 형식 간 변환을 지원합니다.</p>
             </div>
             <div 
               onClick={() => window.location.href = '/tools/video-converter'}
-              className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
+              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
             >
               <div className="flex items-center mb-2">
-                <Video className="w-6 h-6 text-blue-600 mr-2" />
+                <Video className="w-6 h-6 text-yellow-600 mr-2" />
                 <h4 className="font-semibold text-lg">동영상 변환</h4>
               </div>
               <p className="text-gray-600 flex-grow">다양한 동영상 형식 간 변환을 지원합니다.</p>
@@ -434,6 +434,16 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
                 <h4 className="font-semibold text-lg">AI 번역</h4>
               </div>
               <p className="text-gray-600 flex-grow">고품질 AI 번역 서비스를 제공합니다.</p>
+            </div>
+            <div 
+              onClick={() => window.location.href = '/tools/prompt-generator'}
+              className="bg-purple-50 p-6 rounded-lg hover:bg-purple-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
+            >
+              <div className="flex items-center mb-2">
+                <Wand2 className="w-6 h-6 text-purple-600 mr-2" />
+                <h4 className="font-semibold text-lg">프롬프트 생성기</h4>
+              </div>
+              <p className="text-gray-600 flex-grow">고품질 프롬프트 서비스를 제공합니다.</p>
             </div>
           </div>
         </div>
