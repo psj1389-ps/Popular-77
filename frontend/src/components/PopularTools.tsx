@@ -331,7 +331,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           <div className="mt-8 grid grid-cols-1 md:grid-cols-2 gap-6">
             <div 
               onClick={() => window.location.href = '/tools/image-converter'}
-              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
+              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col flex-1"
             >
               <div className="flex items-center mb-2">
                 <RefreshCw className="w-6 h-6 text-yellow-600 mr-2" />
@@ -341,7 +341,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             </div>
             <div 
               onClick={() => window.location.href = '/tools/video-converter'}
-              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
+              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col flex-1"
             >
               <div className="flex items-center mb-2">
                 <Video className="w-6 h-6 text-yellow-600 mr-2" />
