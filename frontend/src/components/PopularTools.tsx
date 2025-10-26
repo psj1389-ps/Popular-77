@@ -22,7 +22,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
     { name: 'PDF변환도구', targetId: 'pdf-tools', icon: FileText, ref: refs?.pdfToolsRef },
     { name: '편집&최적화도구', targetId: 'image-tools', icon: Image, ref: refs?.imageToolsRef },
     { name: 'AI도구', featured: true, targetId: 'ai-tools', icon: Brain, ref: refs?.aiToolsRef },
-    { name: '이미지변환도구', targetId: 'image-conversion-tools', icon: RefreshCw, ref: refs?.imageConvertRef },
+    { name: '이미지&동영상변환도구', targetId: 'image-conversion-tools', icon: RefreshCw, ref: refs?.imageConvertRef },
     { name: '문서변환도구', targetId: 'document-tools', icon: FileType, ref: refs?.documentToolsRef },
     { name: '컨텐츠추출도구', targetId: 'youtube-tools', icon: Youtube, ref: refs?.youtubeToolsRef },
     { name: '유틸리티도구', targetId: 'video-tools', icon: Settings, ref: refs?.videoToolsRef },
@@ -276,10 +276,10 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           </div>
         </div>
 
-        {/* 이미지변환도구 섹션 */}
+        {/* 이미지&동영상변환도구 섹션 */}
         <div ref={refs?.imageConvertRef} id="image-conversion-tools" className="mb-16 scroll-mt-20">
           <h3 className="text-2xl font-bold mb-6 text-gray-800 flex items-center">
-            이미지변환도구          </h3>
+            이미지&동영상변환도구          </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* JPG 변??카드 */}
             <div className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col">
