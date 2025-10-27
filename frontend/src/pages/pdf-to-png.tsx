@@ -146,8 +146,24 @@ const PdfToPngPage: React.FC = () => {
       });
 
       if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || '변환 요청 실패');
+        const contentType = response.headers.get('Content-Type') || '';
+        
+        if (contentType.includes('application/json')) {
+          try {
+            const errorData = await response.json();
+            throw new Error(errorData.error || '변환 요청 실패');
+          } catch (jsonError) {
+            throw new Error('변환 요청 실패');
+          }
+        } else {
+          throw new Error('변환 요청 실패');
+        }
+      }
+
+      const responseContentType = response.headers.get('Content-Type') || '';
+      
+      if (!responseContentType.includes('application/json')) {
+        throw new Error('서버 응답 형식 오류');
       }
 
       const { job_id } = await response.json();
