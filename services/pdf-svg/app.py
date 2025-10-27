@@ -123,7 +123,7 @@ def send_download_memory(path: str):
     )
     return resp
 
-def perform_svg_conversion(in_path, scale: float, base_name: str):
+def perform_svg_conversion(in_path, scale: float, base_name: str, job_id: str = None):
     result_paths = []
     with tempfile.TemporaryDirectory(dir=OUTPUTS_DIR) as tmp:
         doc = fitz.open(in_path)
@@ -131,7 +131,8 @@ def perform_svg_conversion(in_path, scale: float, base_name: str):
         mat = fitz.Matrix(scale, scale)
 
         for i in range(page_count):
-            set_progress(current_job_id, 10 + int(80*(i+1)/page_count), f"페이지 {i+1}/{page_count} 벡터 추출 중")
+            if job_id:
+                set_progress(job_id, 10 + int(80*(i+1)/page_count), f"페이지 {i+1}/{page_count} 벡터 추출 중")
             page = doc.load_page(i)
             svg = page.get_svg_image(matrix=mat)
             if not svg.lstrip().startswith("<"):
@@ -191,11 +192,9 @@ def convert_async():
     app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}, quality={quality}")
 
     def run_job():
-        global current_job_id
-        current_job_id = job_id
         try:
             set_progress(job_id, 10, "변환 준비 중")
-            out_path, name, ctype = perform_svg_conversion(in_path, scale, base_name)
+            out_path, name, ctype = perform_svg_conversion(in_path, scale, base_name, job_id)
             JOBS[job_id] = {"status": "done", "path": out_path, "name": name, "ctype": ctype,
                             "progress": 100, "message": "완료"}
             app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}")
@@ -260,7 +259,7 @@ def convert_to_svg():
     app.logger.info(f"[{job_id}] uploaded: {in_path}, base={base_name}, scale={scale}, quality={quality}")
 
     try:
-        out_path, name, ctype = perform_svg_conversion(in_path, scale, base_name)
+        out_path, name, ctype = perform_svg_conversion(in_path, scale, base_name, job_id)
         app.logger.info(f"[{job_id}] done: {out_path} exists={os.path.exists(out_path)}")
         
         # 파일을 직접 반환
