@@ -138,10 +138,49 @@ const PdfVectorPage: React.FC = () => {
       const contentType = (response.headers.get("content-type") || "").toLowerCase();
       const base = selectedFile.name.replace(/\.pdf$/i, "");
       
-      // 파일명 추출
+      // JSON 응답이면 실제 다운로드 URL로 재요청하여 파일 다운로드
+      if (contentType.includes('application/json')) {
+        const data = await response.json();
+        if (!data?.success || !Array.isArray(data.files) || data.files.length === 0) {
+          throw new Error('서버 응답 형식이 올바르지 않습니다.');
+        }
+        const { filename: serverFilename, download_url } = data.files[0];
+        const dlPath = download_url.startsWith('/') ? `/api/pdf-vector${download_url}` : `/api/pdf-vector/${download_url}`;
+        
+        const fileRes = await fetch(dlPath, { method: 'GET' });
+        if (!fileRes.ok) {
+          const msg2 = await getErrorMessage(fileRes);
+          throw new Error(msg2 || `파일 다운로드 실패: ${fileRes.status}`);
+        }
+        const fileCT = (fileRes.headers.get('content-type') || '').toLowerCase();
+        let finalName = safeGetFilename(fileRes, serverFilename || base);
+        
+        if (!/\.(zip|svg|ai)$/i.test(finalName)) {
+          if (fileCT.includes('zip')) {
+            finalName = `${finalName}.zip`;
+          } else if (fileCT.includes('svg')) {
+            finalName = `${finalName}.svg`;
+          } else if (fileCT.includes('postscript')) {
+            finalName = `${finalName}.ai`;
+          } else if (/\.(zip|svg|ai)$/i.test(serverFilename)) {
+            finalName = serverFilename;
+          } else {
+            finalName = `${finalName}.${format === 'svg' ? 'svg' : 'ai'}`;
+          }
+        }
+        
+        const blob = await fileRes.blob();
+        setSuccessMessage(`변환 완료! ${finalName} 파일이 다운로드됩니다.`);
+        setShowSuccessMessage(true);
+        setTimeout(() => {
+          downloadBlob(blob, finalName);
+        }, 800);
+        
+        return; // 여기서 종료
+      }
+
+      // 그 외(바이너리 직접 반환) 처리
       let filename = safeGetFilename(response, base);
-      
-      // 파일 확장자 결정
       const isZip = contentType.includes("zip") || /\.zip$/i.test(filename);
       const isSvg = contentType.includes("svg") || /\.svg$/i.test(filename);
       
@@ -151,7 +190,7 @@ const PdfVectorPage: React.FC = () => {
         } else if (isSvg) {
           filename = `${filename}.svg`;
         } else {
-          filename = `${filename}.ai`; // 기본값
+          filename = `${filename}.ai`; // 기본값 (서버가 직접 파일 응답을 줄 때만 해당)
         }
       }
 
@@ -164,7 +203,7 @@ const PdfVectorPage: React.FC = () => {
       // 잠시 후 다운로드 시작
       setTimeout(() => {
         downloadBlob(blob, filename);
-      }, 1000);
+      }, 800);
       
     } catch (error) {
       clearInterval(progressInterval);
