@@ -12,7 +12,7 @@
     },
     {
       "source": "/api/pdf-jpg/(.*)",
-      "destination": "https://pdf-jpg.onrender.com/$1"
+      "destination": "https://pdf-jpg-service.onrender.com/$1"
     },
     {
       "source": "/api/pdf-vector/(.*)",
