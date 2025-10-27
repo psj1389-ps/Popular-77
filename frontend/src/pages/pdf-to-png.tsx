@@ -81,6 +81,21 @@ const PdfToPngPage: React.FC = () => {
       const poll = async () => {
         try {
           const response = await fetch(`${API_BASE}/status/${jobId}`);
+          
+          // Content-Type 헤더 확인
+          const contentType = response.headers.get('Content-Type') || '';
+          
+          // JSON이 아닌 응답 (PNG 바이너리 등)은 JSON 파싱 시도하지 않음
+          if (!contentType.includes('application/json')) {
+            if (attempts >= maxAttempts) {
+              reject(new Error('변환 시간 초과'));
+            } else {
+              attempts++;
+              setTimeout(poll, 1000);
+            }
+            return;
+          }
+
           const data = await response.json();
 
           if (data.status === 'completed') {
@@ -94,7 +109,12 @@ const PdfToPngPage: React.FC = () => {
             setTimeout(poll, 1000);
           }
         } catch (error) {
-          reject(error);
+          if (attempts >= maxAttempts) {
+            reject(new Error('변환 시간 초과'));
+          } else {
+            attempts++;
+            setTimeout(poll, 1000);
+          }
         }
       };
       poll();
