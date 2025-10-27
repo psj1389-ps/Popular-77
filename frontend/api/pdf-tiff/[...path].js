@@ -15,9 +15,28 @@ export default async function handler(req, res) {
   try {
     // URL 경로에서 /api/pdf-tiff/ 이후의 경로 추출
     const { path } = req.query;
-    const targetPath = Array.isArray(path) ? path.join('/') : (path || '');
+    let targetPath = Array.isArray(path) ? path.join('/') : (path || '');
+    
+    // 빈 경로일 때 적절한 처리
+    if (!targetPath || targetPath === '') {
+      if (req.method === 'POST' || req.method === 'PUT') {
+        // POST/PUT 요청은 convert-async로 리다이렉트
+        targetPath = 'convert-async';
+      } else if (req.method === 'GET') {
+        // GET 요청은 루트 경로로 유지 (Flask 앱의 / 경로는 GET을 허용)
+        targetPath = '';
+      } else {
+        // 기타 메서드는 에러 반환
+        res.status(405).json({ 
+          error: 'Method not allowed for root path',
+          message: `${req.method} method is not supported for the root path. Use POST for /convert-async or GET for health check.`
+        });
+        return;
+      }
+    }
     
     console.log('[PDF-TIFF] Request method:', req.method);
+    console.log('[PDF-TIFF] Original path:', Array.isArray(path) ? path.join('/') : (path || ''));
     console.log('[PDF-TIFF] Target path:', targetPath);
     console.log('[PDF-TIFF] Content-Type:', req.headers['content-type']);
     console.log('[PDF-TIFF] Content-Length:', req.headers['content-length']);
