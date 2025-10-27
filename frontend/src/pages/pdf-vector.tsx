@@ -153,20 +153,18 @@ const PdfVectorPage: React.FC = () => {
           throw new Error(msg2 || `파일 다운로드 실패: ${fileRes.status}`);
         }
         const fileCT = (fileRes.headers.get('content-type') || '').toLowerCase();
-        let finalName = safeGetFilename(fileRes, serverFilename || base);
-        
-        if (!/\.(zip|svg|ai)$/i.test(finalName)) {
-          if (fileCT.includes('zip')) {
-            finalName = `${finalName}.zip`;
-          } else if (fileCT.includes('svg')) {
-            finalName = `${finalName}.svg`;
-          } else if (fileCT.includes('postscript')) {
-            finalName = `${finalName}.ai`;
-          } else if (/\.(zip|svg|ai)$/i.test(serverFilename)) {
-            finalName = serverFilename;
-          } else {
-            finalName = `${finalName}.${format === 'svg' ? 'svg' : 'ai'}`;
-          }
+        // 파일명은 사용자가 올린 PDF의 베이스명을 우선 사용 (단, ZIP은 서버 파일명 유지)
+        let finalName: string;
+        if (fileCT.includes('zip')) {
+          finalName = (serverFilename && /\.zip$/i.test(serverFilename)) ? serverFilename : `${base}.zip`;
+        } else if (fileCT.includes('svg')) {
+          finalName = `${base}.svg`;
+        } else if (fileCT.includes('postscript')) {
+          finalName = `${base}.ai`;
+        } else {
+          finalName = serverFilename && /\.(zip|svg|ai)$/i.test(serverFilename)
+            ? serverFilename
+            : `${base}.${format === 'svg' ? 'svg' : 'ai'}`;
         }
         
         const blob = await fileRes.blob();
@@ -180,18 +178,21 @@ const PdfVectorPage: React.FC = () => {
       }
 
       // 그 외(바이너리 직접 반환) 처리
-      let filename = safeGetFilename(response, base);
-      const isZip = contentType.includes("zip") || /\.zip$/i.test(filename);
-      const isSvg = contentType.includes("svg") || /\.svg$/i.test(filename);
+      let filename: string;
+      const isZip = contentType.includes("zip");
+      const isSvg = contentType.includes("svg");
+      const isAi = contentType.includes("postscript");
       
-      if (!/\.(zip|svg|ai)$/i.test(filename)) {
-        if (isZip) {
-          filename = `${filename}.zip`;
-        } else if (isSvg) {
-          filename = `${filename}.svg`;
-        } else {
-          filename = `${filename}.ai`; // 기본값 (서버가 직접 파일 응답을 줄 때만 해당)
-        }
+      if (isZip) {
+        const headerName = safeGetFilename(response, base);
+        filename = headerName && /\.zip$/i.test(headerName) ? headerName : `${base}.zip`;
+      } else if (isSvg) {
+        filename = `${base}.svg`;
+      } else if (isAi) {
+        filename = `${base}.ai`;
+      } else {
+        const headerName = safeGetFilename(response, base);
+        filename = /\.(zip|svg|ai)$/i.test(headerName) ? headerName : `${base}.${format === 'svg' ? 'svg' : 'ai'}`;
       }
 
       const blob = await response.blob();
