@@ -145,6 +145,10 @@ def perform_tiff_conversion(file_path, quality, scale, base_name):
 def health():
     return "ok", 200
 
+@app.route('/favicon.ico')
+def favicon():
+    return '', 204
+
 @app.route('/')
 def index():
     return render_template('index.html')
