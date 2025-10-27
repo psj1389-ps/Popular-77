@@ -80,12 +80,12 @@ const PdfToPngPage: React.FC = () => {
     return new Promise((resolve, reject) => {
       const poll = async () => {
         try {
-          const response = await fetch(`${API_BASE}/status/${jobId}`);
+          const response = await fetch(`${API_BASE}/job/${jobId}`);
           
           // Content-Type 헤더 확인
           const contentType = response.headers.get('Content-Type') || '';
           
-          // JSON이 아닌 응답 (PNG 바이너리 등)은 JSON 파싱 시도하지 않음
+          // JSON이 아닌 응답은 JSON 파싱 시도하지 않음
           if (!contentType.includes('application/json')) {
             if (attempts >= maxAttempts) {
               reject(new Error('변환 시간 초과'));
@@ -105,6 +105,10 @@ const PdfToPngPage: React.FC = () => {
           } else if (attempts >= maxAttempts) {
             reject(new Error('변환 시간 초과'));
           } else {
+            // 진행률 업데이트
+            if (data.progress) {
+              setConversionProgress(data.progress);
+            }
             attempts++;
             setTimeout(poll, 1000);
           }
@@ -129,10 +133,6 @@ const PdfToPngPage: React.FC = () => {
     setErrorMessage(null);
     setShowSuccessMessage(false);
 
-    const progressInterval = setInterval(() => {
-      setConversionProgress(prev => Math.min(prev + Math.random() * 15, 90));
-    }, 800);
-
     try {
       const formData = new FormData();
       formData.append('file', selectedFile);
@@ -140,7 +140,7 @@ const PdfToPngPage: React.FC = () => {
       formData.append('scale', scale.toString());
       formData.append('transparent', transparent);
 
-      const response = await fetch(`${API_BASE}/convert`, {
+      const response = await fetch(`${API_BASE}/convert-async`, {
         method: 'POST',
         body: formData,
       });
@@ -170,7 +170,6 @@ const PdfToPngPage: React.FC = () => {
       
       await pollJobStatus(job_id);
       
-      clearInterval(progressInterval);
       setConversionProgress(100);
 
       const downloadUrl = `${API_BASE}/download/${job_id}`;
@@ -185,14 +184,9 @@ const PdfToPngPage: React.FC = () => {
       }, 1000);
       
     } catch (error) {
-      clearInterval(progressInterval);
       setConversionProgress(0);
       setErrorMessage(error instanceof Error ? error.message : '변환 중 예상치 못한 문제 발생');
-    } finally {
-      setTimeout(() => {
-        setIsConverting(false);
-        setConversionProgress(0);
-      }, 2000);
+      setIsConverting(false);
     }
   };
 
