@@ -157,6 +157,7 @@ def convert():
         file = request.files['file']
         quality = request.form.get('quality', 'medium')
         scale = float(request.form.get('scale', '1'))
+        base_name = safe_base_name(file.filename)
         
         if not file or file.filename == '':
             return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
@@ -175,7 +176,7 @@ def convert():
         temp_pdf.close()
         
         # 변환 함수 호출
-        output_path, download_name, content_type = perform_bmp_conversion(input_path, quality, scale)
+        output_path, download_name, content_type = perform_bmp_conversion(input_path, quality, scale, base_name)
         
         # 파일 전송
         return send_file(output_path, as_attachment=True, download_name=download_name, mimetype=content_type)
