@@ -466,21 +466,21 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col">
               <div className="flex items-center mb-2">
                 <Youtube className="w-6 h-6 text-red-600 mr-2" />
-                <h4 className="font-semibold text-lg">유튜브 썸네일<br/>추출기</h4>
+                <h4 className="font-semibold text-lg">유튜브<br/>썸네일 추출기</h4>
               </div>
               <p className="text-gray-600 flex-grow">유튜브 영상의 고화질 썸네일을 추출합니다.</p>
             </div>
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col">
               <div className="flex items-center mb-2">
                 <ImageIcon className="w-6 h-6 text-red-600 mr-2" />
-                <h4 className="font-semibold text-lg">인스타그램 썸네일<br/>추출기</h4>
+                <h4 className="font-semibold text-lg">인스타그램<br/>썸네일 추출기</h4>
               </div>
               <p className="text-gray-600 flex-grow">인스타그램 게시물의 썸네일을 추출합니다.</p>
             </div>
             <div className="bg-red-50 p-6 rounded-lg hover:bg-red-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col">
               <div className="flex items-center mb-2">
                 <Video className="w-6 h-6 text-red-600 mr-2" />
-                <h4 className="font-semibold text-lg">틱톡 썸네일<br/>추출기</h4>
+                <h4 className="font-semibold text-lg">틱톡<br/>썸네일 추출기</h4>
               </div>
               <p className="text-gray-600 flex-grow">틱톡 영상의 썸네일을 추출합니다.</p>
             </div>
