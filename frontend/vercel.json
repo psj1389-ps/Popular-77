@@ -10,6 +10,10 @@
       "source": "/api/pdf-svg/(.*)",
       "destination": "https://pdf-svg.onrender.com/$1"
     },
+    {
+      "source": "/api/pdf-jpg/(.*)",
+      "destination": "https://pdf-jpg-service.onrender.com/$1"
+    },
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
@@ -99,6 +103,23 @@
     },
     {
       "source": "/api/pdf-svg/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "POST, GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    },
+    {
+      "source": "/api/pdf-jpg/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
