@@ -700,43 +700,126 @@ def convert_to_vector():
         except Exception as e:
             logging.warning(f"convert_to_vector: Failed to clean up input file: {e}")
 
-        # Return files directly (single file or ZIP) with proper headers
+        # Store files for download and return JSON response
+        download_files = {}
+        
         if len(valid_files) == 1:
-            # Single file - return directly
+            # Single file
             fp = valid_files[0]
             file_size = os.path.getsize(fp)
+            filename = os.path.basename(fp)
             
-            # Determine MIME type based on file extension
-            if fp.endswith('.svg'):
-                mimetype = 'image/svg+xml'
-            elif fp.endswith('.ai'):
-                mimetype = 'application/postscript'
-            else:
-                mimetype = 'application/octet-stream'
+            # Store file info for download endpoint
+            download_files[filename] = {
+                'path': fp,
+                'size': file_size,
+                'mimetype': 'image/svg+xml' if fp.endswith('.svg') else 'application/postscript' if fp.endswith('.ai') else 'application/octet-stream'
+            }
             
-            resp = send_file(fp, as_attachment=True, download_name=os.path.basename(fp), mimetype=mimetype)
-            resp.headers["Content-Length"] = str(file_size)
-            resp.headers["Content-Disposition"] = f'attachment; filename="{os.path.basename(fp)}"'
-            logging.info(f"convert_to_vector: Returning single file {os.path.basename(fp)} ({file_size} bytes)")
-            return resp
+            logging.info(f"convert_to_vector: Generated single file {filename} ({file_size} bytes)")
+            
+            return jsonify({
+                "success": True,
+                "message": "변환이 완료되었습니다.",
+                "files": [
+                    {
+                        "filename": filename,
+                        "size": file_size,
+                        "download_url": f"/download_vector/{filename}"
+                    }
+                ]
+            })
         else:
-            # Multiple files - return as ZIP
+            # Multiple files - create ZIP
             buf = _zip_paths(valid_files)
             buf.seek(0, os.SEEK_END)
             length = buf.tell()
             buf.seek(0)
             zip_name = f"{os.path.splitext(name)[0]}_{mode}.zip"
-            resp = send_file(buf, mimetype="application/zip", as_attachment=True, download_name=zip_name)
-            resp.headers["Content-Length"] = str(length)
-            resp.headers["Content-Disposition"] = f'attachment; filename="{zip_name}"'
-            logging.info(f"convert_to_vector: Returning ZIP file {zip_name} with {len(valid_files)} files ({length} bytes)")
-            return resp
+            
+            # Save ZIP file temporarily
+            zip_path = os.path.join(OUTPUT_FOLDER, zip_name)
+            with open(zip_path, 'wb') as f:
+                f.write(buf.getvalue())
+            
+            download_files[zip_name] = {
+                'path': zip_path,
+                'size': length,
+                'mimetype': 'application/zip'
+            }
+            
+            logging.info(f"convert_to_vector: Generated ZIP file {zip_name} with {len(valid_files)} files ({length} bytes)")
+            
+            return jsonify({
+                "success": True,
+                "message": "변환이 완료되었습니다.",
+                "files": [
+                    {
+                        "filename": zip_name,
+                        "size": length,
+                        "download_url": f"/download_vector/{zip_name}"
+                    }
+                ]
+            })
 
     except Exception as e:
         logging.exception("convert_to_vector: Unexpected error occurred")
         return jsonify({"error": f"internal server error: {str(e)}"}), 500
 
-# /download_vector endpoint removed - no longer needed as /convert_to_vector returns files directly
+# Download endpoint for converted vector files
+@app.route('/download_vector/<filename>', methods=['GET'])
+def download_vector(filename):
+    try:
+        # Security: sanitize filename
+        safe_filename = secure_filename(filename)
+        if not safe_filename:
+            logging.warning(f"download_vector: Invalid filename: {filename}")
+            return jsonify({"error": "Invalid filename"}), 400
+        
+        # Look for file in output directory
+        file_path = None
+        
+        # Search in all output subdirectories
+        for root, dirs, files in os.walk(OUTPUT_FOLDER):
+            if safe_filename in files:
+                file_path = os.path.join(root, safe_filename)
+                break
+        
+        if not file_path or not os.path.exists(file_path):
+            logging.warning(f"download_vector: File not found: {safe_filename}")
+            return jsonify({"error": "File not found"}), 404
+        
+        file_size = os.path.getsize(file_path)
+        if file_size == 0:
+            logging.warning(f"download_vector: Empty file: {safe_filename}")
+            return jsonify({"error": "File is empty"}), 404
+        
+        # Determine MIME type based on file extension
+        if file_path.endswith('.svg'):
+            mimetype = 'image/svg+xml'
+        elif file_path.endswith('.ai'):
+            mimetype = 'application/postscript'
+        elif file_path.endswith('.zip'):
+            mimetype = 'application/zip'
+        else:
+            mimetype = 'application/octet-stream'
+        
+        logging.info(f"download_vector: Serving file {safe_filename} ({file_size} bytes)")
+        
+        resp = send_file(
+            file_path, 
+            as_attachment=True, 
+            download_name=safe_filename, 
+            mimetype=mimetype
+        )
+        resp.headers["Content-Length"] = str(file_size)
+        resp.headers["Content-Disposition"] = f'attachment; filename="{safe_filename}"'
+        
+        return resp
+        
+    except Exception as e:
+        logging.exception(f"download_vector: Error serving file {filename}")
+        return jsonify({"error": f"Failed to serve file: {str(e)}"}), 500
 
 @app.route('/convert', methods=['POST'])
 @app.route('/upload', methods=['POST'])
