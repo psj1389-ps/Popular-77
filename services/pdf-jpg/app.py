@@ -146,6 +146,11 @@ def perform_jpg_conversion(file_path, quality, scale, base_name):
 def health():
     return "ok", 200
 
+@app.route('/favicon.ico')
+def favicon():
+    """favicon.ico 요청 처리 - 404 오류 방지"""
+    return '', 204
+
 @app.route('/')
 def index():
     return render_template('index.html')
@@ -155,33 +160,55 @@ def convert():
     input_path = None
     
     try:
+        # 파일 존재 여부 확인
+        if 'file' not in request.files:
+            app.logger.error("No file field in request")
+            return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
+            
         file = request.files['file']
-        quality = request.form.get('quality', 'medium')
-        scale = float(request.form.get('scale', '1'))
-        
         if not file or file.filename == '':
+            app.logger.error("Empty file or filename")
             return jsonify({'error': '파일이 선택되지 않았습니다.'}), 400
         
         if not file.filename.lower().endswith('.pdf'):
+            app.logger.error(f"Invalid file type: {file.filename}")
             return jsonify({'error': 'PDF 파일만 업로드 가능합니다.'}), 400
         
-        # 출력 폴더 생성
-        if not os.path.exists('outputs'):
-            os.makedirs('outputs')
+        # 폼 데이터 파싱
+        quality = request.form.get('quality', 'medium')
+        try:
+            scale = float(request.form.get('scale', '1'))
+        except (ValueError, TypeError) as e:
+            app.logger.error(f"Invalid scale value: {request.form.get('scale')}")
+            scale = 1.0
+        
+        app.logger.info(f"Converting file: {file.filename}, quality: {quality}, scale: {scale}")
+        
+        # 출력 폴더 생성 (절대 경로 사용)
+        if not os.path.exists(OUTPUTS_DIR):
+            os.makedirs(OUTPUTS_DIR)
 
-        # 임시 PDF 파일 저장
-        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', dir='outputs')
+        # 임시 PDF 파일 저장 (UPLOADS_DIR 사용)
+        temp_pdf = tempfile.NamedTemporaryFile(delete=False, suffix='.pdf', dir=UPLOADS_DIR)
         file.save(temp_pdf.name)
         input_path = temp_pdf.name
         temp_pdf.close()
         
+        app.logger.info(f"Saved temp file: {input_path}")
+        
+        # 파일명에서 base_name 추출
+        base_name = safe_base_name(file.filename)
+        
         # 변환 함수 호출
-        output_path, download_name, content_type = perform_jpg_conversion(input_path, quality, scale)
+        output_path, download_name, content_type = perform_jpg_conversion(input_path, quality, scale, base_name)
+        
+        app.logger.info(f"Conversion completed: {output_path}, exists: {os.path.exists(output_path)}")
         
         # 파일 전송
         return send_file(output_path, as_attachment=True, download_name=download_name, mimetype=content_type)
     
     except Exception as e:
+        app.logger.exception(f"Conversion error: {str(e)}")
         return jsonify({'error': f'변환 중 오류가 발생했습니다: {str(e)}'}), 500
     
     finally:
@@ -189,8 +216,9 @@ def convert():
         try:
             if input_path and os.path.exists(input_path):
                 os.remove(input_path)
+                app.logger.info(f"Cleaned up temp file: {input_path}")
         except Exception as e:
-            print(f"입력 파일 삭제 실패 (무시됨): {e}")
+            app.logger.warning(f"Failed to cleanup temp file {input_path}: {e}")
 
 @app.route('/convert-async', methods=['POST'])
 def convert_async():
