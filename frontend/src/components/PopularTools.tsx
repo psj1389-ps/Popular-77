@@ -113,7 +113,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           <h3 className="text-2xl font-bold text-gray-900 mb-6">
             PDF변환도구
           </h3>
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-1 gap-6">
             <div 
               onClick={() => window.open('https://popular-77.vercel.app/tools/pdf-doc', '_blank')}
               className="bg-blue-50 p-6 rounded-lg hover:bg-blue-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
