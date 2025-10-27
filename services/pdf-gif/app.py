@@ -255,6 +255,53 @@ def convert():
             pass
         return jsonify({"error": str(e)}), 500
 
+@app.route("/convert_to_gif", methods=["POST"])
+def convert_to_gif():
+    f = request.files.get("file") or request.files.get("pdfFile")
+    if not f:
+        return jsonify({"error": "file field is required"}), 400
+
+    base_name = safe_base_name(f.filename)
+    job_id = uuid4().hex
+    in_path = os.path.join(UPLOADS_DIR, f"{job_id}.pdf")
+    f.save(in_path)
+
+    def clamp(v, lo, hi, default):
+        try:
+            x = type(default)(v)
+        except:
+            return default
+        return max(lo, min(hi, x))
+
+    # 레거시 필드명 지원: scale_factor, transparent_bg(on/off)
+    scale = clamp(request.form.get("scale_factor", request.form.get("scale", "1.0")), 0.1, 3.0, 1.0)
+    delay_ms = clamp(request.form.get("delay_ms", "400"), 50, 5000, 400)
+    colors = clamp(request.form.get("colors", "128"), 2, 256, 128)
+    dither = clamp(request.form.get("dither", "1"), 0, 1, 1)
+    max_pages = clamp(request.form.get("max_pages", "100"), 1, 500, 100)
+    transparent_raw = request.form.get("transparent_bg", request.form.get("transparent", "0"))
+    transparent = 1 if str(transparent_raw).lower() in ("1", "true", "on", "yes") else 0
+
+    try:
+        out_path, name, ctype = perform_gif_conversion(
+            in_path, base_name, job_id,
+            scale=scale, delay_ms=delay_ms, colors=colors, dither=dither, max_pages=max_pages, transparent=transparent
+        )
+        response = send_download_memory(out_path, name, ctype)
+        try:
+            os.remove(in_path)
+            os.remove(out_path)
+        except:
+            pass
+        return response
+    except Exception as e:
+        app.logger.exception("Legacy convert_to_gif error")
+        try:
+            os.remove(in_path)
+        except:
+            pass
+        return jsonify({"error": str(e)}), 500
+
 @app.route("/convert-async", methods=["POST"])
 def convert_async():
     f = request.files.get("file") or request.files.get("pdfFile")
@@ -348,3 +395,6 @@ def handle_any(e):
 if __name__ == "__main__": 
     port = int(os.environ.get("PORT", 5000)) 
     app.run(host="0.0.0.0", port=port)
+
+
+# Legacy route moved above __main__ to ensure registration before app.run
