@@ -18,6 +18,7 @@
       "source": "/api/pdf-vector/(.*)",
       "destination": "https://pdf-vector.onrender.com/$1"
     },
+    { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
@@ -141,6 +142,23 @@
     },
     {
       "source": "/api/pdf-vector/(.*)",
+      "headers": [
+        {
+          "key": "Access-Control-Allow-Origin",
+          "value": "*"
+        },
+        {
+          "key": "Access-Control-Allow-Methods",
+          "value": "POST, GET, OPTIONS"
+        },
+        {
+          "key": "Access-Control-Allow-Headers",
+          "value": "Content-Type"
+        }
+      ]
+    },
+    {
+      "source": "/api/pdf-gif/(.*)",
       "headers": [
         {
           "key": "Access-Control-Allow-Origin",
