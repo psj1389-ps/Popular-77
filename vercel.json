@@ -4,7 +4,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
-    { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-service.onrender.com/$1" },
+    { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-jh3s.onrender.com/$1" },
     { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
     { "source": "/api/pdf-svg/(.*)", "destination": "https://pdf-svg.onrender.com/$1" },
     { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
