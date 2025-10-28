@@ -9,6 +9,7 @@
     { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
     { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
     { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
+    { "source": "/api/image-to-jpg", "destination": "https://images-jpg.onrender.com/api/image-to-jpg" },
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
     { "source": "/api/(.*)", "destination": "/api/$1" },
@@ -89,6 +90,13 @@
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
+      ]
+    },
+    { "source": "/api/image-to-jpg",
+      "headers": [
+        { "key": "Access-Control-Allow-Origin", "value": "*" },
+        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }

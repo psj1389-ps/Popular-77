@@ -18,6 +18,7 @@ import DocxPdfPage from "@/pages/docx-pdf";
 import PptxPdfPage from "@/pages/pptx-pdf";
 import XlsPdfPage from "@/pages/xls-pdf";
 import MainLayout from '@/components/MainLayout';
+import ImageJpgPage from "@/pages/image-jpg";
 
 function App() {
   return (
@@ -148,6 +149,14 @@ function App() {
           element={
             <MainLayout>
               <XlsPdfPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/image-jpg"
+          element={
+            <MainLayout>
+              <ImageJpgPage />
             </MainLayout>
           }
         />
