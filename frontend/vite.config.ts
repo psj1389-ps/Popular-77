@@ -74,11 +74,7 @@ export default defineConfig({
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/pdf-image/, "")
       },
-      "/api/image-to-jpg": {
-        target: "https://images-jpg.onrender.com",
-        changeOrigin: true,
-        rewrite: (path) => path.replace(/^\/api\/image-to-jpg/, "/api/image-to-jpg")
-      }
+
     }
   }
 })
