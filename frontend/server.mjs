@@ -14,7 +14,22 @@ const distDir = path.join(__dirname, 'dist');
 // Health check for Render
 app.get('/health', (req, res) => res.json({ ok: true }));
 
-
+// 이미지 → JPG 마이크로서비스 프록시 (동일 오리진 경유로 CORS 회피)
+const targetJpg = process.env.IMAGES_JPG_URL || 'https://images-jpg-service.onrender.com';
+app.use([
+  '/api/image-to-jpg',
+  '/api/batch-convert',
+  '/api/progress',
+  '/api/download',
+  '/api/cancel'
+], createProxyMiddleware({
+  target: targetJpg,
+  changeOrigin: true,
+  ws: false,
+  xfwd: true,
+  proxyTimeout: 600000,
+  timeout: 600000,
+}));
 
 // SPA history fallback (exclude API paths)
 app.use(
