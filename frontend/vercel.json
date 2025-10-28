@@ -8,7 +8,7 @@
     { "source": "/api/pdf-vector/(.*)", "destination": "https://pdf-vector.onrender.com/$1" },
     { "source": "/api/pdf-gif/(.*)", "destination": "https://pdf-gif.onrender.com/$1" },
     { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
-    { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
+    { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/api/pdf-ai/$1" },
 
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
