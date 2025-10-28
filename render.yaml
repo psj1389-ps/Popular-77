@@ -239,6 +239,22 @@ services:
         value: 3.12.6
     healthCheckPath: /health
 
+  # Images to JPG Service (standalone)
+  - type: web
+    name: images-jpg-service
+    env: python
+    rootDir: services/images-jpg
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: python app.py
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: PORT
+        value: 10000
+    healthCheckPath: /health
+
   # YouTube Downloader Service
   - type: web
     name: youtube-downloader-service
