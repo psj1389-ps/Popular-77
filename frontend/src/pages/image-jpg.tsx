@@ -48,7 +48,7 @@ async function getErrorMessage(res: Response) {
 const ImageJpgPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
-  const [scale, setScale] = useState(1.0); // 0.2 ~ 2.0
+  const [scale, setScale] = useState(0.5); // 0.2 ~ 2.0
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);

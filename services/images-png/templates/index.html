@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Image to JPG Converter</title>
+    <title>Image to PNG Converter</title>
     <style>
         body{font-family:Arial;background:#f5f5f5;margin:0;padding:0}
         
@@ -351,8 +351,8 @@
             <div class="header-logo">
                 <div class="logo-icon">📄</div>
                 <div style="position: relative;">
-                    <h1 class="header-title">Image(PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW) → JPG 변환기</h1>
-                    <p class="header-subtitle">PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 JPG로 변환합니다.</p>
+                    <h1 class="header-title">Image(JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW) → PNG 변환기</h1>
+                    <p class="header-subtitle">JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 PNG로 변환합니다.</p>
                 </div>
             </div>
             
@@ -372,8 +372,8 @@
     <!-- 메인 컨텐츠 -->
     <div class="container">
         <div class="header">
-            <h2>Image → JPG 변환기</h2>
-            <h4>다양한 이미지 형식을 고품질 JPG로 변환 (PNG/WEBP/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → JPG)</h4>
+            <h2>Image → PNG 변환기</h2>
+            <h4>다양한 이미지 형식을 고품질 PNG로 변환 (JPG/WEBP/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → PNG)</h4>
         </div>
         
         <form id="uploadForm" enctype="multipart/form-data">
@@ -382,7 +382,7 @@
                     <div class="upload-icon">🖼️</div>
                     <h3>이미지 파일을 업로드하세요</h3>
                     <p>파일을 드래그하거나 클릭하여 선택하세요 (최대 100개 파일, 총 500MB)</p>
-                    <input type="file" id="fileInput" name="file" accept=".png,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.heif,.cr2,.nef,.arw,.dng,.raf,.orf,.rw2" multiple style="display: none;">
+                    <input type="file" id="fileInput" name="file" accept=".jpg,.jpeg,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.heif,.cr2,.nef,.arw,.dng,.raf,.orf,.rw2" multiple style="display: none;">
                     <button type="button" class="upload-btn" onclick="document.getElementById('fileInput').click()">파일 선택</button>
                 </div>
             </div>
@@ -395,11 +395,11 @@
             <div class="format-options" id="formatOptions" style="margin: 15px 0; display: none;">
                 <h4>출력 형식:</h4>
                 <select name="format" id="formatSelect" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 5px; font-size: 14px;">
-                    <option value="jpg" selected>📷 JPG (JPEG) - 고품질 사진 형식</option>
+                    <option value="png" selected>🖼️ PNG - 고품질 무손실 형식</option>
                 </select>
                 <p style="font-size: 12px; color: #666; margin-top: 5px;">
-                    <strong>JPG 형식:</strong> PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 JPG로 변환합니다.<br>
-                    투명 배경은 흰색 배경으로 변환됩니다.
+                    <strong>PNG 형식:</strong> JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 PNG로 변환합니다.<br>
+                    투명도를 지원하는 무손실 압축 형식입니다.
                 </p>
             </div>
             
@@ -531,7 +531,7 @@
             document.getElementById('fileInfo').style.display = 'block';
             
             // 지원되는 이미지 파일 확장자 체크
-            const supportedExtensions = ['.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+            const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
             const fileExtension = file.name.toLowerCase();
             const isSupported = supportedExtensions.some(ext => fileExtension.endsWith(ext));
             
@@ -543,7 +543,7 @@
                 if (tbo) { tbo.style.display = 'block'; }
                 updateCurrentSize(); // 현재 크기 업데이트
             } else {
-                showError('지원되지 않는 파일 형식입니다. PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                showError('지원되지 않는 파일 형식입니다. JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                 resetFile();
                 return;
             }
@@ -570,7 +570,7 @@
             }
             
             // 지원되는 파일 형식 체크
-            const supportedExtensions = ['.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+            const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
             const unsupportedFiles = [];
             
             for (const file of files) {
@@ -641,7 +641,7 @@
                 
                 // 서버 응답에서 파일 이름 정보(헤더)를 추출
                 const disposition = response.headers.get('Content-Disposition');
-                let filename = 'converted.jpg';
+                let filename = 'converted.png';
                 if (disposition && disposition.indexOf('attachment') !== -1) {
                     const filenameStarRegex = /filename\*=UTF-8''([^;\n]*)/;
                     const starMatches = filenameStarRegex.exec(disposition);
@@ -656,15 +656,15 @@
                     }
                 }
 
-                // 원본 파일명을 기준으로 .jpg 강제 설정
+                // 원본 파일명을 기준으로 .png 강제 설정
                 const sourceBase = (selectedFile && selectedFile.name)
                     ? selectedFile.name.replace(/\.[^.\s]+$/, '')
                     : filename.replace(/\.[^.\s]+$/, '');
-                filename = `${sourceBase}.jpg`;
+                filename = `${sourceBase}.png`;
 
-                // 응답을 명시적으로 JPEG Blob으로 생성
+                // 응답을 명시적으로 PNG Blob으로 생성
                 const arrayBuffer = await response.arrayBuffer();
-                const blob = new Blob([arrayBuffer], { type: 'image/jpeg' });
+                const blob = new Blob([arrayBuffer], { type: 'image/png' });
                 
                 // 파일 다운로드
                 const url = URL.createObjectURL(blob);
@@ -869,7 +869,7 @@
             
             // 품질 및 형식 설정 초기화
             document.querySelector('input[name="quality"][value="medium"]').checked = true;
-            document.getElementById('formatSelect').value = 'jpg';
+            document.getElementById('formatSelect').value = 'png';
             document.querySelector('input[name="transparentBg"][value="false"]').checked = true;
             
             // 고급 옵션 접기
@@ -969,12 +969,12 @@
                 const file = files[0];
                 
                 // 지원되는 이미지 파일 형식 체크
-                const supportedExtensions = ['.png', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+                const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
                 const fileExtension = file.name.toLowerCase();
                 const isSupported = supportedExtensions.some(ext => fileExtension.endsWith(ext));
                 
                 if (!isSupported) {
-                    showError('지원되지 않는 파일 형식입니다. PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                    showError('지원되지 않는 파일 형식입니다. JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                     return;
                 }
                 
