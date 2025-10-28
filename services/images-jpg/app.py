@@ -1,3 +1,4 @@
+# Image to JPG Converter Service - Updated for Render deployment
 from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
 import os, io, zipfile, uuid, time
@@ -22,7 +23,7 @@ def root():
     if request.headers.get('Accept', '').find('text/html') != -1:
         return render_template('index.html')
     
-    # Return JSON for API requests
+    # Return JSON for API requests - Service status endpoint
     return jsonify({
         "service": "Image to JPG Converter",
         "version": "1.0.0",
