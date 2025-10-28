@@ -32,6 +32,9 @@ function safeGetFilename(res: Response, fallback: string) {
 }
 
 async function getErrorMessage(res: Response) {
+  if (res.status === 413) {
+    return '업로드 파일이 너무 큽니다 (413). GIF는 용량이 큰 편이라 크기/품질을 낮추거나 JPG로 압축 후 다시 시도해 주세요.';
+  }
   const ct = (res.headers.get('content-type') || '').toLowerCase();
   if (!ct.includes('application/json')) return `서버 오류: ${res.status}`;
   try {
@@ -271,7 +274,7 @@ const ImageJpgPage: React.FC = () => {
                         style={{ width: `${Math.max(2, Math.round(conversionProgress))}%` }}
                       />
                     </div>
-                    <div className="mt-2 text-sm text-gray-500">⏳ PDF를 JPG로 변환 중...</div>
+                    <div className="mt-2 text-sm text-gray-500">⏳ 이미지를 JPG로 변환 중...</div>
                   </div>
                 )}
 

@@ -27,21 +27,25 @@ export default async function handler(req, res) {
     // 원본 Content-Type 유지 (multipart/form-data 포함)
     const contentType = req.headers['content-type'] || 'application/octet-stream';
 
-    // 요청 바디를 원본 스트림에서 버퍼로 수집 (멀티파트 유실 방지)
-    const chunks = [];
-    for await (const chunk of req) {
-      chunks.push(chunk);
-    }
-    const buffer = Buffer.concat(chunks);
-
-    // 백엔드 서비스로 원본 바디 그대로 전달
+    // 백엔드 서비스로 원본 바디를 스트리밍으로 전달 (Node.js fetch streaming)
     const response = await fetch(TARGET_URL, {
       method: 'POST',
       headers: {
         'Content-Type': contentType,
+        'Accept': '*/*',
       },
-      body: buffer,
+      body: req,
+      duplex: 'half',
     });
+
+    // 413 처리: 친절한 JSON 메시지로 반환
+    if (response.status === 413) {
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.status(413).json({
+        error: '업로드 파일이 너무 큽니다 (413). GIF는 용량이 클 수 있어, 크기/품질을 낮추거나 JPG로 압축 후 다시 시도해 주세요.',
+      });
+      return;
+    }
 
     // 응답 헤더 복사 (파일 다운로드용 헤더 유지)
     const ct = response.headers.get('content-type');
