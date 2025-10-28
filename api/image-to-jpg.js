@@ -2,7 +2,7 @@
 // 목적: 프론트엔드가 동일 도메인(/api/image-to-jpg)으로 호출하면
 // 여기서 images-jpg 서비스로 안전하게 전달합니다. 리라이트가 실패해도 동작합니다.
 
-const TARGET_URL = 'https://images-jpg.onrender.com/api/image-to-jpg';
+const TARGET_URL = 'https://images-jpg-service.onrender.com/api/image-to-jpg';
 
 export default async function handler(req, res) {
   try {
