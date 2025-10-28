@@ -5,13 +5,15 @@ services:
     env: node
     rootDir: frontend
     buildCommand: npm install && npm run build
-    startCommand: npm run preview
+    startCommand: npm run start:render
     publishDir: dist
     envVars:
       - key: NODE_ENV
         value: production
       - key: PORT
         value: 10000
+      - key: IMAGES_JPG_URL
+        value: https://images-jpg-service.onrender.com
     healthCheckPath: /
 
   # Docker-based DOCX to PDF Service
