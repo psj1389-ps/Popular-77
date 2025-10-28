@@ -192,7 +192,7 @@ const ImageJpgPage: React.FC = () => {
               <label htmlFor="file-upload" className="block border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
                 <input id="file-upload" ref={fileInputRef} type="file" accept=".png,.jpg,.jpeg,.webp,.bmp,.tiff,.gif,.svg,.psd,.heif,.heic" onChange={handleFileChange} className="hidden" />
                 <p className="font-semibold text-gray-700">파일을 선택하세요</p>
-                <p className="text-sm text-gray-500 mt-1">이미지 파일을 클릭하여 선택 (최대 100MB)</p>
+                <p className="text-sm text-gray-500 mt-1">파일을 드래그하거나 클릭하여 선택하세요 (최대 100개 파일, 총 500MB)</p>
               </label>
             ) : (
               <div className="space-y-6">

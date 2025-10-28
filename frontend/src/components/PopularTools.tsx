@@ -282,7 +282,10 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
             이미지&동영상변환도구          </h3>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
             {/* JPG 변??카드 */}
-            <div className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col">
+            <div 
+              onClick={() => window.open('https://77-tools.xyz/tools/image-jpg', '_blank')}
+              className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 transform hover:scale-105 h-40 flex flex-col cursor-pointer"
+            >
               <div className="flex items-center mb-2">
                 <Image className="w-6 h-6 text-yellow-600 mr-2" />
                 <h4 className="font-semibold text-lg">JPG 변환</h4>
