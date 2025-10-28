@@ -122,8 +122,7 @@ const ImageJpgPage: React.FC = () => {
 
       const blob = await res.blob();
       const base = selectedFile.name.replace(/\.[^/.]+$/, '');
-      let name = safeGetFilename(res, base + '.jpg');
-      if (!/\.(jpg|jpeg)$/i.test(name)) name = base + '.jpg';
+      const name = base + '.jpg';
 
       setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
       setShowSuccessMessage(true);
@@ -262,17 +261,17 @@ const ImageJpgPage: React.FC = () => {
                 {/* 진행률 */}
                 {isConverting && (
                   <div className="mb-4">
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-blue-700">변환 진행률</span>
-                      <span className="text-sm font-medium text-blue-700">{Math.round(conversionProgress)}%</span>
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>변환 진행률</span>
+                      <span>{Math.round(conversionProgress)}%</span>
                     </div>
-                    <div className="w-full bg-gray-200 rounded-full h-2.5">
-                      <div className="bg-blue-600 h-2.5 rounded-full transition-all duration-300 ease-out" style={{ width: `${conversionProgress}%` }}></div>
+                    <div className="h-2 bg-gray-200 rounded">
+                      <div 
+                        className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
+                        style={{ width: `${Math.max(2, Math.round(conversionProgress))}%` }}
+                      />
                     </div>
-                    <div className="flex items-center justify-center mt-3">
-                      <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mr-2"></div>
-                      <span className="text-sm text-gray-600">변환 중입니다... 잠시만 기다려주세요.</span>
-                    </div>
+                    <div className="mt-2 text-sm text-gray-500">⏳ PDF를 JPG로 변환 중...</div>
                   </div>
                 )}
 
