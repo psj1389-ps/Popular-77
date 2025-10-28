@@ -166,9 +166,9 @@ const ImageJpgPage: React.FC = () => {
           <div className="container mx-auto relative z-10">
             <div className="flex justify-center items-center gap-4 mb-4">
               <svg className="w-12 h-12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              <h1 className="text-4xl font-bold">이미지 → JPG 변환기</h1>
+              <h1 className="text-4xl font-bold">Image(PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW) → JPG 변환기</h1>
             </div>
-            <p className="text-lg opacity-90 max-w-2xl mx-auto">PNG, SVG, WEBP, BMP, TIFF, GIF 등 이미지를 고품질 JPG로 변환하세요.</p>
+            <p className="text-lg opacity-90 max-w-2xl mx-auto">PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 JPG로 변환합니다.</p>
           </div>
         </div>
 
@@ -184,8 +184,8 @@ const ImageJpgPage: React.FC = () => {
         <div className="container mx-auto px-4 py-16">
           <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
             <div className="text-center mb-6">
-              <h2 className="text-2xl font-semibold text-gray-800">이미지 → JPG 변환기</h2>
-              <p className="text-gray-500">이미지 파일을 래스터 JPG로 변환</p>
+              <h2 className="text-2xl font-semibold text-gray-800">Image → JPG 변환기</h2>
+              <p className="text-gray-500">다양한 이미지 형식을 고품질 JPG로 변환 (PNG/WEBP/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → JPG)</p>
             </div>
 
             {!selectedFile ? (
@@ -258,11 +258,6 @@ const ImageJpgPage: React.FC = () => {
                   </div>
                 </div>
 
-                {/* 투명 배경 안내 (JPG 미지원) */}
-                <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">투명 배경: (JPG에서 지원 안함)</h3>
-                  <div className="text-sm text-gray-600">JPG는 투명 배경을 지원하지 않으며 흰색 배경으로 변환됩니다.</div>
-                </div>
 
                 {/* 진행률 */}
                 {isConverting && (
