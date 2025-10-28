@@ -13,7 +13,7 @@ services:
       - key: PORT
         value: 10000
       - key: IMAGES_JPG_URL
-        value: https://images-jpg.onrender.com
+        value: https://images-jpg-service.onrender.com
     healthCheckPath: /
 
   # Docker-based DOCX to PDF Service

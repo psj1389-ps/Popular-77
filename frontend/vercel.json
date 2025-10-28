@@ -97,7 +97,7 @@
         { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
       ]
     },
-    { "source": "/api/image-to-jpg",
+    { "source": "/api/image-to-jpg/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },

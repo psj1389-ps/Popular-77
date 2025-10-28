@@ -1,0 +1,12 @@
+node_modules
+build
+dist
+.git
+.trae
+.log
+.figma
+.venv/
+pycache/
+uploads/
+outputs/
+.env
