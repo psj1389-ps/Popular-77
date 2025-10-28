@@ -1,8 +1,10 @@
 {
   "version": 2,
-  "buildCommand": "npm ci && npm run build",
-  "outputDirectory": "dist",
+  "installCommand": "npm ci --prefix frontend",
+  "buildCommand": "npm run build --prefix frontend",
+  "outputDirectory": "frontend/dist",
   "rewrites": [
+    { "source": "/api/image-to-jpg", "destination": "https://images-jpg.onrender.com/api/image-to-jpg" },
     { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
     { "source": "/api/pdf-jpg/(.*)", "destination": "https://pdf-jpg-jh3s.onrender.com/$1" },
     { "source": "/api/pdf-bmp/(.*)", "destination": "https://pdf-bmp.onrender.com/$1" },
