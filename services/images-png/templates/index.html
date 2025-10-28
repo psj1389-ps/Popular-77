@@ -381,7 +381,7 @@
                 <div id="uploadText">
                     <div class="upload-icon">🖼️</div>
                     <h3>이미지 파일을 업로드하세요</h3>
-                    <p>파일을 드래그하거나 클릭하여 선택하세요 (최대 50개 파일, 총 500MB)</p>
+                    <p>파일을 드래그하거나 클릭하여 선택하세요 (최대 100개 파일, 총 500MB)</p>
                     <input type="file" id="fileInput" name="file" accept=".png,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.heif,.cr2,.nef,.arw,.dng,.raf,.orf,.rw2" multiple style="display: none;">
                     <button type="button" class="upload-btn" onclick="document.getElementById('fileInput').click()">파일 선택</button>
                 </div>
@@ -553,8 +553,8 @@
     
         function handleBatchFiles(files) {
             // 파일 개수 제한 체크
-            if (files.length > 50) {
-                showError('최대 50개 파일까지 업로드 가능합니다.');
+            if (files.length > 100) {
+                showError('최대 100개 파일까지 업로드 가능합니다.');
                 return;
             }
             

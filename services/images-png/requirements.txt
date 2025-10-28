@@ -1,0 +1,16 @@
+# Image to JPG Service - Minimal Requirements for Render
+
+# Web Framework
+Flask==2.3.3
+Werkzeug==2.3.7
+
+# Image Processing
+Pillow>=10.2.0
+cairosvg>=2.7.0
+
+# Web Server
+gunicorn==21.2.0
+
+# Environment
+python-dotenv==1.0.0
+
