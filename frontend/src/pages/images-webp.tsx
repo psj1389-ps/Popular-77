@@ -182,7 +182,7 @@ const ImagesWebpPage: React.FC = () => {
         `}</style>
 
         <div className="container mx-auto px-4 py-16">
-          <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
+          <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto" style={{ transform: 'scale(0.5)', transformOrigin: 'top center' }}>
             <div className="text-center mb-6">
               <h2 className="text-2xl font-semibold text-gray-800">Image → WEBP 변환기</h2>
               <p className="text-gray-500">다양한 이미지 형식을 고품질 WEBP로 변환 (JPG/PNG/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → WEBP)</p>

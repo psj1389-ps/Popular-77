@@ -293,7 +293,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
               <p className="text-gray-600 flex-grow">다양한 이미지 형식을 JPG로 쉽게 변환합니다.</p>
             </div>
 
-            {/* PNG 변??카드 */}
+            {/* PNG 변환카드 */}
             <div 
               onClick={() => window.location.href = '/tools/images-png'}
               className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
