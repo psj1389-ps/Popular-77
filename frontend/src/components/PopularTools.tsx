@@ -307,7 +307,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
 
             {/* WEBP 변??카드 */}
             <div 
-              onClick={() => window.location.href = '/tools/webp-converter'}
+              onClick={() => window.location.href = '/tools/images-webp'}
               className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
             >
               <div className="flex items-center mb-2">

@@ -79,13 +79,15 @@ def convert_image():
         # 변환 옵션 처리
         quality = request.form.get('quality', 'medium')
         resize_factor = float(request.form.get('resize', 1.0))
+        transparent = request.form.get('transparent', 'false').lower() == 'true'
         
         # 변환 실행
         output_files = image_to_webp(
             input_path, 
             OUTPUT_DIR, 
             quality=quality, 
-            resize_factor=resize_factor
+            resize_factor=resize_factor,
+            preserve_transparency=transparent
         )
         
         if not output_files:

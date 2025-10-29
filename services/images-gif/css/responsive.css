@@ -1,0 +1,509 @@
+/* Responsive Design for Image to GIF Converter */
+
+/* Tablet Styles (768px and below) */
+@media (max-width: 768px) {
+    /* Container */
+    .container {
+        padding: 0 var(--spacing-4);
+    }
+
+    /* Header */
+    .header {
+        padding: var(--spacing-12) 0;
+    }
+
+    .header-title {
+        font-size: var(--font-size-2xl);
+        line-height: 1.3;
+    }
+
+    .header-subtitle {
+        font-size: var(--font-size-base);
+    }
+
+    /* Main Content */
+    .main {
+        padding: var(--spacing-12) 0;
+    }
+
+    /* Section Spacing */
+    section {
+        margin-bottom: var(--spacing-8);
+    }
+
+    .section-title {
+        font-size: var(--font-size-xl);
+        margin-bottom: var(--spacing-4);
+    }
+
+    /* Upload Area */
+    .upload-area {
+        padding: var(--spacing-12);
+    }
+
+    .upload-title {
+        font-size: var(--font-size-lg);
+    }
+
+    .supported-formats {
+        justify-content: center;
+    }
+
+    /* File Grid */
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+        gap: var(--spacing-3);
+    }
+
+    .file-card {
+        padding: var(--spacing-3);
+    }
+
+    .file-thumbnail {
+        height: 100px;
+    }
+
+    /* Settings Grid */
+    .settings-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-6);
+    }
+
+    /* Conversion Controls */
+    .conversion-controls {
+        flex-direction: column;
+        align-items: center;
+        gap: var(--spacing-3);
+    }
+
+    .convert-button,
+    .clear-button {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
+
+    /* Results Grid */
+    .results-grid {
+        grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+        gap: var(--spacing-4);
+    }
+
+    /* Download Controls */
+    .download-all-button {
+        width: 100%;
+        max-width: 300px;
+        justify-content: center;
+    }
+
+    /* Section Padding */
+    .preview-section,
+    .settings-section,
+    .conversion-section,
+    .results-section {
+        padding: var(--spacing-6);
+    }
+}
+
+/* Mobile Styles (480px and below) */
+@media (max-width: 480px) {
+    /* Container */
+    .container {
+        padding: 0 var(--spacing-3);
+    }
+
+    /* Header */
+    .header {
+        padding: var(--spacing-10) 0;
+    }
+
+    .header-title {
+        font-size: var(--font-size-xl);
+        line-height: 1.4;
+        margin-bottom: var(--spacing-3);
+    }
+
+    .header-subtitle {
+        font-size: var(--font-size-sm);
+        line-height: 1.5;
+    }
+
+    /* Main Content */
+    .main {
+        padding: var(--spacing-10) 0;
+    }
+
+    /* Section Spacing */
+    section {
+        margin-bottom: var(--spacing-6);
+    }
+
+    .section-title {
+        font-size: var(--font-size-lg);
+        margin-bottom: var(--spacing-4);
+    }
+
+    /* Upload Area */
+    .upload-area {
+        padding: var(--spacing-8);
+        border-radius: var(--radius-lg);
+    }
+
+    .upload-icon svg {
+        width: 36px;
+        height: 36px;
+    }
+
+    .upload-title {
+        font-size: var(--font-size-base);
+        margin-bottom: var(--spacing-2);
+    }
+
+    .upload-description {
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--spacing-4);
+    }
+
+    .upload-button {
+        padding: var(--spacing-3) var(--spacing-6);
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--spacing-4);
+    }
+
+    .supported-formats {
+        gap: var(--spacing-1);
+    }
+
+    .format-badge {
+        font-size: var(--font-size-xs);
+        padding: 2px var(--spacing-2);
+    }
+
+    /* File Grid */
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+        gap: var(--spacing-2);
+    }
+
+    .file-card {
+        padding: var(--spacing-2);
+    }
+
+    .file-thumbnail {
+        height: 80px;
+        margin-bottom: var(--spacing-2);
+    }
+
+    .file-name {
+        font-size: var(--font-size-xs);
+        margin-bottom: 2px;
+    }
+
+    .file-size {
+        font-size: 10px;
+    }
+
+    .file-remove {
+        width: 20px;
+        height: 20px;
+        top: var(--spacing-1);
+        right: var(--spacing-1);
+    }
+
+    .file-remove svg {
+        width: 12px;
+        height: 12px;
+    }
+
+    .file-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-1);
+        font-size: var(--font-size-xs);
+    }
+
+    /* Settings */
+    .settings-grid {
+        gap: var(--spacing-4);
+    }
+
+    .setting-label {
+        font-size: var(--font-size-sm);
+        margin-bottom: var(--spacing-2);
+    }
+
+    .setting-value {
+        font-size: var(--font-size-xs);
+    }
+
+    .range-labels {
+        font-size: 10px;
+    }
+
+    .select-input {
+        padding: var(--spacing-2);
+        font-size: var(--font-size-sm);
+    }
+
+    /* Conversion Controls */
+    .conversion-controls {
+        gap: var(--spacing-2);
+    }
+
+    .convert-button,
+    .clear-button {
+        padding: var(--spacing-3) var(--spacing-4);
+        font-size: var(--font-size-sm);
+        min-height: 40px;
+    }
+
+    .convert-button svg,
+    .clear-button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Progress */
+    .progress-info {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-1);
+        margin-bottom: var(--spacing-2);
+    }
+
+    .progress-text,
+    .progress-percent {
+        font-size: var(--font-size-sm);
+    }
+
+    /* Results Grid */
+    .results-grid {
+        grid-template-columns: 1fr;
+        gap: var(--spacing-3);
+    }
+
+    .result-card {
+        padding: var(--spacing-3);
+    }
+
+    .result-preview {
+        height: 120px;
+        margin-bottom: var(--spacing-3);
+    }
+
+    .result-filename {
+        font-size: var(--font-size-xs);
+    }
+
+    .result-size {
+        font-size: 10px;
+    }
+
+    .download-button {
+        padding: var(--spacing-2) var(--spacing-3);
+        font-size: var(--font-size-xs);
+    }
+
+    .download-all-button {
+        padding: var(--spacing-3) var(--spacing-4);
+        font-size: var(--font-size-sm);
+        min-height: 40px;
+    }
+
+    .download-all-button svg {
+        width: 16px;
+        height: 16px;
+    }
+
+    /* Section Padding */
+    .preview-section,
+    .settings-section,
+    .conversion-section,
+    .results-section {
+        padding: var(--spacing-4);
+        border-radius: var(--radius-lg);
+    }
+
+    /* Footer */
+    .footer {
+        padding: var(--spacing-6) 0;
+        margin-top: var(--spacing-12);
+    }
+
+    .footer p {
+        font-size: var(--font-size-xs);
+        line-height: 1.5;
+    }
+}
+
+/* Extra Small Mobile (360px and below) */
+@media (max-width: 360px) {
+    /* Container */
+    .container {
+        padding: 0 var(--spacing-2);
+    }
+
+    /* Header */
+    .header-title {
+        font-size: var(--font-size-lg);
+        word-break: keep-all;
+        line-height: 1.5;
+    }
+
+    .header-subtitle {
+        font-size: var(--font-size-xs);
+    }
+
+    /* Upload Area */
+    .upload-area {
+        padding: var(--spacing-6);
+    }
+
+    .upload-description {
+        font-size: var(--font-size-xs);
+    }
+
+    /* File Grid */
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+    }
+
+    .file-thumbnail {
+        height: 60px;
+    }
+
+    /* Settings */
+    .setting-label {
+        flex-direction: column;
+        align-items: flex-start;
+        gap: var(--spacing-1);
+    }
+
+    /* Results */
+    .result-preview {
+        height: 100px;
+    }
+
+    /* Section Padding */
+    .preview-section,
+    .settings-section,
+    .conversion-section,
+    .results-section {
+        padding: var(--spacing-3);
+    }
+}
+
+/* Touch Device Optimizations */
+@media (hover: none) and (pointer: coarse) {
+    /* Increase touch targets */
+    .upload-button,
+    .convert-button,
+    .clear-button,
+    .download-button,
+    .download-all-button {
+        min-height: 44px;
+        padding: var(--spacing-3) var(--spacing-4);
+    }
+
+    .file-remove {
+        min-width: 32px;
+        min-height: 32px;
+    }
+
+    .range-slider::-webkit-slider-thumb {
+        width: 24px;
+        height: 24px;
+    }
+
+    .range-slider::-moz-range-thumb {
+        width: 24px;
+        height: 24px;
+    }
+
+    /* Remove hover effects on touch devices */
+    .upload-area:hover,
+    .file-card:hover,
+    .result-card:hover {
+        transform: none;
+        box-shadow: var(--shadow-md);
+    }
+
+    .upload-button:hover,
+    .convert-button:hover,
+    .clear-button:hover,
+    .download-button:hover,
+    .download-all-button:hover {
+        transform: none;
+    }
+}
+
+/* High DPI Displays */
+@media (-webkit-min-device-pixel-ratio: 2), (min-resolution: 192dpi) {
+    /* Ensure crisp rendering on high DPI displays */
+    .upload-icon svg,
+    .convert-button svg,
+    .clear-button svg,
+    .download-all-button svg {
+        shape-rendering: geometricPrecision;
+    }
+}
+
+/* Landscape Orientation on Mobile */
+@media (max-width: 768px) and (orientation: landscape) {
+    .header {
+        padding: var(--spacing-8) 0;
+    }
+
+    .main {
+        padding: var(--spacing-8) 0;
+    }
+
+    .upload-area {
+        padding: var(--spacing-6);
+    }
+
+    .file-grid {
+        grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    }
+
+    .results-grid {
+        grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+    }
+}
+
+/* Print Styles */
+@media print {
+    .header,
+    .upload-section,
+    .conversion-section,
+    .footer {
+        display: none;
+    }
+
+    .preview-section,
+    .settings-section,
+    .results-section {
+        box-shadow: none;
+        border: 1px solid var(--gray-300);
+        page-break-inside: avoid;
+    }
+
+    body {
+        background: white;
+        color: black;
+    }
+}
+
+/* Reduced Motion */
+@media (prefers-reduced-motion: reduce) {
+    * {
+        animation-duration: 0.01ms !important;
+        animation-iteration-count: 1 !important;
+        transition-duration: 0.01ms !important;
+    }
+
+    .loading {
+        animation: none;
+        border: 3px solid var(--gray-400);
+    }
+}

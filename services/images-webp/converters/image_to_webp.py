@@ -26,7 +26,7 @@ def get_image_info(image_path: str) -> dict:
     except Exception as e:
         return {'error': str(e)}
 
-def image_to_webp(input_path: str, output_dir: str, quality: str = 'medium', resize_factor: float = 1.0) -> List[str]:
+def image_to_webp(input_path: str, output_dir: str, quality: str = 'medium', resize_factor: float = 1.0, preserve_transparency: bool = False) -> List[str]:
     """
     Convert an image to WEBP format
     
@@ -35,6 +35,7 @@ def image_to_webp(input_path: str, output_dir: str, quality: str = 'medium', res
         output_dir: Directory for output WEBP file
         quality: WEBP quality ('low', 'medium', 'high' or 1-100)
         resize_factor: Factor to resize image (0.1-3.0)
+        preserve_transparency: Whether to preserve transparency (True) or use white background (False)
     
     Returns:
         List[str]: List of output file paths if successful, empty list otherwise
@@ -56,15 +57,22 @@ def image_to_webp(input_path: str, output_dir: str, quality: str = 'medium', res
         
         # Open and process the image
         with Image.open(input_path) as img:
-            # Convert to RGB if necessary (WEBP doesn't support all modes)
-            if img.mode in ('RGBA', 'LA', 'P'):
-                # Keep transparency for RGBA
-                if img.mode == 'RGBA':
-                    pass  # Keep as is
-                else:
+            # Handle transparency based on preserve_transparency setting
+            if preserve_transparency and img.mode in ('RGBA', 'LA', 'P'):
+                # Preserve transparency - convert to RGBA if needed
+                if img.mode != 'RGBA':
                     img = img.convert('RGBA')
-            elif img.mode not in ('RGB', 'RGBA'):
-                img = img.convert('RGB')
+            else:
+                # Remove transparency - convert to RGB with white background
+                if img.mode in ('RGBA', 'LA', 'P'):
+                    # Create white background
+                    background = Image.new('RGB', img.size, (255, 255, 255))
+                    if img.mode == 'P':
+                        img = img.convert('RGBA')
+                    background.paste(img, mask=img.split()[-1] if img.mode in ('RGBA', 'LA') else None)
+                    img = background
+                elif img.mode not in ('RGB', 'RGBA'):
+                    img = img.convert('RGB')
             
             # Apply resize if needed
             if resize_factor != 1.0:
