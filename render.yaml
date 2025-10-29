@@ -293,3 +293,21 @@ services:
       - key: YT_VISITOR_DATA
         value: ""
     healthCheckPath: /health
+
+  # Images to WebP Service
+  - type: web
+    name: images-webp-service
+    env: python
+    rootDir: services/images-webp
+    buildCommand: pip install --upgrade pip && pip install -r requirements.txt
+    startCommand: gunicorn app:app --workers=2 --threads=1 --timeout=180 --bind 0.0.0.0:$PORT
+    envVars:
+      - key: FLASK_ENV
+        value: production
+      - key: PYTHON_VERSION
+        value: 3.12.6
+      - key: PORT
+        value: 10000
+      - key: MAX_CONTENT_LENGTH
+        value: 52428800
+    healthCheckPath: /health
