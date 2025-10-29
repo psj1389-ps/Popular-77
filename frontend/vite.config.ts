@@ -78,6 +78,11 @@ export default defineConfig({
         target: "https://popular-77-srwb.onrender.com",
         changeOrigin: true,
         rewrite: (path) => path.replace(/^\/api\/image-to-jpg/, "/api/image-to-jpg")
+      },
+      "/api/images-webp": {
+        target: "http://localhost:5000",
+        changeOrigin: true,
+        rewrite: (path) => path.replace(/^\/api\/images-webp/, "")
       }
     }
   }
