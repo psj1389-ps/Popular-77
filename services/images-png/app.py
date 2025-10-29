@@ -187,6 +187,113 @@ def api_image_to_png():
         return jsonify({"error": f"이미지 변환 중 오류가 발생했습니다: {str(e)}"}), 500
 
 
+# 프론트엔드 API 엔드포인트 - /api/images-png
+@app.route("/api/images-png", methods=["POST"])
+def api_images_png():
+    f = request.files.get("file")
+    if not f:
+        return jsonify({"error": "file is required"}), 400
+
+    # 파일 확장자 확인
+    from converters.image_to_png import _is_supported_image
+    if not _is_supported_image(f):
+        supported_formats = _get_supported_formats()
+        return jsonify({"error": f"지원되지 않는 파일 형식입니다. 지원 형식: {', '.join(supported_formats)}"}), 400
+
+    quality = request.form.get("quality") or "medium"      # PNG 압축 레벨
+    transparent_background = _flag(request.form.get("transparent_background"))  # 투명 배경 사용 여부
+    
+    # scale 파라미터 안전하게 처리 (프론트엔드에서 scale로 전송)
+    try:
+        resize_factor = float(request.form.get("scale") or 1.0)  # 크기 조절 비율
+    except (ValueError, TypeError):
+        resize_factor = 1.0
+
+    # 크기 조절 비율 검증
+    if not (0.1 <= resize_factor <= 3.0):
+        return jsonify({"error": "크기 조절 비율은 0.1에서 3.0 사이여야 합니다."}), 400
+
+    # 파일명/확장자 안전 처리 및 고유 파일명 생성
+    original_name = secure_filename(f.filename or "")
+    base, ext = os.path.splitext(original_name)
+
+    if not ext:
+        import mimetypes
+        guessed_ext = mimetypes.guess_extension(getattr(f, 'mimetype', '') or '')
+        if guessed_ext in (".jpeg", ".jpe"):
+            guessed_ext = ".jpg"
+        ext = guessed_ext or ""
+
+    # 확장자가 여전히 없거나 지원되지 않으면 내용 기반 감지 시도
+    supported_exts = set(["." + s for s in _get_supported_formats()])
+    if not ext or ext.lower() not in supported_exts:
+        try:
+            from PIL import Image
+            f.stream.seek(0)
+            with Image.open(f.stream) as img:
+                fmt = (img.format or "").lower()
+                fmt_map = {
+                    "png": ".png", "webp": ".webp", "bmp": ".bmp",
+                    "tiff": ".tiff", "gif": ".gif", "jpeg": ".jpg",
+                    "svg": ".svg", "psd": ".psd", "heif": ".heif", "heic": ".heic"
+                }
+                ext = fmt_map.get(fmt, ext)
+        except Exception:
+            pass
+        finally:
+            try:
+                f.stream.seek(0)
+            except Exception:
+                pass
+
+    if not ext:
+        return jsonify({"error": "업로드한 파일의 확장자를 확인할 수 없습니다."}), 400
+
+    unique_name = (base or "upload") + "_" + uuid.uuid4().hex[:8] + ext
+    in_path = os.path.join(UPLOAD_DIR, unique_name)
+
+    try:
+        f.save(in_path)
+    except IsADirectoryError:
+        return jsonify({"error": f"업로드 경로가 디렉토리로 잘못 지정되었습니다: {in_path}"}), 500
+
+    # 파일 저장 성공 여부 확인 (파일이어야 함)
+    if not os.path.isfile(in_path):
+        return jsonify({"error": f"파일 저장에 실패했습니다(파일이 아님): {in_path}"}), 500
+
+    out_dir = os.path.join(OUTPUT_DIR, os.path.splitext(unique_name)[0])
+    os.makedirs(out_dir, exist_ok=True)
+
+    try:
+        out_files = image_to_png(
+            in_path, out_dir,
+            quality=quality,
+            resize_factor=resize_factor,
+            transparent_background=transparent_background
+        )
+
+        if not out_files:
+            return jsonify({"error": "변환된 파일이 생성되지 않았습니다."}), 500
+
+        # 단일 파일 반환
+        fp = out_files[0]
+        base_name = os.path.splitext(original_name or f.filename)[0] or os.path.splitext(unique_name)[0]
+        korean_filename = f"{base_name}.png"
+        resp = send_file(fp, as_attachment=True, download_name=korean_filename, mimetype="image/png")
+        resp.headers["Content-Length"] = str(os.path.getsize(fp))
+        
+        # UTF-8 및 일반 filename 모두 설정
+        import urllib.parse
+        encoded_filename = urllib.parse.quote(korean_filename)
+        resp.headers["Content-Disposition"] = f"attachment; filename=\"{korean_filename}\"; filename*=UTF-8''{encoded_filename}"
+        resp.headers["Content-Type"] = "image/png"
+        return resp
+
+    except Exception as e:
+        import traceback
+        traceback.print_exc()
+        return jsonify({"error": f"이미지 변환 중 오류가 발생했습니다: {str(e)}"}), 500
+
 
 # 배치 변환 API 엔드포인트
 @app.route("/api/batch-convert", methods=["POST"])
