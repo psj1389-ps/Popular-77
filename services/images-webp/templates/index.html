@@ -531,7 +531,7 @@
             document.getElementById('fileInfo').style.display = 'block';
             
             // 지원되는 이미지 파일 확장자 체크
-            const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+            const supportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
             const fileExtension = file.name.toLowerCase();
             const isSupported = supportedExtensions.some(ext => fileExtension.endsWith(ext));
             
@@ -543,7 +543,7 @@
                 if (tbo) { tbo.style.display = 'block'; }
                 updateCurrentSize(); // 현재 크기 업데이트
             } else {
-                showError('지원되지 않는 파일 형식입니다. JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                showError('지원되지 않는 파일 형식입니다. JPG, JPEG, PNG, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                 resetFile();
                 return;
             }
@@ -570,7 +570,7 @@
             }
             
             // 지원되는 파일 형식 체크
-            const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+            const supportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
             const unsupportedFiles = [];
             
             for (const file of files) {
@@ -641,7 +641,7 @@
                 
                 // 서버 응답에서 파일 이름 정보(헤더)를 추출
                 const disposition = response.headers.get('Content-Disposition');
-                let filename = 'converted.png';
+                let filename = 'converted.webp';
                 if (disposition && disposition.indexOf('attachment') !== -1) {
                     const filenameStarRegex = /filename\*=UTF-8''([^;\n]*)/;
                     const starMatches = filenameStarRegex.exec(disposition);
@@ -656,15 +656,15 @@
                     }
                 }
 
-                // 원본 파일명을 기준으로 .png 강제 설정
+                // 원본 파일명을 기준으로 .webp 강제 설정
                 const sourceBase = (selectedFile && selectedFile.name)
                     ? selectedFile.name.replace(/\.[^.\s]+$/, '')
                     : filename.replace(/\.[^.\s]+$/, '');
-                filename = `${sourceBase}.png`;
+                filename = `${sourceBase}.webp`;
 
-                // 응답을 명시적으로 PNG Blob으로 생성
+                // 응답을 명시적으로 WEBP Blob으로 생성
                 const arrayBuffer = await response.arrayBuffer();
-                const blob = new Blob([arrayBuffer], { type: 'image/png' });
+                const blob = new Blob([arrayBuffer], { type: 'image/webp' });
                 
                 // 파일 다운로드
                 const url = URL.createObjectURL(blob);
@@ -969,12 +969,12 @@
                 const file = files[0];
                 
                 // 지원되는 이미지 파일 형식 체크
-                const supportedExtensions = ['.jpg', '.jpeg', '.webp', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
+                const supportedExtensions = ['.jpg', '.jpeg', '.png', '.bmp', '.tiff', '.tif', '.gif', '.svg', '.psd', '.heic', '.heif', '.cr2', '.nef', '.arw', '.dng', '.raf', '.orf', '.rw2'];
                 const fileExtension = file.name.toLowerCase();
                 const isSupported = supportedExtensions.some(ext => fileExtension.endsWith(ext));
                 
                 if (!isSupported) {
-                    showError('지원되지 않는 파일 형식입니다. JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                    showError('지원되지 않는 파일 형식입니다. JPG, JPEG, PNG, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                     return;
                 }
                 
