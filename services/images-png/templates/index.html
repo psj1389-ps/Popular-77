@@ -125,8 +125,8 @@
             color: white;
         }
         
-        /* 메인 컨테이너 조정 */
-        .container{max-width:600px;margin:20px auto;background:white;border-radius:10px;padding:30px;box-shadow:0 4px 6px rgba(0,0,0,0.1)}
+        /* 메인 컨테이너 조정 - 크기 0.5배로 고정 */
+        .container{max-width:300px;margin:20px auto;background:white;border-radius:10px;padding:15px;box-shadow:0 4px 6px rgba(0,0,0,0.1);transform:scale(0.5);transform-origin:top center}
         .header{text-align:center;margin-bottom:30px}
         .upload-area{border:2px dashed #ddd;padding:40px;text-align:center;border-radius:10px;cursor:pointer}
         .upload-area:hover{border-color:#007bff;background:#f8f9ff}
@@ -420,7 +420,15 @@
                 <label><input type="radio" name="quality" value="high"> 고품질 (더 높은 품질, 더 큰 파일 크기)</label>
             </div>
             
-            <!-- 배경 처리 안내 제거됨 -->
+            <div class="transparent-options" id="transparentOptions">
+                <h4>투명 배경: (PNG, WEBP에서 지원)</h4>
+                <label><input type="radio" name="transparent" value="false" checked> 사용 안함</label>
+                <label><input type="radio" name="transparent" value="true"> 사용</label>
+                <div style="font-size: 12px; color: #666; margin-top: 8px; padding: 8px; background: #f0f8ff; border-radius: 4px; border-left: 3px solid #4CAF50;">
+                    💡 투명 배경 지원: PNG, WEBP 형식<br>
+                    흰색 배경 변환: JPG, JPEG, TIFF, GIF, BMP
+                </div>
+            </div>
             
             <div class="button-group">
                 <button class="btn" id="convertBtn" onclick="convertFile()">변환하기</button>
