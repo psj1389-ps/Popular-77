@@ -407,8 +407,8 @@
             <div class="size-options" id="sizeOptions" style="margin: 15px 0; display: none;">
                 <h4>크기 x</h4>
                 <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
-                    <input type="range" id="sizeSlider" min="0.1" max="3.0" step="0.1" value="1.0" style="flex: 1; height: 8px; background: #ddd; border-radius: 5px; outline: none;">
-                    <input type="text" id="sizeValue" value="1.0" readonly style="width: 50px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: center; background: #f9f9f9;">
+                    <input type="range" id="sizeSlider" min="0.1" max="3.0" step="0.1" value="0.5" style="flex: 1; height: 8px; background: #ddd; border-radius: 5px; outline: none;">
+                    <input type="text" id="sizeValue" value="0.5" readonly style="width: 50px; padding: 5px; border: 1px solid #ddd; border-radius: 3px; text-align: center; background: #f9f9f9;">
                 </div>
                 <div id="currentSize" style="font-size: 12px; color: #666; margin-top: 5px;">443×591 px</div>
             </div>
@@ -418,6 +418,12 @@
                 <label><input type="radio" name="quality" value="low"> 저품질 (품질이 낮고 파일이 더 컴팩트함)</label>
                 <label><input type="radio" name="quality" value="medium" checked> 중간 품질 (중간 품질 및 파일 크기)</label>
                 <label><input type="radio" name="quality" value="high"> 고품질 (더 높은 품질, 더 큰 파일 크기)</label>
+            </div>
+            
+            <div class="transparent-bg-options" id="transparentBgOptions" style="margin: 15px 0;">
+                <h4>투명 배경:</h4>
+                <label><input type="radio" name="transparent_bg" value="false" checked> 사용 안함</label>
+                <label><input type="radio" name="transparent_bg" value="true"> 사용</label>
             </div>
             
             <!-- 배경 처리 안내 제거됨 -->
@@ -543,7 +549,7 @@
                 if (tbo) { tbo.style.display = 'block'; }
                 updateCurrentSize(); // 현재 크기 업데이트
             } else {
-                showError('지원되지 않는 파일 형식입니다. PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                showError('지원되지 않는 파일 형식입니다. JPG, PNG, WEBP, BMP, TIFF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                 resetFile();
                 return;
             }
@@ -620,8 +626,16 @@
             formData.append('quality', quality);
             
             // 크기 조절 설정 추가
-            const resize = document.getElementById('sizeSlider')?.value || '1.0';
+            const resize = document.getElementById('sizeSlider')?.value || '0.5';
             formData.append('resize', resize);
+            
+            // 투명 배경 설정 추가
+            const transparentBg = document.querySelector('input[name="transparent_bg"]:checked')?.value || 'false';
+            formData.append('transparent_bg', transparentBg);
+            
+            // 투명 배경 설정 추가
+            const transparentBg = document.querySelector('input[name="transparent_bg"]:checked')?.value || 'false';
+            formData.append('transparent_bg', transparentBg);
             
             // UI 업데이트
             document.getElementById('convertBtn').disabled = true;
@@ -729,8 +743,12 @@
             }
             const quality = document.querySelector('input[name="quality"]:checked')?.value || 'medium';
             formData.append('quality', quality);
-            const resize = document.getElementById('sizeSlider')?.value || '1.0';
+            const resize = document.getElementById('sizeSlider')?.value || '0.5';
             formData.append('resize', resize);
+            
+            // 투명 배경 설정 추가
+            const transparentBg = document.querySelector('input[name="transparent_bg"]:checked')?.value || 'false';
+            formData.append('transparent_bg', transparentBg);
             
             // UI 업데이트
             document.getElementById('convertBtn').disabled = true;
@@ -974,7 +992,7 @@
                 const isSupported = supportedExtensions.some(ext => fileExtension.endsWith(ext));
                 
                 if (!isSupported) {
-                    showError('지원되지 않는 파일 형식입니다. PNG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
+                    showError('지원되지 않는 파일 형식입니다. JPG, PNG, WEBP, BMP, TIFF, SVG, PSD, HEIC, RAW 파일만 지원됩니다.');
                     return;
                 }
                 
