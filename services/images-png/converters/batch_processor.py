@@ -15,7 +15,7 @@ from dataclasses import dataclass, asdict
 from enum import Enum
 import json
 
-from .image_to_jpg import image_to_jpg, _is_supported_image
+from .image_to_png import image_to_png, _is_supported_image
 
 
 class JobStatus(Enum):
@@ -135,11 +135,12 @@ class BatchProcessor:
                 
                 # 실제 변환 작업 수행
                 try:
-                    result_files = image_to_jpg(
+                    result_files = image_to_png(
                         task.file_path,
                         job.output_dir,
                         quality=job.quality,
-                        resize_factor=job.resize_factor
+                        resize_factor=job.resize_factor,
+                        transparent_background=False  # 기본값으로 투명 배경 사용 안함
                     )
                     
                     with self.lock:

@@ -1,9 +1,9 @@
-# Image to JPG Converter Service - Updated for Render deployment
+# Image to PNG Converter Service - Updated for Render deployment
 from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
 from werkzeug.utils import secure_filename
 import os, io, zipfile, uuid, time
 
-from converters.image_to_jpg import image_to_jpg, get_image_info, _get_supported_formats
+from converters.image_to_png import image_to_png, get_image_info, _get_supported_formats
 from utils.file_utils import ensure_dirs
 from converters.batch_processor import BatchProcessor, JobStatus, get_batch_processor
 
@@ -77,19 +77,20 @@ def _flag(v, default=False):
         return default
     return str(v).strip().lower() in ("1","true","yes","y","on")
 
-@app.route("/api/image-to-jpg", methods=["POST"])
-def api_image_to_jpg():
+@app.route("/convert", methods=["POST"])
+def api_image_to_png():
     f = request.files.get("file")
     if not f:
         return jsonify({"error": "file is required"}), 400
 
     # 파일 확장자 확인
-    from converters.image_to_jpg import _is_supported_image
+    from converters.image_to_png import _is_supported_image
     if not _is_supported_image(f):
         supported_formats = _get_supported_formats()
         return jsonify({"error": f"지원되지 않는 파일 형식입니다. 지원 형식: {', '.join(supported_formats)}"}), 400
 
-    quality = request.form.get("quality") or "medium"      # 75~100 또는 low/medium/high
+    quality = request.form.get("quality") or "medium"      # PNG 압축 레벨
+    transparent_background = _flag(request.form.get("transparentBackground"))  # 투명 배경 사용 여부
     
     # resize 파라미터 안전하게 처리
     try:
@@ -101,9 +102,8 @@ def api_image_to_jpg():
     if not (0.1 <= resize_factor <= 3.0):
         return jsonify({"error": "크기 조절 비율은 0.1에서 3.0 사이여야 합니다."}), 400
     
-    # 브라우저에서 전송하는 추가 파라미터들 처리 (무시)
-    format_param = request.form.get("format")  # 브라우저에서 전송하지만 JPG 고정이므로 무시
-    transparent_bg = request.form.get("transparentBg")  # JPG는 투명도 지원 안하므로 무시
+    # 브라우저에서 전송하는 추가 파라미터들 처리
+    format_param = request.form.get("format")  # PNG 고정이므로 무시
 
     # 파일명/확장자 안전 처리 및 고유 파일명 생성
     original_name = secure_filename(f.filename or "")
@@ -157,10 +157,11 @@ def api_image_to_jpg():
     os.makedirs(out_dir, exist_ok=True)
 
     try:
-        out_files = image_to_jpg(
+        out_files = image_to_png(
             in_path, out_dir,
             quality=quality,
-            resize_factor=resize_factor
+            resize_factor=resize_factor,
+            transparent_background=transparent_background
         )
 
         if not out_files:
@@ -169,15 +170,15 @@ def api_image_to_jpg():
         # 단일 파일 반환
         fp = out_files[0]
         base_name = os.path.splitext(original_name or f.filename)[0] or os.path.splitext(unique_name)[0]
-        korean_filename = f"{base_name}.jpg"
-        resp = send_file(fp, as_attachment=True, download_name=korean_filename, mimetype="image/jpeg")
+        korean_filename = f"{base_name}.png"
+        resp = send_file(fp, as_attachment=True, download_name=korean_filename, mimetype="image/png")
         resp.headers["Content-Length"] = str(os.path.getsize(fp))
         
         # UTF-8 및 일반 filename 모두 설정
         import urllib.parse
         encoded_filename = urllib.parse.quote(korean_filename)
         resp.headers["Content-Disposition"] = f"attachment; filename=\"{korean_filename}\"; filename*=UTF-8''{encoded_filename}"
-        resp.headers["Content-Type"] = "image/jpeg"
+        resp.headers["Content-Type"] = "image/png"
         return resp
 
     except Exception as e:
@@ -185,23 +186,7 @@ def api_image_to_jpg():
         traceback.print_exc()
         return jsonify({"error": f"이미지 변환 중 오류가 발생했습니다: {str(e)}"}), 500
 
-# 웹 인터페이스용 /convert 라우트
-@app.route("/convert", methods=["POST"])
-def convert():
-    # 디버깅을 위한 요청 정보 로깅
-    print(f"[DEBUG] Request method: {request.method}")
-    print(f"[DEBUG] Request content type: {request.content_type}")
-    print(f"[DEBUG] Request files: {list(request.files.keys())}")
-    print(f"[DEBUG] Request form: {dict(request.form)}")
-    print(f"[DEBUG] Request headers: {dict(request.headers)}")
-    
-    try:
-        return api_image_to_jpg()
-    except Exception as e:
-        print(f"[ERROR] Exception in convert(): {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return jsonify({"error": f"변환 중 오류가 발생했습니다: {str(e)}"}), 500
+
 
 # 배치 변환 API 엔드포인트
 @app.route("/api/batch-convert", methods=["POST"])

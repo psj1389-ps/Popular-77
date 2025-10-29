@@ -33,7 +33,7 @@ function safeGetFilename(res: Response, fallback: string) {
 
 async function getErrorMessage(res: Response) {
   if (res.status === 413) {
-    return '업로드 파일이 너무 큽니다 (413). 이미지는 용량이 큰 편이라 크기/품질을 낮추거나 압축 후 다시 시도해 주세요.';
+    return '업로드 파일이 너무 큽니다 (413). 파일 크기를 줄이거나 품질을 낮춰서 다시 시도해 주세요.';
   }
   const ct = (res.headers.get('content-type') || '').toLowerCase();
   if (!ct.includes('application/json')) return `서버 오류: ${res.status}`;
@@ -48,7 +48,8 @@ async function getErrorMessage(res: Response) {
 const ImagesPngPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
-  const [scale, setScale] = useState(0.5); // 0.2 ~ 2.0
+  const [transparentBackground, setTransparentBackground] = useState(false);
+  const [scale, setScale] = useState(0.5);
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -101,266 +102,269 @@ const ImagesPngPage: React.FC = () => {
 
     const progressInterval = setInterval(() => {
       setConversionProgress(prev => {
-        if (prev >= 90) return prev;
-        return prev + Math.random() * 15;
+        if (prev >= 90) {
+          clearInterval(progressInterval);
+          return 90;
+        }
+        return Math.min(90, prev + Math.random() * 15);
       });
     }, 200);
 
+    const form = new FormData();
+    form.append('file', selectedFile);
+    form.append('quality', quality);
+    form.append('transparent_background', String(transparentBackground));
+    form.append('scale', String(scale));
+
     try {
-      const formData = new FormData();
-      formData.append('file', selectedFile);
-      formData.append('quality', quality);
-      formData.append('scale', scale.toString());
-
-      const response = await fetch('/api/images-png', {
-        method: 'POST',
-        body: formData,
-      });
-
+      const res = await fetch('/api/images-png', { method: 'POST', body: form });
+      if (!res.ok) {
+        const msg = await getErrorMessage(res);
+        throw new Error(msg);
+      }
       clearInterval(progressInterval);
       setConversionProgress(100);
 
-      if (!response.ok) {
-        const errorMsg = await getErrorMessage(response);
-        setErrorMessage(errorMsg);
-        return;
-      }
+      const blob = await res.blob();
+      const base = selectedFile.name.replace(/\.[^/.]+$/, '');
+      const name = base + '.png';
 
-      const blob = await response.blob();
-      const originalName = selectedFile.name.replace(/\.[^.]+$/, '');
-      const filename = safeGetFilename(response, `${originalName}.png`);
-      
-      downloadBlob(blob, filename);
-      
-      setSuccessMessage(`파일이 성공적으로 PNG로 변환되었습니다: ${filename}`);
+      setSuccessMessage(`변환 완료! ${name} 파일이 다운로드됩니다.`);
       setShowSuccessMessage(true);
-      
-      setTimeout(() => {
-        setShowSuccessMessage(false);
-      }, 5000);
 
-    } catch (error) {
+      setTimeout(() => downloadBlob(blob, name), 1000);
+    } catch (e) {
       clearInterval(progressInterval);
       setConversionProgress(0);
-      setErrorMessage('변환 중 오류가 발생했습니다. 네트워크 연결을 확인해주세요.');
+      setErrorMessage(e instanceof Error ? e.message : '변환 중 예상치 못한 문제 발생');
     } finally {
-      setIsConverting(false);
+      setTimeout(() => {
+        setIsConverting(false);
+        setConversionProgress(0);
+      }, 2000);
     }
   };
 
+  const calculatePixelSize = () => {
+    if (!dims) return '원본 크기 확인 중...';
+    const scaledWidth = Math.round(dims.width * scale);
+    const scaledHeight = Math.round(dims.height * scale);
+    return `${scaledWidth}×${scaledHeight} px`;
+  };
+
   return (
-    <div className="min-h-screen bg-gray-50">
-      <PageTitle 
-        title="Image(JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW) → PNG 변환기"
-        description="JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 PNG로 변환합니다."
-      />
-      
-      <div className="max-w-4xl mx-auto px-4 py-8">
-        <div className="bg-white rounded-lg shadow-lg p-8">
-          <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">Image → PNG 변환기</h2>
-            <p className="text-gray-600">
-              다양한 이미지 형식을 고품질 PNG로 변환<br />
-              (JPG/WEBP/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → PNG)
-            </p>
-          </div>
-
-          {/* 파일 업로드 영역 */}
-          <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center mb-6 hover:border-purple-400 transition-colors">
-            <input
-              ref={fileInputRef}
-              type="file"
-              onChange={handleFileChange}
-              accept=".jpg,.jpeg,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.raw,.cr2,.nef,.arw,.dng"
-              className="hidden"
-              id="file-upload"
-            />
-            <label htmlFor="file-upload" className="cursor-pointer">
-              <div className="text-6xl mb-4">📁</div>
-              <h3 className="text-xl font-semibold text-gray-700 mb-2">파일을 선택하세요</h3>
-              <p className="text-gray-500">
-                파일을 드래그하거나 클릭하여 선택하세요 (최대 50개 파일, 총 500MB)
-              </p>
-            </label>
-          </div>
-
-          {/* 선택된 파일 정보 */}
-          {selectedFile && (
-            <div className="bg-gray-50 rounded-lg p-4 mb-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="font-medium text-gray-800">{selectedFile.name}</p>
-                  <p className="text-sm text-gray-600">
-                    크기: {formatFileSize(selectedFile.size)}
-                    {dims && ` | 해상도: ${dims.width}×${dims.height}px`}
-                  </p>
-                </div>
-                <button
-                  onClick={handleReset}
-                  className="text-red-500 hover:text-red-700 font-medium"
-                >
-                  제거
-                </button>
-              </div>
+    <>
+      <PageTitle suffix="이미지 → PNG" />
+      <div className="w-full bg-white">
+        {/* 상단 보라색 배경 섹션 */}
+        <div className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white py-20 px-4 text-center relative overflow-hidden">
+          {/* 애니메이션 배경 패턴 */}
+          <div 
+            className="absolute inset-0 opacity-30"
+            style={{
+              backgroundImage: `url("data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><defs><pattern id='grain' width='100' height='100' patternUnits='userSpaceOnUse'><circle cx='12' cy='8' r='0.6' fill='%23ffffff' opacity='0.18'/><circle cx='37' cy='23' r='1.8' fill='%23ffffff' opacity='0.06'/><circle cx='68' cy='15' r='0.9' fill='%23ffffff' opacity='0.14'/><circle cx='91' cy='42' r='1.3' fill='%23ffffff' opacity='0.09'/><circle cx='24' cy='56' r='0.7' fill='%23ffffff' opacity='0.16'/><circle cx='55' cy='73' r='1.5' fill='%23ffffff' opacity='0.07'/><circle cx='83' cy='88' r='1.1' fill='%23ffffff' opacity='0.11'/><circle cx='6' cy='34' r='2.0' fill='%23ffffff' opacity='0.05'/><circle cx='45' cy='47' r='0.8' fill='%23ffffff' opacity='0.13'/><circle cx='72' cy='61' r='1.2' fill='%23ffffff' opacity='0.10'/><circle cx='18' cy='79' r='0.5' fill='%23ffffff' opacity='0.19'/><circle cx='63' cy='29' r='1.7' fill='%23ffffff' opacity='0.08'/><circle cx='89' cy='18' r='0.9' fill='%23ffffff' opacity='0.15'/><circle cx='31' cy='91' r='1.4' fill='%23ffffff' opacity='0.12'/><circle cx='76' cy='5' r='0.6' fill='%23ffffff' opacity='0.17'/><circle cx='9' cy='67' r='1.6' fill='%23ffffff' opacity='0.06'/><circle cx='52' cy='12' r='1.0' fill='%23ffffff' opacity='0.14'/><circle cx='95' cy='76' r='0.8' fill='%23ffffff' opacity='0.11'/></pattern></defs><rect width='100' height='100' fill='url(%23grain)'/></svg>")`,
+              backgroundRepeat: 'repeat',
+              animation: 'float 20s ease-in-out infinite'
+            }}
+          />
+          <div className="container mx-auto relative z-10">
+            <div className="flex justify-center items-center gap-4 mb-4">
+              <h1 className="text-4xl font-bold">
+                <svg className="w-12 h-12 inline-block mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
+                Image(JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW) → PNG 변환기
+              </h1>
             </div>
-          )}
-
-          {/* 출력 형식 */}
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">출력 형식</h4>
-            <div className="bg-green-50 border border-green-200 rounded-lg p-3">
-              <span className="text-green-800 font-medium">PNG (고품질 무손실)</span>
-            </div>
-          </div>
-
-          {/* 크기 조절 */}
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">크기 조절 (Scale)</h4>
-            <div className="flex items-center space-x-4">
-              <input
-                type="range"
-                min="0.2"
-                max="2.0"
-                step="0.1"
-                value={scale}
-                onChange={(e) => setScale(parseFloat(e.target.value))}
-                className="flex-1 h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
-              />
-              <span className="text-gray-700 font-medium min-w-[60px]">{scale}x</span>
-            </div>
-            {dims && (
-              <p className="text-sm text-gray-600 mt-2">
-                변환 후 크기: {Math.round(dims.width * scale)}×{Math.round(dims.height * scale)}px
-              </p>
-            )}
-          </div>
-
-          {/* 변환 품질 */}
-          <div className="mb-6">
-            <h4 className="text-lg font-semibold text-gray-800 mb-3">변환 품질</h4>
-            <div className="grid grid-cols-3 gap-3">
-              {[
-                { value: 'low', label: '저품질', desc: '빠른 변환' },
-                { value: 'medium', label: '중간품질', desc: '균형잡힌 품질' },
-                { value: 'high', label: '고품질', desc: '최고 품질' }
-              ].map((option) => (
-                <button
-                  key={option.value}
-                  onClick={() => setQuality(option.value as 'low' | 'medium' | 'high')}
-                  className={`p-3 rounded-lg border-2 text-center transition-colors ${
-                    quality === option.value
-                      ? 'border-purple-500 bg-purple-50 text-purple-700'
-                      : 'border-gray-200 hover:border-gray-300'
-                  }`}
-                >
-                  <div className="font-medium">{option.label}</div>
-                  <div className="text-sm text-gray-600">{option.desc}</div>
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* 진행률 표시 */}
-          {isConverting && (
-            <div className="mb-6">
-              <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-gray-700">변환 진행률</span>
-                <span className="text-sm text-gray-600">{Math.round(conversionProgress)}%</span>
-              </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
-                <div
-                  className="bg-purple-600 h-2 rounded-full transition-all duration-300"
-                  style={{ width: `${conversionProgress}%` }}
-                ></div>
-              </div>
-            </div>
-          )}
-
-          {/* 성공 메시지 */}
-          {showSuccessMessage && (
-            <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-              <div className="flex items-center">
-                <div className="text-green-600 mr-3">✅</div>
-                <p className="text-green-800">{successMessage}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 에러 메시지 */}
-          {errorMessage && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-              <div className="flex items-center">
-                <div className="text-red-600 mr-3">❌</div>
-                <p className="text-red-800">{errorMessage}</p>
-              </div>
-            </div>
-          )}
-
-          {/* 변환 버튼 */}
-          <div className="flex space-x-4">
-            <button
-              onClick={handleConvert}
-              disabled={!selectedFile || isConverting}
-              className={`flex-1 py-3 px-6 rounded-lg font-medium transition-colors ${
-                !selectedFile || isConverting
-                  ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
-                  : 'bg-purple-600 text-white hover:bg-purple-700'
-              }`}
-            >
-              {isConverting ? '변환 중...' : 'PNG로 변환하기'}
-            </button>
-            
-            <button
-              onClick={handleReset}
-              className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              초기화
-            </button>
+            <p className="text-lg opacity-90 max-w-2xl mx-auto">JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 이미지를 고품질 PNG로 변환합니다.</p>
           </div>
         </div>
 
-        {/* 사용법 안내 */}
-        <div className="mt-8 bg-white rounded-lg shadow-lg p-8">
-          <h3 className="text-xl font-bold text-gray-800 mb-6">이미지를 PNG로 변환하는 방법</h3>
-          <p className="text-gray-600 mb-6">간단한 4단계로 다양한 이미지를 고품질 PNG로 변환하세요</p>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-purple-600 font-bold">1️⃣</span>
-              </div>
-              <h4 className="font-semibold text-gray-800 mb-2">이미지 업로드</h4>
-              <p className="text-sm text-gray-600">JPG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 등 파일을 업로드하세요.</p>
+        <style>{`
+          @keyframes float {
+            0% { transform: translateX(0px) translateY(0px); }
+            33% { transform: translateX(-25px) translateY(18px); }
+            66% { transform: translateX(22px) translateY(-15px); }
+            100% { transform: translateX(0px) translateY(0px); }
+          }
+        `}</style>
+
+        <div className="container mx-auto px-4 py-16">
+          <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
+            <div className="text-center mb-6">
+              <h2 className="text-2xl font-semibold text-gray-800">Image → PNG 변환기</h2>
+              <p className="text-gray-500">다양한 이미지 형식을 고품질 PNG로 변환 (JPG/JPEG/WEBP/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → PNG)</p>
             </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-purple-600 font-bold">2️⃣</span>
+
+            {!selectedFile ? (
+              <label htmlFor="file-upload" className="block border-2 border-dashed border-gray-300 rounded-lg p-10 text-center cursor-pointer hover:border-blue-500 hover:bg-gray-50 transition-colors">
+                <input id="file-upload" ref={fileInputRef} type="file" accept=".jpg,.jpeg,.webp,.bmp,.tiff,.gif,.svg,.psd,.heif,.heic" onChange={handleFileChange} className="hidden" />
+                <p className="font-semibold text-gray-700">파일을 선택하세요</p>
+                <p className="text-sm text-gray-500 mt-1">파일을 드래그하거나 클릭하여 선택하세요 (최대 100개 파일, 총 500MB)</p>
+              </label>
+            ) : (
+              <div className="space-y-6">
+                <div>
+                  <p className="text-gray-700"><span className="font-semibold">파일명:</span> {selectedFile.name}</p>
+                  <p className="text-gray-700"><span className="font-semibold">크기:</span> {formatFileSize(selectedFile.size)}</p>
+                </div>
+
+                {/* 출력 형식 (고정 PNG) */}
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-3">출력 형식:</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg">
+                    <label className="flex items-center p-3 border rounded-lg">
+                      <input type="radio" name="format" value="png" checked readOnly className="w-4 h-4 text-blue-600 mr-3" />
+                      <div className="flex-1"><span className="font-medium">🖼️ PNG - 무손실 압축, 투명도 지원</span></div>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 고급 옵션 */}
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
+                  <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                    {/* 크기 슬라이더 */}
+                    <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-700">크기 x</label>
+                        <span className="text-sm text-gray-600">{scale}</span>
+                      </div>
+                      <div className="text-sm text-gray-500 mb-2">{calculatePixelSize()}</div>
+                      <input
+                        type="range"
+                        min="0.2"
+                        max="2.0"
+                        step="0.1"
+                        value={scale}
+                        onChange={(e) => setScale(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0.2x (작게)</span>
+                        <span>2.0x (크게)</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 변환 품질 선택 */}
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">변환 품질 선택:</h3>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input type="radio" name="quality" value="low" checked={quality === 'low'} onChange={(e) => setQuality(e.target.value as 'low' | 'medium' | 'high')} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">저품질 (품질이 낮고 파일이 더 컴팩트함)</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="quality" value="medium" checked={quality === 'medium'} onChange={(e) => setQuality(e.target.value as 'low' | 'medium' | 'high')} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">중간 품질 (중간 품질 및 파일 크기)</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="quality" value="high" checked={quality === 'high'} onChange={(e) => setQuality(e.target.value as 'low' | 'medium' | 'high')} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">고품질 (더 높은 품질, 더 큰 파일 크기)</span>
+                    </label>
+                  </div>
+                </div>
+
+                {/* 투명 배경 옵션 */}
+                <div>
+                  <h3 className="font-semibold text-gray-800 mb-2">투명 배경: (PNG, WEBP에서 지원)</h3>
+                  <div className="space-y-2">
+                    <label className="flex items-center">
+                      <input type="radio" name="transparent" value="false" checked={!transparentBackground} onChange={() => setTransparentBackground(false)} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">사용 안함</span>
+                    </label>
+                    <label className="flex items-center">
+                      <input type="radio" name="transparent" value="true" checked={transparentBackground} onChange={() => setTransparentBackground(true)} className="w-4 h-4 text-blue-600" />
+                      <span className="ml-2 text-gray-700">사용</span>
+                    </label>
+                  </div>
+                  <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+                    <div className="flex items-start">
+                      <span className="text-blue-500 mr-2">💡</span>
+                      <div className="text-sm text-blue-700">
+                        <div><strong>투명 배경 지원:</strong> PNG, WEBP 형식</div>
+                        <div><strong>흰색 배경 변환:</strong> JPG, JPEG, TIFF, GIF, BMP</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 진행률 */}
+                {isConverting && (
+                  <div className="mb-4">
+                    <div className="flex justify-between text-sm mb-1">
+                      <span>변환 진행률</span>
+                      <span>{Math.round(conversionProgress)}%</span>
+                    </div>
+                    <div className="h-2 bg-gray-200 rounded">
+                      <div 
+                        className="h-2 bg-indigo-500 rounded transition-[width] duration-300"
+                        style={{ width: `${Math.max(2, Math.round(conversionProgress))}%` }}
+                      />
+                    </div>
+                    <div className="mt-2 text-sm text-gray-500">⏳ 이미지를 PNG로 변환 중...</div>
+                  </div>
+                )}
+
+                {/* 성공 메시지 */}
+                {showSuccessMessage && (
+                  <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <div className="flex items-center">
+                      <svg className="w-5 h-5 text-green-500 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                      <span className="text-green-700 font-medium">{successMessage}</span>
+                    </div>
+                  </div>
+                )}
+
+                <div className="flex gap-4">
+                  <button onClick={handleConvert} disabled={isConverting || !selectedFile} className="flex-1 text-white px-6 py-3 rounded-lg text-lg font-semibold disabled:bg-gray-400 disabled:cursor-not-allowed" style={{background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}} onMouseEnter={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #5a6fd8 0%, #6a4190 100%)'} onMouseLeave={(e) => e.currentTarget.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)'}>
+                    {isConverting ? '변환 중...' : '변환하기'}
+                  </button>
+                  <button onClick={handleReset} disabled={isConverting} className="flex-1 bg-gray-600 text-white px-6 py-3 rounded-lg text-lg font-semibold hover:bg-gray-700 disabled:bg-gray-400 disabled:cursor-not-allowed">
+                    파일 초기화
+                  </button>
+                </div>
               </div>
-              <h4 className="font-semibold text-gray-800 mb-2">품질/크기 선택</h4>
-              <p className="text-sm text-gray-600">변환 품질과 크기 조절 옵션을 선택해 최적화하세요.</p>
+            )}
+
+            {errorMessage && selectedFile && <p className="mt-4 text-center text-red-500">{errorMessage}</p>}
+          </div>
+        </div>
+
+        {/* 이미지를 PNG로 변환하는 방법 가이드 */}
+        <div className="bg-gray-50 py-16">
+          <div className="max-w-4xl mx-auto px-4">
+            <div className="text-center mb-12">
+              <h2 className="text-3xl font-bold text-gray-800 mb-4">이미지를 PNG로 변환하는 방법</h2>
+              <p className="text-gray-600">간단한 4단계로 다양한 이미지를 고품질 PNG로 변환하세요</p>
             </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-purple-600 font-bold">3️⃣</span>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-center w-12 h-12 bg-blue-100 rounded-full mb-4 mx-auto"><span className="text-xl font-bold text-blue-600">1️⃣</span></div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">이미지 업로드</h3>
+                <p className="text-gray-600 text-sm text-center">JPG, JPEG, WEBP, BMP, TIFF, GIF, SVG, PSD, HEIC, RAW 등 파일을 업로드하세요.</p>
               </div>
-              <h4 className="font-semibold text-gray-800 mb-2">자동 변환 시작</h4>
-              <p className="text-sm text-gray-600">"변환하기" 버튼을 클릭하면 엔진이 PNG로 변환합니다.</p>
-            </div>
-            
-            <div className="text-center">
-              <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-3">
-                <span className="text-purple-600 font-bold">4️⃣</span>
+              <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-center w-12 h-12 bg-green-100 rounded-full mb-4 mx-auto"><span className="text-xl font-bold text-green-600">2️⃣</span></div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">품질/투명도 선택</h3>
+                <p className="text-gray-600 text-sm text-center">변환 품질과 투명 배경 옵션을 선택해 최적화하세요.</p>
               </div>
-              <h4 className="font-semibold text-gray-800 mb-2">PNG 다운로드</h4>
-              <p className="text-sm text-gray-600">변환 완료 후 PNG 파일을 바로 다운로드합니다.</p>
+              <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-center w-12 h-12 bg-yellow-100 rounded-full mb-4 mx-auto"><span className="text-xl font-bold text-yellow-600">3️⃣</span></div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">자동 변환 시작</h3>
+                <p className="text-gray-600 text-sm text-center">"변환하기" 버튼을 클릭하면 엔진이 PNG로 변환합니다.</p>
+              </div>
+              <div className="bg-white rounded-lg p-6 shadow-md hover:shadow-lg transition-shadow">
+                <div className="flex items-center justify-center w-12 h-12 bg-purple-100 rounded-full mb-4 mx-auto"><span className="text-xl font-bold text-purple-600">4️⃣</span></div>
+                <h3 className="text-lg font-semibold text-gray-800 mb-2 text-center">PNG 다운로드</h3>
+                <p className="text-gray-600 text-sm text-center">변환 완료 후 PNG 파일을 바로 다운로드합니다.</p>
+              </div>
             </div>
           </div>
         </div>
       </div>
-    </div>
+    </>
   );
 };
 
-export default ImagesPngPage;
+export default ImagesPngPage

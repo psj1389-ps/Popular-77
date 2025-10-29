@@ -41,8 +41,8 @@ def _quality_to_int(q):
     return {"low": 75, "medium": 85, "high": 95}.get(s, 90)
 
 def _get_supported_formats():
-    """지원되는 이미지 형식 목록"""
-    formats = ['png', 'webp', 'bmp', 'tiff', 'tif', 'gif', 'jpeg', 'jpg']
+    """지원되는 이미지 형식 목록 (PNG 제외)"""
+    formats = ['webp', 'bmp', 'tiff', 'tif', 'gif', 'jpeg', 'jpg']
     
     # 추가 형식 지원 확인
     if SVG_SUPPORT:
@@ -92,10 +92,10 @@ def _is_supported_image(file_input) -> bool:
         # file_input이 경로(str)일 때만 Image.open 사용
         if isinstance(file_input, str):
             with Image.open(file_input) as img:
-                return img.format.lower() in ['png', 'webp', 'bmp', 'tiff', 'gif', 'jpeg']
+                return img.format.lower() in ['webp', 'bmp', 'tiff', 'gif', 'jpeg']
         else:
             # FileStorage 객체는 확장자만으로 판단
-            return file_ext in ['png', 'webp', 'bmp', 'tiff', 'gif', 'jpeg']
+            return file_ext in ['webp', 'bmp', 'tiff', 'gif', 'jpeg']
     except Exception:
         return False
 
@@ -128,20 +128,22 @@ def _convert_special_format_to_pil(image_path: str) -> Image.Image:
         # 일반 이미지 형식
         return Image.open(image_path)
 
-def image_to_jpg(
+def image_to_png(
     image_path: str,
     out_dir: str,
     quality: Optional[str] = None,
-    resize_factor: float = 1.0
+    resize_factor: float = 1.0,
+    transparent_background: bool = False
 ) -> List[str]:
     """
-    이미지 파일을 JPG 형식으로 변환
+    이미지 파일을 PNG 형식으로 변환
     
     Args:
         image_path: 입력 이미지 파일 경로
         out_dir: 출력 디렉토리
-        quality: JPG 품질 (low/medium/high 또는 1-100)
+        quality: PNG 압축 레벨 (low/medium/high 또는 1-9)
         resize_factor: 크기 조절 비율 (기본값: 1.0)
+        transparent_background: 투명 배경 사용 여부
     
     Returns:
         변환된 파일 경로 목록
@@ -149,29 +151,35 @@ def image_to_jpg(
     if not _is_supported_image(image_path):
         raise ValueError(f"지원되지 않는 이미지 형식입니다: {image_path}")
     
-    # 품질 설정
-    jpg_quality = _quality_to_int(quality)
+    # PNG 압축 레벨 설정 (0-9, 높을수록 더 압축)
+    compress_level = _quality_to_compress_level(quality)
     
     # 출력 파일명 생성
     base_name = os.path.splitext(os.path.basename(image_path))[0]
-    out_path = os.path.join(out_dir, f"{base_name}.jpg")
+    out_path = os.path.join(out_dir, f"{base_name}.png")
     
     try:
         # 특수 형식 처리 또는 일반 이미지 로드
         img = _convert_special_format_to_pil(image_path)
         
-        # RGBA 또는 P 모드인 경우 RGB로 변환 (JPG는 투명도 지원 안함)
-        if img.mode in ('RGBA', 'LA', 'P'):
-            # 투명한 배경을 흰색으로 변환
-            if img.mode in ('P', 'LA'):
+        # 투명 배경 처리
+        if transparent_background:
+            # RGBA 모드로 변환하여 투명도 지원
+            if img.mode != 'RGBA':
                 img = img.convert('RGBA')
-            
-            # 흰색 배경 생성
-            background = Image.new('RGB', img.size, (255, 255, 255))
-            background.paste(img, mask=img.split()[-1])  # 알파 채널을 마스크로 사용
-            img = background
-        elif img.mode != 'RGB':
-            img = img.convert('RGB')
+        else:
+            # 투명 배경을 사용하지 않는 경우
+            if img.mode in ('RGBA', 'LA', 'P'):
+                # 투명한 배경을 흰색으로 변환
+                if img.mode in ('P', 'LA'):
+                    img = img.convert('RGBA')
+                
+                # 흰색 배경 생성
+                background = Image.new('RGB', img.size, (255, 255, 255))
+                background.paste(img, mask=img.split()[-1])  # 알파 채널을 마스크로 사용
+                img = background
+            elif img.mode != 'RGB':
+                img = img.convert('RGB')
         
         # 크기 조절
         if resize_factor != 1.0:
@@ -179,13 +187,22 @@ def image_to_jpg(
             new_height = int(img.height * resize_factor)
             img = img.resize((new_width, new_height), Image.Resampling.LANCZOS)
         
-        # JPG로 저장
-        img.save(out_path, 'JPEG', quality=jpg_quality, optimize=True)
+        # PNG로 저장
+        img.save(out_path, 'PNG', compress_level=compress_level, optimize=True)
         
         return [out_path]
         
     except Exception as e:
         raise RuntimeError(f"이미지 변환 중 오류 발생: {str(e)}")
+
+def _quality_to_compress_level(q):
+    """품질 설정을 PNG 압축 레벨로 변환"""
+    if q is None: 
+        return 6
+    s = str(q).strip().lower()
+    if s.isdigit(): 
+        return max(0, min(9, int(s)))
+    return {"low": 3, "medium": 6, "high": 9}.get(s, 6)
 
 def get_image_info(image_path: str) -> dict:
     """
