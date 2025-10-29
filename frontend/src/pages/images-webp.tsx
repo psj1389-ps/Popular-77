@@ -49,6 +49,7 @@ const ImagesWebpPage: React.FC = () => {
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [quality, setQuality] = useState<'low' | 'medium' | 'high'>('medium');
   const [transparentBackground, setTransparentBackground] = useState(false);
+  const [scale, setScale] = useState(0.5);
   const [isConverting, setIsConverting] = useState(false);
   const [conversionProgress, setConversionProgress] = useState(0);
   const [showSuccessMessage, setShowSuccessMessage] = useState(false);
@@ -145,7 +146,9 @@ const ImagesWebpPage: React.FC = () => {
 
   const calculatePixelSize = () => {
     if (!dims) return '원본 크기 확인 중...';
-    return `${dims.width}×${dims.height} px`;
+    const scaledWidth = Math.round(dims.width * scale);
+    const scaledHeight = Math.round(dims.height * scale);
+    return `${scaledWidth}×${scaledHeight} px`;
   };
 
   return (
@@ -182,7 +185,7 @@ const ImagesWebpPage: React.FC = () => {
         `}</style>
 
         <div className="container mx-auto px-4 py-16">
-          <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto" style={{ transform: 'scale(0.5)', transformOrigin: 'top center' }}>
+          <div className="bg-white p-8 rounded-xl shadow-lg max-w-2xl mx-auto">
             <div className="text-center mb-6">
               <h2 className="text-2xl font-semibold text-gray-800">Image → WEBP 변환기</h2>
               <p className="text-gray-500">다양한 이미지 형식을 고품질 WEBP로 변환 (JPG/PNG/BMP/TIFF/GIF/SVG/PSD/HEIC/RAW → WEBP)</p>
@@ -216,8 +219,26 @@ const ImagesWebpPage: React.FC = () => {
                 <div>
                   <h3 className="font-semibold text-gray-800 mb-2">고급 옵션:</h3>
                   <div className="bg-gray-50 p-4 rounded-lg space-y-4">
+                    {/* 크기 슬라이더 */}
                     <div>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="text-sm font-medium text-gray-700">크기 x</label>
+                        <span className="text-sm text-gray-600">{scale}</span>
+                      </div>
                       <div className="text-sm text-gray-500 mb-2">{calculatePixelSize()}</div>
+                      <input
+                        type="range"
+                        min="0.2"
+                        max="2.0"
+                        step="0.1"
+                        value={scale}
+                        onChange={(e) => setScale(parseFloat(e.target.value))}
+                        className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+                      />
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>0.2x (작게)</span>
+                        <span>2.0x (크게)</span>
+                      </div>
                     </div>
                   </div>
                 </div>
