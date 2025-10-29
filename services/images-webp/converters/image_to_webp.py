@@ -26,20 +26,34 @@ def get_image_info(image_path: str) -> dict:
     except Exception as e:
         return {'error': str(e)}
 
-def image_to_webp(input_path: str, output_path: str, quality: int = 80, resize_factor: float = 1.0) -> bool:
+def image_to_webp(input_path: str, output_dir: str, quality: str = 'medium', resize_factor: float = 1.0) -> List[str]:
     """
     Convert an image to WEBP format
     
     Args:
         input_path: Path to input image
-        output_path: Path for output WEBP file
-        quality: WEBP quality (1-100)
+        output_dir: Directory for output WEBP file
+        quality: WEBP quality ('low', 'medium', 'high' or 1-100)
         resize_factor: Factor to resize image (0.1-3.0)
     
     Returns:
-        bool: True if conversion successful, False otherwise
+        List[str]: List of output file paths if successful, empty list otherwise
     """
     try:
+        # Convert quality string to numeric value
+        if isinstance(quality, str):
+            quality_map = {'low': 60, 'medium': 80, 'high': 95}
+            numeric_quality = quality_map.get(quality.lower(), 80)
+        else:
+            numeric_quality = int(quality)
+        
+        # Ensure quality is in valid range
+        numeric_quality = max(1, min(100, numeric_quality))
+        
+        # Generate output filename
+        base_name = os.path.splitext(os.path.basename(input_path))[0]
+        output_path = os.path.join(output_dir, f"{base_name}.webp")
+        
         # Open and process the image
         with Image.open(input_path) as img:
             # Convert to RGB if necessary (WEBP doesn't support all modes)
@@ -62,23 +76,23 @@ def image_to_webp(input_path: str, output_path: str, quality: int = 80, resize_f
             img = ImageOps.exif_transpose(img)
             
             # Ensure output directory exists
-            os.makedirs(os.path.dirname(output_path), exist_ok=True)
+            os.makedirs(output_dir, exist_ok=True)
             
             # Save as WEBP
             save_kwargs = {
                 'format': 'WEBP',
-                'quality': quality,
+                'quality': numeric_quality,
                 'optimize': True
             }
             
             # Enable lossless for high quality settings
-            if quality >= 95:
+            if numeric_quality >= 95:
                 save_kwargs['lossless'] = True
                 save_kwargs.pop('quality')  # Remove quality for lossless
             
             img.save(output_path, **save_kwargs)
-            return True
+            return [output_path]
             
     except Exception as e:
         print(f"Error converting {input_path} to WEBP: {str(e)}")
-        return False
+        return []

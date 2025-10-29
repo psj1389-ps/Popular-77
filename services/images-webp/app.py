@@ -55,6 +55,7 @@ def root():
 def health():
     return jsonify({"status": "healthy", "service": "Image to WEBP Converter"})
 
+@app.route("/convert", methods=["POST"])
 @app.route("/api/image-to-webp", methods=["POST"])
 def convert_image():
     try:
