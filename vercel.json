@@ -15,8 +15,12 @@
     { "source": "/api/pdf-pptx/(.*)", "destination": "https://pdf-pptx.onrender.com/$1" },
     { "source": "/api/pdf-tiff/(.*)", "destination": "https://pdf-tiff.onrender.com/$1" },
     { "source": "/api/pdf-image/(.*)", "destination": "https://pdf-image-service.onrender.com/$1" },
+
     { "source": "/api/images-png/(.*)", "destination": "https://images-png.onrender.com/$1" },
+    { "source": "/api/images-png", "destination": "https://images-png.onrender.com" },
     { "source": "/api/images-webp/(.*)", "destination": "https://images-webp.onrender.com/$1" },
+    { "source": "/api/images-webp", "destination": "https://images-webp.onrender.com" },
+
     { "source": "/tools/(.*)", "destination": "/index.html" },
     { "source": "/(.*)", "destination": "/index.html" }
   ]
