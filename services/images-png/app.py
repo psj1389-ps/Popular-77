@@ -27,12 +27,12 @@ def root():
     
     # Return JSON for API requests - Service status endpoint
     return jsonify({
-        "service": "Image to JPG Converter",
+        "service": "Image to PNG Converter",
         "version": "1.0.0",
         "status": "running",
         "endpoints": {
             "health": "/health",
-            "convert": "/api/image-to-jpg",
+            "convert": "/api/images-png",
             "web_convert": "/convert",
             "batch_convert": "/api/batch-convert",
             "progress": "/api/progress",
@@ -40,10 +40,10 @@ def root():
         },
         "usage": {
             "method": "POST",
-            "endpoint": "/api/image-to-jpg",
+            "endpoint": "/api/images-png",
             "parameters": {
-                "file": "Image file (required) - PNG, WEBP, BMP, TIFF, GIF",
-                "quality": "JPG Quality (75-100 or low/medium/high, default: medium)",
+                "file": "Image file (required) - WEBP, JPG, BMP, TIFF, GIF",
+                "quality": "PNG Quality (default: lossless)",
                 "resize": "Resize factor (0.1-3.0, default: 1.0)"
             },
             "supported_formats": {
