@@ -1,4 +1,4 @@
-# Image to JPG Service - Minimal Requirements for Render
+# Image to PNG Service - Minimal Requirements for Render
 
 # Web Framework
 Flask==2.3.3

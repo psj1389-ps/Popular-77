@@ -457,8 +457,11 @@ def not_found(error):
         "available_endpoints": {
             "service_info": "GET /",
             "health_check": "GET /health",
-            "image_conversion": "POST /api/image-to-jpg",
-            "web_interface": "POST /convert"
+            "image_conversion": "POST /api/images-png",
+            "web_interface": "POST /convert",
+            "batch_convert": "POST /api/batch-convert",
+            "progress": "GET /api/progress/<job_id>",
+            "download": "GET /api/download/<job_id>"
         },
         "documentation": "Visit GET / for detailed API documentation"
     }), 404
@@ -466,10 +469,15 @@ def not_found(error):
 # 500 에러 핸들러
 @app.errorhandler(500)
 def internal_error(error):
+    import traceback
+    app.logger.error(f"Internal Server Error: {str(error)}")
+    app.logger.error(f"Traceback: {traceback.format_exc()}")
+    
     return jsonify({
         "error": "Internal Server Error",
         "message": "An unexpected error occurred while processing your request.",
-        "support": "Please check your request parameters and try again."
+        "support": "Please check your request parameters and try again.",
+        "service": "Image to PNG Converter"
     }), 500
 
 if __name__ == '__main__':
