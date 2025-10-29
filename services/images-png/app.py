@@ -1,5 +1,6 @@
 # Image to PNG Converter Service - Updated for Render deployment
 from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os, io, zipfile, uuid, time
 
@@ -12,6 +13,7 @@ UPLOAD_DIR = os.path.join(BASE, "uploads")
 OUTPUT_DIR = os.path.join(BASE, "outputs")
 
 app = Flask(__name__)
+CORS(app)  # CORS 설정 추가
 ensure_dirs([UPLOAD_DIR, OUTPUT_DIR])
 
 # 배치 프로세서 초기화
@@ -472,6 +474,6 @@ def internal_error(error):
 
 if __name__ == '__main__':
     import os
-    port = int(os.environ.get('PORT', 5000))
+    port = int(os.environ.get('PORT', 5001))
     debug = os.environ.get('FLASK_ENV', '').lower() != 'production'
     app.run(debug=debug, host='0.0.0.0', port=port)

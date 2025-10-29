@@ -1,5 +1,6 @@
 # Image to WEBP Converter Service - Updated for Render deployment
 from flask import Flask, request, send_file, jsonify, render_template, send_from_directory
+from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os, io, zipfile, uuid, time
 
@@ -12,6 +13,7 @@ UPLOAD_DIR = os.path.join(BASE, "uploads")
 OUTPUT_DIR = os.path.join(BASE, "outputs")
 
 app = Flask(__name__)
+CORS(app)  # CORS 설정 추가
 ensure_dirs([UPLOAD_DIR, OUTPUT_DIR])
 
 # 배치 프로세서 초기화
