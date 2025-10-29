@@ -7,7 +7,7 @@ import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 // 워커 설정을 조건부로 처리 (SSR 환경 고려)
 if (typeof window !== "undefined") {
   GlobalWorkerOptions.workerSrc = new URL(
-    "pdfjs-dist/build/pdf.worker.min.js",
+    /* @vite-ignore */ "pdfjs-dist/build/pdf.worker.min.js",
     import.meta.url
   ).toString();
 }
