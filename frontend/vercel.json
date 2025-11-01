@@ -12,8 +12,8 @@
     { "source": "/api/image-to-jpg/(.*)", "destination": "https://popular-77-srwb.onrender.com/$1" },
     { "source": "/api/images-webp/(.*)", "destination": "https://images-webp.onrender.com/$1" },
     { "source": "/api/images-webp", "destination": "https://images-webp.onrender.com" },
-    { "source": "/api/images-png/(.*)", "destination": "https://images-png.onrender.com/$1" },
-    { "source": "/api/images-png", "destination": "https://images-png.onrender.com" },
+    { "source": "/api/images-png/(.*)", "destination": "https://images-png.onrender.com/api/images-png/$1" },
+    { "source": "/api/images-png", "destination": "https://images-png.onrender.com/api/images-png" },
     { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
 
     { "source": "/rss.xml", "destination": "/api/rss" },
