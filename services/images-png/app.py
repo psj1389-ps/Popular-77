@@ -3,6 +3,7 @@ from flask import Flask, request, send_file, jsonify, render_template, send_from
 from flask_cors import CORS
 from werkzeug.utils import secure_filename
 import os, io, zipfile, uuid, time
+import sys
 
 from converters.image_to_png import image_to_png, get_image_info, _get_supported_formats
 from utils.file_utils import ensure_dirs
@@ -13,6 +14,53 @@ UPLOAD_DIR = os.path.join(BASE, "uploads")
 OUTPUT_DIR = os.path.join(BASE, "outputs")
 
 app = Flask(__name__)
+app.config['JSON_AS_ASCII'] = False  # UTF-8 지원
+
+# UTF-8 인코딩 설정
+if sys.platform.startswith('win'):
+    import locale
+    try:
+        locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
+    except locale.Error:
+        try:
+            locale.setlocale(locale.LC_ALL, 'Korean_Korea.65001')
+        except locale.Error:
+            pass
+
+# Jinja2 환경 설정 - UTF-8 인코딩 강제
+from jinja2 import FileSystemLoader, TemplateNotFound
+import codecs
+
+class UTF8FileSystemLoader(FileSystemLoader):
+    def get_source(self, environment, template):
+        # 부모 클래스의 메서드를 사용하여 경로 찾기
+        for searchpath in self.searchpath:
+            path = os.path.join(searchpath, template)
+            if os.path.isfile(path):
+                break
+        else:
+            raise TemplateNotFound(template)
+        
+        # UTF-8로 강제 읽기
+        try:
+            with codecs.open(path, 'r', encoding='utf-8') as f:
+                source = f.read()
+        except UnicodeDecodeError:
+            # UTF-8 실패시 다른 인코딩 시도
+            try:
+                with codecs.open(path, 'r', encoding='cp949') as f:
+                    source = f.read()
+            except UnicodeDecodeError:
+                with codecs.open(path, 'r', encoding='latin1') as f:
+                    source = f.read()
+        
+        mtime = os.path.getmtime(path)
+        return source, path, lambda: mtime == os.path.getmtime(path)
+
+# 커스텀 로더 적용
+app.jinja_loader = UTF8FileSystemLoader(app.template_folder)
+app.jinja_env.globals.update(zip=zip)
+
 CORS(app)  # CORS 설정 추가
 ensure_dirs([UPLOAD_DIR, OUTPUT_DIR])
 
