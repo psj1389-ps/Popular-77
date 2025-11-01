@@ -71,7 +71,9 @@ batch_processor = get_batch_processor()
 def root():
     # Check if request accepts HTML (browser request)
     if request.headers.get('Accept', '').find('text/html') != -1:
-        return render_template('index.html')
+        response = app.make_response(render_template('index.html'))
+        response.headers['Content-Type'] = 'text/html; charset=utf-8'
+        return response
     
     # Return JSON for API requests - Service status endpoint
     return jsonify({
