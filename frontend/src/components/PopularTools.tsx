@@ -319,7 +319,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
 
             {/* GIF 변??카드 */}
             <div 
-              onClick={() => window.open('https://images-gif.onrender.com/', '_blank')}
+              onClick={() => window.location.href = 'https://77-tools.xyz/tools/images-gif'}
               className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
             >
               <div className="flex items-center mb-2">
@@ -333,7 +333,7 @@ const PopularTools: React.FC<PopularToolsProps> = ({ tools, refs, scrollToSectio
           {/* 이미지 변환 & 동영상 변환 통합 카드 (4번 카드박스) */}
           <div className="mt-8 grid grid-cols-1 md:grid-cols-4 gap-6">
             <div 
-              onClick={() => window.open('https://images-all.onrender.com', '_blank')}
+              onClick={() => window.location.href = 'https://77-tools.xyz/tools/images-all'}
               className="bg-yellow-50 p-6 rounded-lg hover:bg-yellow-100 hover:shadow-lg transition-all duration-200 cursor-pointer transform hover:scale-105 h-40 flex flex-col"
             >
               <div className="flex items-center mb-2">
