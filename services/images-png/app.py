@@ -17,15 +17,29 @@ app = Flask(__name__)
 app.config['JSON_AS_ASCII'] = False  # UTF-8 지원
 
 # UTF-8 인코딩 설정
-if sys.platform.startswith('win'):
-    import locale
-    try:
-        locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
-    except locale.Error:
+import locale
+try:
+    if sys.platform.startswith('win'):
+        # Windows 환경
         try:
-            locale.setlocale(locale.LC_ALL, 'Korean_Korea.65001')
+            locale.setlocale(locale.LC_ALL, 'ko_KR.UTF-8')
         except locale.Error:
-            pass
+            try:
+                locale.setlocale(locale.LC_ALL, 'Korean_Korea.65001')
+            except locale.Error:
+                pass
+    else:
+        # Linux/Unix 환경 (Render 등)
+        try:
+            locale.setlocale(locale.LC_ALL, 'C.UTF-8')
+        except locale.Error:
+            try:
+                locale.setlocale(locale.LC_ALL, 'en_US.UTF-8')
+            except locale.Error:
+                pass
+except Exception:
+    # locale 설정 실패시 무시
+    pass
 
 # Jinja2 환경 설정 - UTF-8 인코딩 강제
 from jinja2 import FileSystemLoader, TemplateNotFound
