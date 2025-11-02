@@ -508,20 +508,25 @@
         const API_BASE = '';
         let selectedFile = null;
     
-        document.getElementById('uploadArea').addEventListener('click', function(e) {
+        document.getElementById('upload-area').addEventListener('click', function(e) {
             const t = e.target;
             const isInput = t.tagName.toLowerCase() === 'input';
             const isUploadBtn = t.classList && t.classList.contains('upload-btn');
             if (isUploadBtn) return; // 버튼 클릭은 자체 핸들러로 처리
             if (!isInput) {
-                document.getElementById('fileInput').click();
+                document.getElementById('file-input').click();
             }
         });
     
         let selectedFiles = [];
         let isBatchMode = false;
+
+        // 파일 선택 버튼 클릭 이벤트
+        document.getElementById('browse-btn').addEventListener('click', function() {
+            document.getElementById('file-input').click();
+        });
     
-        document.getElementById('fileInput').addEventListener('change', function(e) {
+        document.getElementById('file-input').addEventListener('change', function(e) {
             const files = Array.from(e.target.files);
             if (files.length === 0) return;
             
@@ -886,7 +891,7 @@
 
         function resetFile() {
             selectedFile = null;
-            document.getElementById('fileInput').value = '';
+            document.getElementById('file-input').value = '';
             document.getElementById('fileInfo').style.display = 'none';
             document.getElementById('formatOptions').style.display = 'none';
             document.getElementById('qualityOptions').style.display = 'none';
@@ -973,7 +978,7 @@
         }
         
         // 드래그 앤 드롭 기능 추가 (이미지 파일 지원)
-        const uploadArea = document.getElementById('uploadArea');
+        const uploadArea = document.getElementById('upload-area');
         
         uploadArea.addEventListener('dragover', function(e) {
             e.preventDefault();
@@ -1012,11 +1017,11 @@
                     return;
                 }
                 
-                document.getElementById('fileInput').files = files;
+                document.getElementById('file-input').files = files;
                 
                 // 파일 선택 이벤트 트리거
                 const event = new Event('change', { bubbles: true });
-                document.getElementById('fileInput').dispatchEvent(event);
+                document.getElementById('file-input').dispatchEvent(event);
             }
         });
     </script>
