@@ -377,16 +377,30 @@
         </div>
         
         <form id="uploadForm" enctype="multipart/form-data">
-            <div class="upload-area" id="uploadArea">
+            <div class="upload-area" id="upload-area">
                 <div id="uploadText">
                     <div class="upload-icon">🖼️</div>
                     <h3>이미지 파일을 업로드하세요</h3>
                     <p>파일을 드래그하거나 클릭하여 선택하세요 (최대 100개 파일, 총 500MB)</p>
-                    <input type="file" id="fileInput" name="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.heif,.cr2,.nef,.arw,.dng,.raf,.orf,.rw2" multiple style="display: none;">
-                    <button type="button" class="upload-btn" onclick="document.getElementById('fileInput').click()">파일 선택</button>
+                    <input type="file" id="file-input" name="file" accept=".jpg,.jpeg,.png,.webp,.bmp,.tiff,.tif,.gif,.svg,.psd,.heic,.heif,.cr2,.nef,.arw,.dng,.raf,.orf,.rw2" multiple style="display: none;">
+                    <button type="button" class="upload-btn" id="browse-btn">파일 선택</button>
                 </div>
             </div>
         </form>
+        
+        <!-- 파일 목록 및 미리보기 섹션 -->
+        <div id="preview-section" style="display: none;">
+            <div class="file-stats" style="margin: 20px 0; padding: 15px; background: #f8f9fa; border-radius: 8px;">
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <div>
+                        <span id="file-count">0</span>개 파일 선택됨 
+                        (<span id="total-size">0 MB</span>)
+                    </div>
+                    <button type="button" id="clear-all-btn" class="btn reset-btn" style="padding: 5px 10px; font-size: 12px;">모두 삭제</button>
+                </div>
+            </div>
+            <div id="file-list" style="max-height: 300px; overflow-y: auto; border: 1px solid #ddd; border-radius: 8px; padding: 10px;"></div>
+        </div>
         
         <div class="file-info" id="fileInfo">
             <div id="fileName"></div>
@@ -628,10 +642,6 @@
             // 크기 조절 설정 추가
             const resize = document.getElementById('sizeSlider')?.value || '0.5';
             formData.append('resize', resize);
-            
-            // 투명 배경 설정 추가
-            const transparentBg = document.querySelector('input[name="transparent_bg"]:checked')?.value || 'false';
-            formData.append('transparent_bg', transparentBg);
             
             // 투명 배경 설정 추가
             const transparentBg = document.querySelector('input[name="transparent_bg"]:checked')?.value || 'false';
