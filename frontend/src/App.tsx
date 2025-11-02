@@ -21,6 +21,8 @@ import MainLayout from '@/components/MainLayout';
 import ImageJpgPage from "@/pages/image-jpg";
 import ImagesWebpPage from "@/pages/images-webp";
 import ImagesPngPage from "@/pages/images-png";
+import ImagesGifPage from "@/pages/images-gif";
+import ImagesAllPage from "@/pages/images-all";
 
 function App() {
   return (
@@ -175,6 +177,22 @@ function App() {
           element={
             <MainLayout>
               <ImagesPngPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/images-gif"
+          element={
+            <MainLayout>
+              <ImagesGifPage />
+            </MainLayout>
+          }
+        />
+        <Route
+          path="/tools/images-all"
+          element={
+            <MainLayout>
+              <ImagesAllPage />
             </MainLayout>
           }
         />
