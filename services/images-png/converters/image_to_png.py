@@ -95,7 +95,7 @@ def _is_supported_image(file_input) -> bool:
                 return img.format.lower() in ['webp', 'bmp', 'tiff', 'gif', 'jpeg']
         else:
             # FileStorage 객체는 확장자만으로 판단
-            return file_ext in ['webp', 'bmp', 'tiff', 'gif', 'jpeg']
+            return file_ext in ['webp', 'bmp', 'tiff', 'tif', 'gif', 'jpeg', 'jpg']
     except Exception:
         return False
 

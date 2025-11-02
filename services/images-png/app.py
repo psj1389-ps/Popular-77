@@ -367,7 +367,7 @@ def api_batch_convert():
         return jsonify({"error": "총 파일 크기가 500MB를 초과합니다"}), 400
 
     # 지원되는 파일 형식 확인
-    from converters.image_to_jpg import _is_supported_image
+    from converters.image_to_png import _is_supported_image
     unsupported_files = [f.filename for f in files if not _is_supported_image(f)]
     if unsupported_files:
         supported_formats = _get_supported_formats()
