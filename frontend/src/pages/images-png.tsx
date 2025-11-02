@@ -267,7 +267,7 @@ const ImagesPngPage: React.FC = () => {
 
                 {/* 투명 배경 옵션 */}
                 <div>
-                  <h3 className="font-semibold text-gray-800 mb-2">투명 배경: (PNG, WEBP에서 지원)</h3>
+                  <h3 className="font-semibold text-gray-800 mb-2">투명 배경: (PNG, WEBP, SVG에서 지원)</h3>
                   <div className="space-y-2">
                     <label className="flex items-center">
                       <input type="radio" name="transparent" value="false" checked={!transparentBackground} onChange={() => setTransparentBackground(false)} className="w-4 h-4 text-blue-600" />
@@ -282,7 +282,7 @@ const ImagesPngPage: React.FC = () => {
                     <div className="flex items-start">
                       <span className="text-blue-500 mr-2">💡</span>
                       <div className="text-sm text-blue-700">
-                        <div><strong>투명 배경 지원:</strong> PNG, WEBP 형식</div>
+                        <div><strong>투명 배경 지원:</strong> PNG, WEBP, SVG 형식</div>
                         <div><strong>흰색 배경 변환:</strong> JPG, JPEG, TIFF, GIF, BMP</div>
                       </div>
                     </div>
