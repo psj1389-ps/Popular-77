@@ -25,6 +25,6 @@
   },
   "homepage": "https://github.com/psj1389-ps/Popular-77#readme",
   "engines": {
-    "node": ">=18.0.0"
+    "node": "20.x"
   }
 }
