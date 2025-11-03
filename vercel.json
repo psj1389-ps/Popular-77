@@ -1,4 +1,5 @@
 {
+  "outputDirectory": "frontend/dist",
   "rewrites": [
     { "source": "/api/pdf-doc/(.*)", "destination": "https://pdf-doc-306w.onrender.com/$1" },
     { "source": "/api/pdf-tiff/(.*)", "destination": "https://pdf-tiff.onrender.com/$1" },
@@ -15,13 +16,10 @@
     { "source": "/api/images-png/(.*)", "destination": "https://images-png.onrender.com/api/images-png/$1" },
     { "source": "/api/images-png", "destination": "https://images-png.onrender.com/api/images-png" },
     { "source": "/api/pdf-ai/(.*)", "destination": "https://popular-77.onrender.com/$1" },
-
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-    { "source": "/api/(.*)", "destination": "/api/$1" }
-  ],
-  "routes": [
-    { "src": "/(.*)", "dest": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/$1" },
+    { "source": "/(.*)", "destination": "/index.html" }
   ],
   "headers": [
     {
@@ -31,116 +29,100 @@
         { "key": "Cache-Control", "value": "public, s-maxage=600, stale-while-revalidate=300" }
       ]
     },
-    { "source": "/api/pdf-doc/(.*)",
+    {
+      "source": "/api/pdf-doc/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-tiff/(.*)",
+    {
+      "source": "/api/pdf-tiff/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-image/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
-      ]
-    },
-    { "source": "/api/pdf-png/(.*)",
+    {
+      "source": "/api/pdf-png/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-svg/(.*)",
+    {
+      "source": "/api/pdf-svg/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-jpg/(.*)",
+    {
+      "source": "/api/pdf-jpg/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-vector/(.*)",
+    {
+      "source": "/api/pdf-vector/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-gif/(.*)",
+    {
+      "source": "/api/pdf-gif/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-bmp/(.*)",
+    {
+      "source": "/api/pdf-bmp/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
         { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/pdf-ai/(.*)",
+    {
+      "source": "/api/pdf-image/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
         { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/image-to-jpg/(.*)",
+    {
+      "source": "/api/images-webp/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
+        { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/images-webp/(.*)",
+    {
+      "source": "/api/images-png/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
+        { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     },
-    { "source": "/api/images-webp",
+    {
+      "source": "/api/pdf-ai/(.*)",
       "headers": [
         { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
-      ]
-    },
-    { "source": "/api/images-png/(.*)",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
-      ]
-    },
-    { "source": "/api/images-png",
-      "headers": [
-        { "key": "Access-Control-Allow-Origin", "value": "*" },
-        { "key": "Access-Control-Allow-Methods", "value": "POST, OPTIONS" },
-        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" },
-        { "key": "Access-Control-Expose-Headers", "value": "Content-Disposition" }
+        { "key": "Access-Control-Allow-Methods", "value": "POST, GET, OPTIONS" },
+        { "key": "Access-Control-Allow-Headers", "value": "Content-Type" }
       ]
     }
   ]
