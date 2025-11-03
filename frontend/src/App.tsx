@@ -38,6 +38,11 @@ const Login = lazy(() => import('@/pages/Login'));
 const Profile = lazy(() => import('@/pages/Profile'));
 const AuthCallback = lazy(() => import('@/pages/AuthCallback'));
 
+// 새로운 기능 페이지들
+const DashboardPage = lazy(() => import('@/pages/DashboardPage'));
+const HistoryPage = lazy(() => import('@/pages/HistoryPage'));
+const SettingsPage = lazy(() => import('@/pages/SettingsPage'));
+
 function App() {
   return (
     <Router>
@@ -211,6 +216,32 @@ function App() {
               <ImagesAllPage />
             </MainLayout>
           }
+        />
+        
+        {/* 새로운 기능 라우트 */}
+        <Route 
+          path="/dashboard" 
+          element={
+            <MainLayout>
+              <DashboardPage />
+            </MainLayout>
+          } 
+        />
+        <Route 
+          path="/history" 
+          element={
+            <MainLayout>
+              <HistoryPage />
+            </MainLayout>
+          } 
+        />
+        <Route 
+          path="/settings" 
+          element={
+            <MainLayout>
+              <SettingsPage />
+            </MainLayout>
+          } 
         />
         
         {/* 인증 관련 라우트 */}

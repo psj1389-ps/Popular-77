@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Menu, X, Search, Settings, User, LogOut, LogIn } from 'lucide-react';
+import { Menu, X, Search, Settings, User, LogOut, LogIn, BarChart3, History, FileText } from 'lucide-react';
 import { useAuthContext } from '../contexts/AuthContext';
 
 const Navbar = () => {
@@ -29,6 +29,35 @@ const Navbar = () => {
               77+ Popular Tools
             </span>
           </Link>
+
+          {/* 네비게이션 메뉴 */}
+          <div className="hidden md:flex items-center space-x-6">
+            {user && (
+              <>
+                <Link
+                  to="/dashboard"
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
+                >
+                  <BarChart3 className="w-4 h-4" />
+                  <span>대시보드</span>
+                </Link>
+                <Link
+                  to="/history"
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
+                >
+                  <History className="w-4 h-4" />
+                  <span>기록</span>
+                </Link>
+                <Link
+                  to="/settings"
+                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
+                >
+                  <Settings className="w-4 h-4" />
+                  <span>설정</span>
+                </Link>
+              </>
+            )}
+          </div>
 
           {/* 검색창 */}
           <div className="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end">
@@ -86,13 +115,44 @@ const Navbar = () => {
                       <User className="w-4 h-4 mr-2" />
                       내 프로필
                     </Link>
-                    <button
-                      onClick={handleSignOut}
-                      className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
-                    >
-                      <LogOut className="w-4 h-4 mr-2" />
-                      로그아웃
-                    </button>
+                    
+                    {/* 모바일에서만 보이는 메뉴들 */}
+                    <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <BarChart3 className="w-4 h-4 mr-2" />
+                        대시보드
+                      </Link>
+                      <Link
+                        to="/history"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <History className="w-4 h-4 mr-2" />
+                        기록
+                      </Link>
+                      <Link
+                        to="/settings"
+                        onClick={() => setIsUserMenuOpen(false)}
+                        className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <Settings className="w-4 h-4 mr-2" />
+                        설정
+                      </Link>
+                    </div>
+                    
+                    <div className="border-t border-gray-100 mt-1 pt-1">
+                      <button
+                        onClick={handleSignOut}
+                        className="flex items-center w-full px-4 py-2 text-sm text-gray-700 hover:bg-gray-100"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        로그아웃
+                      </button>
+                    </div>
                   </div>
                 )}
               </div>
