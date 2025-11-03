@@ -1,0 +1,9 @@
+__pycache__/
+uploads/
+outputs/
+*.log
+*.tmp
+*.mp4
+*.mkv
+*.webm
+.env

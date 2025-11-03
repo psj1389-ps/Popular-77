@@ -1,0 +1,25 @@
+FROM python:3.12-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_ROOT_USER_ACTION=ignore \
+    HOME=/tmp
+
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ffmpeg ca-certificates \
+ && apt-get clean \
+ && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+# 서비스 컨텍스트에서 requirements.txt를 복사
+COPY requirements.txt /tmp/requirements.txt
+RUN python -m pip install --upgrade pip \
+ && pip install --no-cache-dir -r /tmp/requirements.txt
+
+# 현재 디렉토리(서비스 폴더)를 /app으로 복사
+COPY . /app/
+
+CMD ["sh","-c","python -m gunicorn app:app -b 0.0.0.0:${PORT:-10000} -k sync -w 1 --threads 1 --timeout 600 --graceful-timeout 30 --keep-alive 15 --worker-tmp-dir=/dev/shm"]

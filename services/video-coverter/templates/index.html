@@ -1,0 +1,1299 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>비디오 변환기</title>
+    <style>
+        body{font-family:Arial;background:#f5f5f5;margin:0;padding:0}
+        
+        /* 🔥 헤더 스타일 (1번 그림 스타일) */
+        .main-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px 0;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .main-header::before {
+            content: '';
+            position: absolute;
+            top: -50%;
+            left: -50%;
+            width: 200%;
+            height: 200%;
+            background: url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><defs><pattern id="grain" width="100" height="100" patternUnits="userSpaceOnUse"><circle cx="50" cy="50" r="1" fill="%23ffffff" opacity="0.1"/></pattern></defs><rect width="100" height="100" fill="url(%23grain)"/></svg>') repeat;
+            animation: float 20s ease-in-out infinite;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translateY(0px) rotate(0deg); }
+            50% { transform: translateY(-20px) rotate(180deg); }
+        }
+        
+        .header-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 20px;
+            text-align: center;
+            position: relative;
+            z-index: 2;
+        }
+        
+        .header-logo {
+            display: inline-flex;
+            align-items: center;
+            gap: 15px;
+            margin-bottom: 10px;
+        }
+        
+        .logo-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(255,255,255,0.2);
+            border-radius: 12px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .header-title {
+            font-size: 2.5em;
+            font-weight: bold;
+            margin: 0;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        
+        .header-subtitle {
+            font-size: 1.2em;
+            opacity: 0.9;
+            margin: 10px 0 0 0;
+            font-weight: 300;
+        }
+        
+        /* 네비게이션 관련 스타일 제거 또는 주석 처리 */
+        /*
+        .header-nav {
+            margin-top: 20px;
+            display: flex;
+            justify-content: center;
+            gap: 30px;
+        }
+        
+        .nav-item {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            color: white;
+        }
+        */
+        
+        /* 반응형 디자인에서 네비게이션 관련 부분도 제거 */
+        @media (max-width: 768px) {
+            .header-title { font-size: 2em; }
+            /* .header-nav { flex-direction: column; gap: 10px; } */
+            .footer-content { grid-template-columns: 1fr; }
+            .footer-features { justify-content: center; }
+        }
+        
+        .nav-item {
+            color: rgba(255,255,255,0.9);
+            text-decoration: none;
+            padding: 8px 16px;
+            border-radius: 20px;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(5px);
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .nav-item:hover {
+            background: rgba(255,255,255,0.2);
+            transform: translateY(-2px);
+            color: white;
+        }
+        
+        /* 메인 컨테이너 조정 */
+        .container{max-width:600px;margin:20px auto;background:white;border-radius:10px;padding:30px;box-shadow:0 4px 6px rgba(0,0,0,0.1)}
+        .header{text-align:center;margin-bottom:30px}
+        .upload-area{border:2px dashed #ddd;padding:40px;text-align:center;border-radius:10px;cursor:pointer}
+        .upload-area:hover{border-color:#007bff;background:#f8f9ff}
+        .file-input{display:none}
+        .btn{background:#007bff;color:white;border:none;padding:12px 24px;border-radius:5px;cursor:pointer;font-size:16px}
+        .btn:hover{background:#0056b3}
+        .btn:disabled{background:#6c757d;cursor:not-allowed}
+        .file-info{background:#f8f9fa;padding:15px;border-radius:5px;margin-top:15px;display:none}
+        .quality-options{margin:15px 0;display:none}
+        .quality-options label{display:block;margin:5px 0}
+        .error{background:#f8d7da;color:#721c24;padding:10px;border-radius:5px;margin-top:10px;display:none}
+        .success{background:#d4edda;color:#155724;padding:10px;border-radius:5px;margin-top:10px;display:none}
+        .loading{display:none;text-align:center;margin-top:20px}
+        .spinner{border:4px solid #f3f3f3;border-top:4px solid #007bff;border-radius:50%;width:40px;height:40px;animation:spin 1s linear infinite;margin:0 auto}
+        @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+        .reset-btn{background:#6c757d;margin-left:10px}
+        .reset-btn:hover{background:#545b62}
+        .button-group{display:flex;justify-content:center;gap:10px;margin-top:15px}
+        
+        /* 🔥 풋터 스타일 (헤더와 동일한 색상 적용) */
+        .main-footer {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            margin-top: 50px;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .main-footer::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, #3498db, #e74c3c, #f39c12, #2ecc71, #9b59b6);
+            background-size: 300% 100%;
+            animation: rainbow 3s ease infinite;
+        }
+        
+        .footer-content {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px 20px;
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 30px;
+        }
+        
+        .footer-section h3 {
+            color: white;
+            margin-bottom: 15px;
+            font-size: 1.2em;
+            position: relative;
+        }
+        
+        .footer-section h3::after {
+            content: '';
+            position: absolute;
+            bottom: -5px;
+            left: 0;
+            width: 30px;
+            height: 2px;
+            background: white;
+        }
+        
+        .footer-section p, .footer-section li {
+            color: white;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+        
+        .footer-section ul {
+            list-style: none;
+            padding: 0;
+        }
+        
+        .footer-section a {
+            color: white;
+            text-decoration: none;
+            transition: color 0.3s ease;
+        }
+        
+        .footer-section a:hover {
+            color: #f0f0f0;
+        }
+        
+        .footer-features {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 15px;
+        }
+        
+        .feature-tag {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            padding: 5px 12px;
+            border-radius: 15px;
+            font-size: 0.9em;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        
+        .footer-bottom {
+            border-top: 1px solid #34495e;
+            margin-top: 30px;
+            padding-top: 20px;
+            text-align: center;
+            color: white;
+        }
+        
+        .footer-social {
+            display: flex;
+            justify-content: center;
+            gap: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .social-icon {
+            width: 40px;
+            height: 40px;
+            background: rgba(52, 152, 219, 0.2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #3498db;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+        
+        .social-icon:hover {
+            background: #3498db;
+            color: white;
+            transform: translateY(-2px);
+            box-shadow: 0 4px 8px rgba(52, 152, 219, 0.3);
+        }
+        
+        .social-icon:active {
+            transform: translateY(0px);
+        }
+        
+        /* 네비게이션 아이콘들 스타일 */
+        .nav-icons-container {
+            position: absolute;
+            top: -80px;
+            right: 20px;
+            display: flex;
+            gap: 15px;
+            z-index: 10;
+        }
+        
+        .nav-icon {
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            text-decoration: none;
+        }
+        
+        .nav-icon:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+            color: white;
+        }
+        
+        /* 기존 롤오버 아이콘 스타일 (호환성 유지) */
+        .rollover-icon {
+            position: absolute;
+            top: -60px;
+            right: 20px;
+            width: 50px;
+            height: 50px;
+            background: linear-gradient(135deg, #667eea, #764ba2);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-size: 24px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+            z-index: 10;
+        }
+        
+        .rollover-icon:hover {
+            transform: translateY(-5px) scale(1.1);
+            box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+            background: linear-gradient(135deg, #5a67d8, #667eea);
+        }
+        
+        .rollover-icon:active {
+            transform: translateY(-2px) scale(1.05);
+        }
+        
+        /* 반응형 디자인 */
+        @media (max-width: 768px) {
+            .header-title { font-size: 2em; }
+            .header-nav { flex-direction: column; gap: 10px; }
+            .footer-content { grid-template-columns: 1fr; }
+            .footer-features { justify-content: center; }
+            .nav-icons-container { right: 10px; top: -60px; gap: 10px; }
+            .nav-icon { width: 40px; height: 40px; font-size: 16px; }
+            .rollover-icon { right: 10px; top: -50px; width: 40px; height: 40px; font-size: 20px; }
+        }
+        
+        /* 진행률 표시 스타일 */
+        #progressContainer {
+            margin-top: 20px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+            border: 1px solid #e9ecef;
+            display: none;
+        }
+        
+        .progress-wrapper {
+            text-align: center;
+        }
+        
+        .progress-message {
+            font-size: 16px;
+            color: #495057;
+            margin-bottom: 15px;
+            font-weight: 500;
+        }
+        
+        .progress-bar {
+            width: 100%;
+            height: 20px;
+            background-color: #e9ecef;
+            border-radius: 10px;
+            overflow: hidden;
+            margin-bottom: 10px;
+            box-shadow: inset 0 1px 3px rgba(0,0,0,0.2);
+        }
+        
+        .progress-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #007bff, #0056b3);
+            border-radius: 10px;
+            transition: width 0.3s ease;
+            position: relative;
+        }
+        
+        .progress-fill::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            bottom: 0;
+            right: 0;
+            background-image: linear-gradient(
+                -45deg,
+                rgba(255, 255, 255, .2) 25%,
+                transparent 25%,
+                transparent 50%,
+                rgba(255, 255, 255, .2) 50%,
+                rgba(255, 255, 255, .2) 75%,
+                transparent 75%,
+                transparent
+            );
+            background-size: 50px 50px;
+            animation: move 2s linear infinite;
+        }
+        
+        @keyframes move {
+            0% {
+                background-position: 0 0;
+            }
+            100% {
+                background-position: 50px 50px;
+            }
+        }
+        
+        .progress-percent {
+            font-size: 18px;
+            font-weight: bold;
+            color: #007bff;
+        }
+    </style>
+</head>
+<body>
+    <!-- 🔥 헤더 섹션 (1번 그림 스타일) -->
+    <header class="main-header">
+        <div class="header-content">
+            <div class="header-logo">
+                <div style="position: relative;">
+                    <!-- 네비게이션 아이콘들 -->
+                    <div class="nav-icons-container">
+                        <a href="#" class="nav-icon" title="홈페이지">🏠</a>
+                        <a href="#" class="nav-icon" title="설정">⚙️</a>
+                        <a href="#" class="nav-icon" title="도움말">❓</a>
+                        <a href="#uploadArea" class="nav-icon" title="파일 업로드">📤</a>
+                    </div>
+                    <div style="display: flex; align-items: center; gap: 15px; margin-bottom: 10px;">
+                        <div class="logo-icon">📺</div>
+                        <h1 class="header-title" style="margin: 0;">MOV, MKV, FLV, AVI 등 다양한 비디오 변환기</h1>
+                    </div>
+                    <p class="header-subtitle">다양한 비디오 형식을 고화질로 변환하세요. 여러 품질과 형식을 지원합니다.</p>
+                </div>
+            </div>
+            
+            <!-- 네비게이션 메뉴 제거 -->
+            <!-- <nav class="header-nav">
+                <a href="#" class="nav-item">서비스</a>
+                <a href="#" class="nav-item">지원</a>
+                <a href="#" class="nav-item">PDF 변환</a>
+                <a href="#" class="nav-item">배치 처리</a>
+                <a href="#" class="nav-item">도움말</a>
+                <a href="#" class="nav-item">문의하기</a>
+                <a href="#" class="nav-item">개인정보처리방침</a>
+            </nav> -->
+        </div>
+    </header>
+
+    <!-- 메인 컨텐츠 -->
+    <div class="container">
+        <div class="header">
+            <h2>온라인 비디오 변환기</h2>
+            <h4>고화질 비디오 변환</h4>
+            
+        </div>
+        
+        <form id="downloadForm" enctype="multipart/form-data">
+            <div class="upload-area" id="urlArea">
+                <div id="urlText">
+                    <strong>비디오 URL을 입력하거나 파일을 드래그하세요</strong>
+                    <p>변환할 비디오 링크를 붙여넣기 하거나 파일을 드래그 앤 드롭하세요</p>
+                </div>
+                <input type="url" id="urlInput" placeholder="https://example.com/video..." 
+                       style="width: 100%; padding: 12px; border: 2px solid #ddd; border-radius: 8px; font-size: 16px; margin-top: 10px;">
+                
+                <!-- 파일 업로드 영역 -->
+                <div class="file-upload-area" id="fileUploadArea" style="margin-top: 15px; padding: 20px; border: 2px dashed #ddd; border-radius: 8px; text-align: center; background: #f9f9f9; cursor: pointer;">
+                    <div id="fileUploadText">
+                        <i class="fas fa-cloud-upload-alt" style="font-size: 24px; color: #666; margin-bottom: 10px;"></i>
+                        <p style="margin: 0; color: #666;">파일을 여기에 드래그하거나 클릭하여 선택하세요</p>
+                        <p style="margin: 5px 0 0 0; font-size: 12px; color: #999;">지원 형식: MP4, MOV, MKV, AVI, WMV, FLV, MP3, WAV, M4A 등</p>
+                    </div>
+                    <input type="file" id="fileInput" accept="video/*,audio/*" style="display: none;">
+                    <div id="selectedFile" style="display: none; margin-top: 10px; padding: 10px; background: #e8f5e8; border-radius: 5px;">
+                        <i class="fas fa-file-video" style="color: #28a745; margin-right: 5px;"></i>
+                        <span id="fileName"></span>
+                        <button type="button" id="removeFile" style="float: right; background: none; border: none; color: #dc3545; cursor: pointer;">✕</button>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 버튼 그룹을 폼 안으로 이동 -->
+            <div class="button-group">
+                <button class="btn" id="downloadBtn" type="submit">다운로드</button>
+                <button class="btn reset-btn" id="resetBtn" type="button" onclick="resetUrl()">초기화</button>
+            </div>
+        </form>
+        
+        <div class="file-info" id="videoInfo" style="display: block;">
+            <div id="videoThumbnail" style="text-align: center; margin-bottom: 15px;"></div>
+            <div id="videoTitle"></div>
+            <div id="videoDuration"></div>
+            <div id="videoUploader"></div>
+            
+            <div class="quality-options" id="qualityOptions" style="display: block;">
+                <h4>변환 옵션:</h4>
+                
+                <!-- 출력 타입 선택 -->
+                <div style="margin-bottom: 20px;">
+                    <label style="display: block; margin-bottom: 10px; font-weight: bold;">출력 타입:</label>
+                    <div style="display: flex; gap: 20px;">
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="outputType" value="video" checked onchange="toggleOutputOptions()"> 
+                            <span style="margin-left: 5px;">비디오</span>
+                        </label>
+                        <label style="display: flex; align-items: center; cursor: pointer;">
+                            <input type="radio" name="outputType" value="audio" onchange="toggleOutputOptions()"> 
+                            <span style="margin-left: 5px;">오디오</span>
+                        </label>
+                    </div>
+                </div>
+                
+                <!-- 비디오 옵션 -->
+                <div id="videoOptions" style="margin-bottom: 20px;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold;">비디오 품질:</label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="videoQuality" value="best"> 
+                                <span style="margin-left: 5px;">최고 품질</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="videoQuality" value="720p" checked> 
+                                <span style="margin-left: 5px;">720p HD</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="videoQuality" value="480p"> 
+                                <span style="margin-left: 5px;">480p</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="videoQuality" value="360p"> 
+                                <span style="margin-left: 5px;">360p</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold;">비디오 형식:</label>
+                        <select name="videoFormat" id="videoFormat" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="mp4">MP4 (권장)</option>
+                            <option value="avi">AVI</option>
+                            <option value="wmv">WMV</option>
+                            <option value="mov">MOV</option>
+                            <option value="mkv">MKV</option>
+                            <option value="m4v">M4V</option>
+                            <option value="mpeg">MPEG</option>
+                            <option value="flv">FLV</option>
+                            <option value="3gp">3GP</option>
+                            <option value="webm">WEBM</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 오디오 옵션 -->
+                <div id="audioOptions" style="margin-bottom: 20px; display: none;">
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold;">오디오 품질:</label>
+                        <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px;">
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="audioQuality" value="320k"> 
+                                <span style="margin-left: 5px;">320kbps (최고)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="audioQuality" value="256k"> 
+                                <span style="margin-left: 5px;">256kbps</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="audioQuality" value="192k" checked> 
+                                <span style="margin-left: 5px;">192kbps (권장)</span>
+                            </label>
+                            <label style="display: flex; align-items: center; cursor: pointer;">
+                                <input type="radio" name="audioQuality" value="128k"> 
+                                <span style="margin-left: 5px;">128kbps</span>
+                            </label>
+                        </div>
+                    </div>
+                    
+                    <div style="margin-bottom: 15px;">
+                        <label style="display: block; margin-bottom: 8px; font-weight: bold;">오디오 형식:</label>
+                        <select name="audioFormat" id="audioFormat" style="width: 100%; padding: 8px; border: 1px solid #ddd; border-radius: 4px;">
+                            <option value="mp3">MP3 (권장)</option>
+                            <option value="wav">WAV</option>
+                            <option value="wma">WMA</option>
+                            <option value="m4a">M4A</option>
+                            <option value="aac">AAC</option>
+                            <option value="flac">FLAC</option>
+                            <option value="ogg">OGG</option>
+                            <option value="opus">OPUS</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <!-- 지원 형식 정보 -->
+                <div style="margin-bottom: 20px; padding: 15px; background: #f8f9fa; border-radius: 8px; border-left: 4px solid #007bff;">
+                    <h5 style="margin: 0 0 10px 0; color: #007bff;">📋 지원되는 형식</h5>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px; font-size: 14px;">
+                        <div>
+                            <strong>입력 비디오:</strong><br>
+                            <span style="color: #666;">MP4, MOV, MKV, M4V, FLV, AVI, MPG, MPEG, VOB, 3GP, 3G2, WMV, ASF, RM, RMVB, DAT, OGV, WEBM, MXF, MOD, TOD, MTS, M2TS, TP, TRP, TS, DV, WTV</span>
+                        </div>
+                        <div>
+                            <strong>입력 오디오:</strong><br>
+                            <span style="color: #666;">MP3, WAV, WMA, M4A, M4B, M4R, APE, AAC, AC3, MKA, AIF, AIFF, AA, AMR, FLAC, AU, CUE, MPA, RA, RAM, OGG, MP2, OPUS, M4P</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="loading" id="loading">
+            <div class="spinner"></div>
+         </div>
+        
+        <div class="error" id="errorMsg"></div>
+        <div class="success" id="successMsg"></div>
+    </div>
+
+    <!-- 🔥 풋터 섹션 (2번 그림 스타일) -->
+    <footer class="main-footer">
+        <div class="footer-content">
+            <div class="footer-section">
+                <h3>서비스</h3>
+                <ul>
+                    <li><a href="#">비디오 변환</a></li>
+                    <li><a href="#">배치 다운로드</a></li>
+                    <li><a href="#">API 서비스</a></li>
+                    <li><a href="#">프리미엄 플랜</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3>지원</h3>
+                <ul>
+                    <li><a href="#">도움말</a></li>
+                    <li><a href="#">문의하기</a></li>
+                    <li><a href="#">FAQ</a></li>
+                    <li><a href="#">기술 지원</a></li>
+                </ul>
+            </div>
+            
+            <div class="footer-section">
+                <h3>주요 기능</h3>
+                <div class="footer-features">
+                    <span class="feature-tag">✨ 고화질 다운로드</span>
+                    <span class="feature-tag">✨ 다양한 형식 지원</span>
+                    <span class="feature-tag">✨ 빠른 처리</span>
+                    <span class="feature-tag">MP4 다운로드</span>
+                    <span class="feature-tag">MP3 추출</span>
+                    <span class="feature-tag">무료 서비스</span>
+                </div>
+            </div>
+            
+            <div class="footer-section">
+                <h3>회사 정보</h3>
+                <p>비디오 변환 전문 서비스</p>
+                <p>📧 psj1389@gmail.com</p>
+            </div>
+        </div>
+        
+        <div class="footer-bottom">
+            <div class="footer-social">
+                <a href="mailto:psj1389@gmail.com" class="social-icon" title="이메일 문의">📧</a>
+                <a href="#" class="social-icon" title="Facebook">📘</a>
+                <a href="#" class="social-icon" title="Twitter">🐦</a>
+                <a href="#" class="social-icon" title="Instagram">📷</a>
+            </div>
+            <p>&copy; 2024 Video Converter. All rights reserved. | <a href="#">개인정보처리방침</a> | <a href="#">이용약관</a></p>
+        </div>
+    </footer>
+
+    <script>
+        let currentUrl = null;
+        let videoInfo = null;
+
+        // URL 입력 필드 이벤트 리스너
+        document.getElementById('urlInput').addEventListener('input', function(e) {
+            const url = e.target.value.trim();
++            // 입력이 진행되면 에러/성공 메시지 숨김
++            hideMessages();
+             if (url && isValidYouTubeUrl(url)) {
+                 currentUrl = url;
+                 // 로딩 표시
+                 document.getElementById('loading').style.display = 'block';
+                 getVideoInfo(url).finally(() => {
+                     document.getElementById('loading').style.display = 'none';
+                 });
+             } else {
+                 resetVideoInfo();
+             }
+         });
+
+        // 시간 포맷 함수
+        function formatDuration(seconds) {
+            if (!seconds) return '알 수 없음';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = seconds % 60;
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // 비디오 URL 유효성 검사
+        function isValidYouTubeUrl(url) {
+            const youtubeRegex = /^(https?:\/\/)?(www\.)?(youtube\.com\/watch\?v=|youtu\.be\/|youtube\.com\/embed\/|youtube\.com\/v\/)[a-zA-Z0-9_-]{11}/;
+            return youtubeRegex.test(url);
+        }
+
+        // 동영상 정보 가져오기
+        async function getVideoInfo(url) {
+            try {
+                const response = await fetch('/get_video_info', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ url: url })
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    if (data.success && data.video_info) {
+                        videoInfo = data.video_info;
+                        displayVideoInfo(videoInfo);
+                    } else {
+                        showError(data.error || '동영상 정보를 가져올 수 없습니다.');
+                    }
+                } else {
+                    const error = await response.json();
+                    showError(error.error || '동영상 정보를 가져올 수 없습니다.');
+                }
+            } catch (error) {
+                console.error('Error fetching video info:', error);
+                showError('동영상 정보를 가져오는 중 오류가 발생했습니다.');
+            }
+        }
+
+        // 동영상 정보 표시
+        function displayVideoInfo(info) {
+            // 썸네일 표시
+            const thumbnailDiv = document.getElementById('videoThumbnail');
+            if (info.thumbnail) {
+                thumbnailDiv.innerHTML = `<img src="${info.thumbnail}" alt="Video Thumbnail" style="max-width: 300px; max-height: 200px; border-radius: 8px; box-shadow: 0 2px 8px rgba(0,0,0,0.1);">`;
+            } else {
+                thumbnailDiv.innerHTML = '';
+            }
+            
+            document.getElementById('videoTitle').textContent = `제목: ${info.title}`;
+            document.getElementById('videoDuration').textContent = `길이: ${formatDuration(info.duration)}`;
+            document.getElementById('videoUploader').textContent = `업로더: ${info.uploader}`;
+            hideMessages();
+        }
+
+        // 동영상 정보 초기화
+        function resetVideoInfo() {
+            // 정보 영역은 유지하면서 기본값으로 초기화
+            document.getElementById('videoInfo').style.display = 'block';
+            document.getElementById('qualityOptions').style.display = 'block';
+            document.getElementById('videoThumbnail').innerHTML = '';
+            document.getElementById('videoTitle').textContent = '제목: -';
+            document.getElementById('videoDuration').textContent = '길이: -';
+            document.getElementById('videoUploader').textContent = '업로더: -';
+            videoInfo = null;
+        }
+
+        // 동영상 다운로드
+        async function downloadVideo() {
+            try {
+                // URL이 없으면 자동으로 입력 필드에서 가져오기
+                const urlInput = document.getElementById('urlInput');
+                const inputUrl = urlInput.value.trim();
+                
+                if (inputUrl && isValidYouTubeUrl(inputUrl)) {
+                    currentUrl = inputUrl;
+                    // 비디오 정보가 없으면 먼저 가져오기
+                    if (!videoInfo) {
+                        await getVideoInfo(currentUrl);
+                    }
+                }
+                
+                if (!currentUrl || !isValidYouTubeUrl(currentUrl)) {
+                    showError('유효한 YouTube URL을 입력해주세요.');
+                    urlInput.focus();
+                    
+                    // 버튼 상태 복원
+                    const downloadBtn = document.getElementById('downloadBtn');
+                    downloadBtn.disabled = false;
+                    downloadBtn.textContent = '다운로드';
+                    return;
+                }
+
+                const quality = document.querySelector('input[name="quality"]:checked')?.value || '720p';
+                const format = document.querySelector('input[name="format"]:checked')?.value || 'mp4';
+                
+                // 출력 타입 확인 (비디오 또는 오디오)
+                const outputType = document.querySelector('input[name="outputType"]:checked')?.value || 'video';
+                
+                // 오디오 형식 확인 (오디오 변환 시)
+                const audioFormat = document.querySelector('input[name="audioFormat"]:checked')?.value || 'mp3';
+
+                 // UI 업데이트 - 즉시 응답 시스템
+                 const downloadBtn = document.getElementById('downloadBtn');
+                 downloadBtn.disabled = true;
+                 downloadBtn.textContent = '변환 중...';
+                 
+                 document.getElementById('loading').style.display = 'block';
+                 hideMessages();
+
+                 // 타임아웃 처리 추가
+                 const controller = new AbortController();
+                 const timeoutId = setTimeout(() => controller.abort(), 300000); // 5분 타임아웃
+
+                 const response = await fetch('/download_video', {
+                     method: 'POST',
+                     headers: {
+                         'Content-Type': 'application/json',
+                     },
+                     body: JSON.stringify({
+                         url: currentUrl,
+                         quality: quality,
+                         format: format,
+                         output_type: outputType,
+                         audio_format: audioFormat
+                     }),
+                     signal: controller.signal
+                 });
+
+                 clearTimeout(timeoutId);
+
+                 updateProgress('다운로드 중...', 50);
+
+                 if (response.ok) {
+                     const result = await response.json();
+                     
+                     if (result.success && result.download_url) {
+                         updateProgress('다운로드 완료! 파일을 준비하고 있습니다...', 90);
+                         
+                         // 파일 다운로드 시작
+                         const fileResponse = await fetch(result.download_url);
+                         const blob = await fileResponse.blob();
+                         // 헤더의 파일명 우선 사용 (없으면 백엔드 제공 파일명 사용)
+                         const finalFilename = getFilenameFromHeader(fileResponse, result.filename);
+                         // 표시용 파일명은 선택한 형식 확장자를 강제하여 표기
+                         const selectedExt = format === 'mp3' ? '.mp3' : '.mp4';
+                         const baseName = finalFilename.replace(/\.[^.\s]+$/, '');
+                         const displayFilename = baseName + selectedExt;
+                         
+                         updateProgress('파일 다운로드 중...', 100);
+                         
+                         downloadBlob(blob, finalFilename);
+                         showSuccess(`다운로드 완료! ${displayFilename} 파일이 다운로드됩니다.`);
+                         hideProgress();
+                         
+                         // 버튼 상태 복원
+                         const downloadBtn = document.getElementById('downloadBtn');
+                         downloadBtn.disabled = false;
+                         downloadBtn.textContent = '다운로드';
+                     } else {
+                         throw new Error(result.error || '다운로드 중 오류가 발생했습니다.');
+                     }
+                 } else {
+                     const error = await response.json();
+                     throw new Error(error.error || '다운로드 중 오류가 발생했습니다.');
+                 }
+        } catch (error) {
+            console.error('Download error:', error);
+            hideProgress();
+            document.getElementById('loading').style.display = 'none';
+            
+            let errorMessage = '다운로드 중 오류가 발생했습니다.';
+            if (error.name === 'AbortError') {
+                errorMessage = '다운로드 시간이 초과되었습니다. 네트워크 상태를 확인하고 다시 시도해주세요.';
+            } else if (error.message) {
+                errorMessage = error.message;
+            }
+            
+            showError(errorMessage);
+            
+            // 버튼 상태 복원
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = false;
+            downloadBtn.textContent = '다운로드';
+        }
+        }
+
+        // 진행률 표시 함수들
+        function showProgress(message) {
+            let progressContainer = document.getElementById('progressContainer');
+            if (!progressContainer) {
+                progressContainer = document.createElement('div');
+                progressContainer.id = 'progressContainer';
+                progressContainer.innerHTML = `
+                    <div class="progress-wrapper">
+                        <div class="progress-message" id="progressMessage">${message}</div>
+                        <div class="progress-bar">
+                            <div class="progress-fill" id="progressFill" style="width: 0%"></div>
+                        </div>
+                        <div class="progress-percent" id="progressPercent">0%</div>
+                    </div>
+                `;
+                document.querySelector('.container').appendChild(progressContainer);
+            }
+            progressContainer.style.display = 'block';
+        }
+
+        function updateProgress(message, percent) {
+            const progressMessage = document.getElementById('progressMessage');
+            const progressFill = document.getElementById('progressFill');
+            const progressPercent = document.getElementById('progressPercent');
+            
+            if (progressMessage) progressMessage.textContent = message;
+            if (progressFill) progressFill.style.width = `${percent}%`;
+            if (progressPercent) progressPercent.textContent = `${percent}%`;
+        }
+
+        function hideProgress() {
+            const progressContainer = document.getElementById('progressContainer');
+            if (progressContainer) {
+                progressContainer.style.display = 'none';
+            }
+        }
+
+        // URL 초기화
+        function resetUrl() {
+            currentUrl = null;
+            videoInfo = null;
+            document.getElementById('urlInput').value = '';
+            // 정보/옵션 영역은 계속 표시되도록 유지
+            document.getElementById('videoInfo').style.display = 'block';
+            document.getElementById('qualityOptions').style.display = 'block';
+            document.getElementById('loading').style.display = 'none';
+            document.getElementById('downloadBtn').disabled = false;
+            document.getElementById('downloadBtn').textContent = '다운로드';
+            
+            // 옵션 초기화 (기본값으로 복원)
+            const q720 = document.querySelector('input[name="quality"][value="720p"]');
+            if (q720) q720.checked = true;
+            const fmp4 = document.querySelector('input[name="format"][value="mp4"]');
+            if (fmp4) fmp4.checked = true;
+
+            // 표시 텍스트 초기화
+            document.getElementById('videoThumbnail').innerHTML = '';
+            document.getElementById('videoTitle').textContent = '제목: -';
+            document.getElementById('videoDuration').textContent = '길이: -';
+            document.getElementById('videoUploader').textContent = '업로더: -';
+
+            hideProgress();
+            hideMessages();
+        }
+
+        // 파일명 추출 함수
+        function getFilenameFromHeader(response, defaultName) {
+            const contentDisposition = response.headers.get('Content-Disposition');
+            if (contentDisposition) {
+                const filenameMatch = contentDisposition.match(/filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/);
+                if (filenameMatch && filenameMatch[1]) {
+                    return filenameMatch[1].replace(/['"]/g, '');
+                }
+            }
+            return defaultName;
+        }
+
+        // Blob 다운로드 함수
+        function downloadBlob(blob, filename) {
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+        }
+
+        function showError(msg) {
+            const errorDiv = document.getElementById('errorMsg');
+            errorDiv.textContent = msg;
+            errorDiv.style.display = 'block';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+
+        function showSuccess(msg) {
+            const successDiv = document.getElementById('successMsg');
+            successDiv.textContent = msg;
+            successDiv.style.display = 'block';
+            document.getElementById('errorMsg').style.display = 'none';
+        }
+
+        function hideMessages() {
+            document.getElementById('errorMsg').style.display = 'none';
+            document.getElementById('successMsg').style.display = 'none';
+        }
+
+        // 출력 타입에 따른 옵션 토글
+        function toggleOutputOptions() {
+            const outputType = document.querySelector('input[name="outputType"]:checked').value;
+            const videoOptions = document.getElementById('videoOptions');
+            const audioOptions = document.getElementById('audioOptions');
+            
+            if (outputType === 'video') {
+                videoOptions.style.display = 'block';
+                audioOptions.style.display = 'none';
+            } else {
+                videoOptions.style.display = 'none';
+                audioOptions.style.display = 'block';
+            }
+        }
+
+        // 드래그 앤 드롭 기능 초기화
+        function initDragAndDrop() {
+            const fileUploadArea = document.getElementById('fileUploadArea');
+            const fileInput = document.getElementById('fileInput');
+            const selectedFile = document.getElementById('selectedFile');
+            const fileName = document.getElementById('fileName');
+            const removeFile = document.getElementById('removeFile');
+            const urlInput = document.getElementById('urlInput');
+
+            // 파일 업로드 영역 클릭 시 파일 선택 창 열기
+            fileUploadArea.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // 파일 선택 시 처리
+            fileInput.addEventListener('change', (e) => {
+                const file = e.target.files[0];
+                if (file) {
+                    handleFileSelect(file);
+                }
+            });
+
+            // 드래그 앤 드롭 이벤트
+            fileUploadArea.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#007bff';
+                fileUploadArea.style.backgroundColor = '#f0f8ff';
+            });
+
+            fileUploadArea.addEventListener('dragleave', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#ddd';
+                fileUploadArea.style.backgroundColor = '#f9f9f9';
+            });
+
+            fileUploadArea.addEventListener('drop', (e) => {
+                e.preventDefault();
+                fileUploadArea.style.borderColor = '#ddd';
+                fileUploadArea.style.backgroundColor = '#f9f9f9';
+                
+                const files = e.dataTransfer.files;
+                if (files.length > 0) {
+                    handleFileSelect(files[0]);
+                }
+            });
+
+            // 파일 제거 버튼
+            removeFile.addEventListener('click', (e) => {
+                e.stopPropagation();
+                fileInput.value = '';
+                selectedFile.style.display = 'none';
+                document.getElementById('fileUploadText').style.display = 'block';
+                urlInput.disabled = false;
+            });
+
+            function handleFileSelect(file) {
+                // 파일 타입 검증
+                const allowedTypes = [
+                    'video/mp4', 'video/avi', 'video/mov', 'video/mkv', 'video/wmv', 'video/flv',
+                    'video/webm', 'video/3gpp', 'video/quicktime', 'video/x-msvideo',
+                    'audio/mp3', 'audio/wav', 'audio/mpeg', 'audio/mp4', 'audio/aac',
+                    'audio/flac', 'audio/ogg', 'audio/wma'
+                ];
+                
+                if (!allowedTypes.some(type => file.type.startsWith(type.split('/')[0]))) {
+                    showError('지원되지 않는 파일 형식입니다. 비디오 또는 오디오 파일을 선택해주세요.');
+                    return;
+                }
+
+                // 파일 크기 검증 (500MB 제한)
+                if (file.size > 500 * 1024 * 1024) {
+                    showError('파일 크기가 너무 큽니다. 500MB 이하의 파일을 선택해주세요.');
+                    return;
+                }
+
+                fileName.textContent = file.name;
+                selectedFile.style.display = 'block';
+                document.getElementById('fileUploadText').style.display = 'none';
+                urlInput.disabled = true;
+                urlInput.value = '';
+                hideMessages();
+            }
+        }
+
+        // 파일 업로드 및 변환 처리
+        function processFileUpload() {
+            const fileInput = document.getElementById('fileInput');
+            const file = fileInput.files[0];
+            
+            if (!file) {
+                displayErrorMessage('파일을 선택해주세요.');
+                return;
+            }
+
+            // 폼 데이터 생성
+            const formData = new FormData();
+            formData.append('file', file);
+            
+            // 출력 타입 추가 (비디오 또는 오디오)
+            const selectedOutputType = document.querySelector('input[name="outputType"]:checked');
+            if (selectedOutputType) {
+                formData.append('output_type', selectedOutputType.value);
+            }
+            
+            // 선택된 옵션들 추가
+            const selectedFormat = document.querySelector('input[name="format"]:checked');
+            if (selectedFormat) {
+                formData.append('format', selectedFormat.value);
+            }
+            
+            // 오디오 형식 추가 (오디오 변환 시)
+            const selectedAudioFormat = document.querySelector('input[name="audioFormat"]:checked');
+            if (selectedAudioFormat) {
+                formData.append('audio_format', selectedAudioFormat.value);
+            }
+            
+            const selectedQuality = document.querySelector('input[name="quality"]:checked');
+            if (selectedQuality) {
+                formData.append('video_quality', selectedQuality.value);
+            }
+
+            // 로딩 표시 및 버튼 상태 변경
+            const downloadBtn = document.getElementById('downloadBtn');
+            downloadBtn.disabled = true;
+            downloadBtn.textContent = '파일 변환 중...';
+            
+            // loadingMessage 요소가 존재하는 경우에만 표시
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.style.display = 'block';
+            }
+            
+            // loading 요소 표시 (대체 로딩 표시)
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.style.display = 'block';
+            }
+            
+            hideMessages();
+
+            // 파일 업로드 및 변환 요청 (타임아웃 처리 추가)
+            const controller = new AbortController();
+            const timeoutId = setTimeout(() => controller.abort(), 300000); // 5분 타임아웃
+            
+            fetch('/convert', {
+                method: 'POST',
+                body: formData,
+                signal: controller.signal
+            })
+            .then(response => {
+                clearTimeout(timeoutId);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+                return response.json();
+            })
+            .then(data => {
+                // loadingMessage 요소가 존재하는 경우에만 숨김
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    loadingMessage.style.display = 'none';
+                }
+                
+                // loading 요소 숨김
+                const loading = document.getElementById('loading');
+                if (loading) {
+                    loading.style.display = 'none';
+                }
+                
+                // 버튼 상태 복원
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '다운로드';
+                
+                if (data.success) {
+                    displaySuccessMessage(data.message);
+                    
+                    // 다운로드 버튼 생성
+                    const downloadLink = document.createElement('a');
+                    downloadLink.href = data.download_url;
+                    downloadLink.className = 'btn btn-success';
+                    downloadLink.textContent = '변환된 파일 다운로드';
+                    downloadLink.style.marginTop = '10px';
+                    downloadLink.style.display = 'inline-block';
+                    
+                    const successDiv = document.getElementById('successMessage');
+                    successDiv.appendChild(document.createElement('br'));
+                    successDiv.appendChild(downloadLink);
+                } else {
+                    displayErrorMessage(data.error || '변환 중 오류가 발생했습니다.');
+                }
+            })
+            .catch(error => {
+                clearTimeout(timeoutId);
+                
+                // loadingMessage 요소가 존재하는 경우에만 숨김
+                const loadingMessage = document.getElementById('loadingMessage');
+                if (loadingMessage) {
+                    loadingMessage.style.display = 'none';
+                }
+                
+                // loading 요소 숨김
+                const loading = document.getElementById('loading');
+                if (loading) {
+                    loading.style.display = 'none';
+                }
+                
+                // 버튼 상태 복원
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '다운로드';
+                
+                let errorMessage = '파일 처리 중 오류가 발생했습니다.';
+                if (error.name === 'AbortError') {
+                    errorMessage = '변환 시간이 초과되었습니다. 파일 크기를 확인하고 다시 시도해주세요.';
+                } else if (error.message.includes('HTTP error')) {
+                    errorMessage = '서버 오류가 발생했습니다. 잠시 후 다시 시도해주세요.';
+                }
+                
+                displayErrorMessage(errorMessage);
+                console.error('Error:', error);
+            });
+        }
+
+        // 폼 제출 처리 수정
+        function handleFormSubmit(event) {
+            event.preventDefault();
+            
+            const fileInput = document.getElementById('fileInput');
+            const urlInput = document.getElementById('urlInput');
+            
+            if (fileInput.files.length > 0) {
+                // 파일 업로드 처리
+                processFileUpload();
+            } else if (urlInput.value.trim()) {
+                // URL 다운로드 처리 (기존 로직)
+                downloadVideo();
+            } else {
+                // 버튼 상태 복원
+                const downloadBtn = document.getElementById('downloadBtn');
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '다운로드';
+                displayErrorMessage('URL을 입력하거나 파일을 선택해주세요.');
+            }
+        }
+
+        // 버튼 상태 초기화 함수
+        function resetButtonState() {
+            const downloadBtn = document.getElementById('downloadBtn');
+            if (downloadBtn) {
+                downloadBtn.disabled = false;
+                downloadBtn.textContent = '다운로드';
+            }
+            
+            // 로딩 메시지 숨기기
+            const loadingMessage = document.getElementById('loadingMessage');
+            if (loadingMessage) {
+                loadingMessage.style.display = 'none';
+            }
+            
+            const loading = document.getElementById('loading');
+            if (loading) {
+                loading.style.display = 'none';
+            }
+        }
+
+        // 페이지 로드 시 초기화
+        document.addEventListener('DOMContentLoaded', function() {
+            initDragAndDrop();
+            resetButtonState(); // 버튼 상태 초기화 추가
+            
+            // 폼 제출 이벤트 리스너 추가
+            const form = document.getElementById('downloadForm');
+            form.addEventListener('submit', handleFormSubmit);
+        });
+    </script>
+    <script src="{{ url_for('static', filename='js/download-utils.js') }}"></script>
+</body>
+</html>

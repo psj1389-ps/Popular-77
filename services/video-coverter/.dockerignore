@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+*.pyo
+*.log
+*.tmp
+
+# 실제 서비스에서 쓰지 않는 로컬 폴더/대용량만 제외
+uploads/
+outputs/
+_archive/
+*.mp4
+*.mkv
+*.webm
