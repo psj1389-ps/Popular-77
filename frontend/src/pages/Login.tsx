@@ -117,6 +117,7 @@ const Login: React.FC = () => {
             onClick={handleGoogleLogin}
             disabled={isLoading}
             className="group relative w-full flex justify-center py-3 px-4 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            style={{ fontSize: '115%' }}
           >
             <span className="absolute left-0 inset-y-0 flex items-center pl-3">
               <svg className="h-5 w-5" viewBox="0 0 24 24">
@@ -146,6 +147,7 @@ const Login: React.FC = () => {
             onClick={handleKakaoLogin}
             disabled={isLoading}
             className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+            style={{ fontSize: '115%' }}
           >
             <span className="absolute left-0 inset-y-0 flex items-center pl-3">
               <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
@@ -155,15 +157,7 @@ const Login: React.FC = () => {
             {isLoading ? '로그인 중...' : 'KakaoTalk으로 로그인'}
           </button>
 
-          {/* 홈으로 돌아가기 */}
-          <div className="text-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-sm text-blue-600 hover:text-blue-500 font-medium"
-            >
-              홈으로 돌아가기
-            </button>
-          </div>
+          {/* 홈으로 돌아가기 버튼 제거 */}
         </div>
 
         {/* 추가 정보 */}
@@ -176,6 +170,18 @@ const Login: React.FC = () => {
               <span className="px-2 bg-gray-50 text-gray-500">
                 로그인하면 서비스 이용약관에 동의하게 됩니다
               </span>
+            </div>
+            {/* 구글 로그인 링크 안내 */}
+            <div className="mt-3 text-center text-sm text-gray-600">
+              이미 계정이 있으신가요? (
+              <a
+                href="#"
+                className="text-blue-600 hover:text-blue-500 font-medium"
+                onClick={(e) => { e.preventDefault(); handleGoogleLogin(); }}
+              >
+                로그인
+              </a>
+              )
             </div>
           </div>
         </div>

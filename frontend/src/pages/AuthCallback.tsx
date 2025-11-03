@@ -10,7 +10,41 @@ const AuthCallback: React.FC = () => {
   useEffect(() => {
     const handleAuthCallback = async () => {
       try {
-        // URL에서 인증 정보 처리
+        // URL에서 인증 코드/오류 파라미터 확인
+        const currentUrl = new URL(window.location.href);
+        const codeParam = currentUrl.searchParams.get('code');
+        const oauthError = currentUrl.searchParams.get('error_description') || currentUrl.searchParams.get('error');
+
+        if (oauthError) {
+          console.error('OAuth 오류:', oauthError);
+          setError(oauthError);
+          setStatus('error');
+          return;
+        }
+
+        // 브라우저에서 코드가 전달된 경우, 안전하게 세션 교환 시도
+        if (codeParam) {
+          try {
+            const { data: exchangeData, error: exchangeError } = await supabase.auth.exchangeCodeForSession(codeParam);
+            if (exchangeError) {
+              console.error('코드 교환 실패:', exchangeError);
+              // 교환 실패 시 계속 진행하여 getSession으로 재확인
+            } else if (exchangeData?.session) {
+              // 교환으로 세션 확보된 경우 즉시 성공 처리
+              setStatus('success');
+              setTimeout(() => {
+                // 프로필로 이동하여 인증 상태를 명확히 확인
+                navigate('/profile', { replace: true });
+              }, 1200);
+              return;
+            }
+          } catch (ex) {
+            console.error('코드 교환 중 예외:', ex);
+            // 계속 진행하여 getSession으로 재확인
+          }
+        }
+
+        // 세션 확인 (Supabase가 URL을 자동 처리한 후 세션을 반환)
         const { data, error } = await supabase.auth.getSession();
         
         if (error) {
@@ -26,7 +60,8 @@ const AuthCallback: React.FC = () => {
           
           // 성공 메시지를 잠시 보여준 후 홈으로 리다이렉트
           setTimeout(() => {
-            navigate('/', { replace: true });
+            // 홈에서 예기치 않은 연결 문제가 있을 경우를 대비해 프로필로 이동
+            navigate('/profile', { replace: true });
           }, 2000);
         } else {
           // 세션이 없는 경우 로그인 페이지로 리다이렉트
