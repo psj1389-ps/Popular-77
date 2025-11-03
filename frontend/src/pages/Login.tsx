@@ -157,15 +157,7 @@ const Login: React.FC = () => {
             {isLoading ? '로그인 중...' : 'KakaoTalk으로 로그인'}
           </button>
 
-          {/* 홈으로 돌아가기 텍스트 링크 추가 */}
-          <div className="text-center">
-            <a
-              href="https://77-tools.xyz"
-              className="text-sm text-blue-600 hover:text-blue-500 font-medium"
-            >
-              홈으로 돌아가기
-            </a>
-          </div>
+          {/* 홈으로 돌아가기 링크 제거 */}
         </div>
 
         {/* 추가 정보 */}
