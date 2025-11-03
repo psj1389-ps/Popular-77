@@ -4,7 +4,7 @@ import { useAuthContext } from '../contexts/AuthContext';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
-  const { user, loading, error, signInWithGoogle, signInWithKakao } = useAuthContext();
+  const { user, loading, error, signInWithGoogle } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
 
@@ -31,21 +31,7 @@ const Login: React.FC = () => {
     }
   };
 
-  const handleKakaoLogin = async () => {
-    setIsLoading(true);
-    setAuthError(null);
-    
-    try {
-      const { error } = await signInWithKakao();
-      if (error) {
-        setAuthError(error);
-      }
-    } catch (err) {
-      setAuthError('KakaoTalk 로그인 중 오류가 발생했습니다.');
-    } finally {
-      setIsLoading(false);
-    }
-  };
+
 
   if (loading) {
     return (
