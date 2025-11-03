@@ -3,7 +3,6 @@ import { useAuth, AuthState } from '../hooks/useAuth';
 
 interface AuthContextType extends AuthState {
   signInWithGoogle: () => Promise<{ data: any; error: string | null }>;
-  signInWithKakao: () => Promise<{ data: any; error: string | null }>;
   signOut: () => Promise<{ error: string | null }>;
 }
 

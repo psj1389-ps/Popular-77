@@ -104,33 +104,7 @@ export const useAuth = () => {
     }
   };
 
-  // KakaoTalk 로그인
-  const signInWithKakao = async () => {
-    try {
-      setAuthState(prev => ({ ...prev, loading: true, error: null }));
-      
-      const { data, error } = await supabase.auth.signInWithOAuth({
-        provider: 'kakao',
-        options: {
-          redirectTo: `${window.location.origin}/auth/callback`
-        }
-      });
 
-      if (error) {
-        throw error;
-      }
-
-      return { data, error: null };
-    } catch (error: any) {
-      console.error('KakaoTalk 로그인 오류:', error);
-      setAuthState(prev => ({ 
-        ...prev, 
-        error: error.message || 'KakaoTalk 로그인에 실패했습니다.',
-        loading: false 
-      }));
-      return { data: null, error: error.message };
-    }
-  };
 
   // 로그아웃
   const signOut = async () => {
@@ -158,7 +132,6 @@ export const useAuth = () => {
   return {
     ...authState,
     signInWithGoogle,
-    signInWithKakao,
     signOut
   };
 };
