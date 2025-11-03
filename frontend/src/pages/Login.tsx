@@ -153,10 +153,10 @@ const Login: React.FC = () => {
             <div className="mt-3 text-center text-sm text-gray-600">
               이미 계정이 있으신가요? (
               <a
-                href="https://77-tools.xyz/login"
+                href="#"
                 className="text-blue-600 hover:text-blue-500 font-medium"
-                target="_blank"
-                rel="noopener noreferrer"
+                title="Google 로그인"
+                onClick={(e) => { e.preventDefault(); handleGoogleLogin(); }}
               >
                 로그인
               </a>
