@@ -4,7 +4,6 @@
   "description": "77-tools - 가장 많이 사용되는 온라인 도구와 AI",
   "private": true,
   "scripts": {
-    "install": "cd frontend && npm ci",
     "build": "cd frontend && npm run build",
     "dev": "cd frontend && npm run dev",
     "preview": "cd frontend && npm run preview",
