@@ -157,7 +157,15 @@ const Login: React.FC = () => {
             {isLoading ? '로그인 중...' : 'KakaoTalk으로 로그인'}
           </button>
 
-          {/* 홈으로 돌아가기 버튼 제거 */}
+          {/* 홈으로 돌아가기 텍스트 링크 추가 */}
+          <div className="text-center">
+            <a
+              href="https://77-tools.xyz"
+              className="text-sm text-blue-600 hover:text-blue-500 font-medium"
+            >
+              홈으로 돌아가기
+            </a>
+          </div>
         </div>
 
         {/* 추가 정보 */}
@@ -167,7 +175,12 @@ const Login: React.FC = () => {
               <div className="w-full border-t border-gray-300" />
             </div>
             <div className="relative flex justify-center text-sm">
-              <span className="px-2 bg-gray-50 text-gray-500">
+              <span
+                role="button"
+                className="px-2 bg-gray-50 text-gray-500 cursor-pointer"
+                title="Google 로그인"
+                onClick={(e) => { e.preventDefault(); handleGoogleLogin(); }}
+              >
                 로그인하면 서비스 이용약관에 동의하게 됩니다
               </span>
             </div>
