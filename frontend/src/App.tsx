@@ -24,10 +24,17 @@ import ImagesPngPage from "@/pages/images-png";
 import ImagesGifPage from "@/pages/images-gif";
 import ImagesAllPage from "@/pages/images-all";
 
+// 인증 관련 컴포넌트
+import { AuthProvider } from '@/contexts/AuthContext';
+import Login from '@/pages/Login';
+import Profile from '@/pages/Profile';
+import AuthCallback from '@/pages/AuthCallback';
+
 function App() {
   return (
     <Router>
-      <Routes>
+      <AuthProvider>
+        <Routes>
         <Route
           path="/"
           element={
@@ -196,7 +203,13 @@ function App() {
             </MainLayout>
           }
         />
-      </Routes>
+        
+        {/* 인증 관련 라우트 */}
+        <Route path="/login" element={<Login />} />
+        <Route path="/profile" element={<Profile />} />
+        <Route path="/auth/callback" element={<AuthCallback />} />
+        </Routes>
+      </AuthProvider>
     </Router>
   )
 }
