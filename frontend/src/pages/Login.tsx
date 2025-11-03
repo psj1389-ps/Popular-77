@@ -139,23 +139,10 @@ const Login: React.FC = () => {
                 />
               </svg>
             </span>
-            {isLoading ? '로그인 중...' : 'Google로 로그인'}
+          {isLoading ? '로그인 중...' : 'Google로 로그인'}
           </button>
 
-          {/* KakaoTalk 로그인 버튼 */}
-          <button
-            onClick={handleKakaoLogin}
-            disabled={isLoading}
-            className="group relative w-full flex justify-center py-3 px-4 border border-transparent text-sm font-medium rounded-md text-black bg-yellow-400 hover:bg-yellow-500 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-            style={{ fontSize: '115%' }}
-          >
-            <span className="absolute left-0 inset-y-0 flex items-center pl-3">
-              <svg className="h-5 w-5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M12 3c5.799 0 10.5 3.664 10.5 8.185 0 4.52-4.701 8.184-10.5 8.184a13.5 13.5 0 0 1-1.727-.11l-4.408 2.883c-.501.265-.678.236-.472-.413l.892-3.678c-2.88-1.46-4.785-3.99-4.785-6.866C1.5 6.665 6.201 3 12 3z" />
-              </svg>
-            </span>
-            {isLoading ? '로그인 중...' : 'KakaoTalk으로 로그인'}
-          </button>
+          {/* KakaoTalk 로그인 버튼 제거 */}
 
           {/* 홈으로 돌아가기 링크 제거 */}
         </div>
@@ -180,9 +167,10 @@ const Login: React.FC = () => {
             <div className="mt-3 text-center text-sm text-gray-600">
               이미 계정이 있으신가요? (
               <a
-                href="#"
+                href="https://77-tools.xyz/login"
                 className="text-blue-600 hover:text-blue-500 font-medium"
-                onClick={(e) => { e.preventDefault(); handleGoogleLogin(); }}
+                target="_blank"
+                rel="noopener noreferrer"
               >
                 로그인
               </a>
