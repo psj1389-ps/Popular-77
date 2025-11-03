@@ -1,0 +1,30 @@
+{
+  "name": "popular-77",
+  "version": "1.0.0",
+  "description": "77-tools - 가장 많이 사용되는 온라인 도구와 AI",
+  "private": true,
+  "scripts": {
+    "install": "cd frontend && npm ci",
+    "build": "cd frontend && npm run build",
+    "dev": "cd frontend && npm run dev",
+    "preview": "cd frontend && npm run preview",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/psj1389-ps/Popular-77.git"
+  },
+  "workspaces": [
+    "frontend"
+  ],
+  "keywords": ["tools", "pdf", "converter", "ai"],
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/psj1389-ps/Popular-77/issues"
+  },
+  "homepage": "https://github.com/psj1389-ps/Popular-77#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
