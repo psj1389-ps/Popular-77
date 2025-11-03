@@ -9,6 +9,27 @@ import path from "path";
 export default defineConfig({
   build: {
     sourcemap: 'hidden',
+    chunkSizeWarningLimit: 1000,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          // React 관련 라이브러리들을 별도 청크로 분리
+          'react-vendor': ['react', 'react-dom'],
+          // React Router 관련
+          'router': ['react-router-dom'],
+          // UI 라이브러리들
+          'ui-vendor': ['lucide-react'],
+          // 유틸리티 라이브러리들
+          'utils': ['clsx', 'tailwind-merge'],
+          // Supabase 관련
+          'supabase': ['@supabase/supabase-js'],
+          // PDF 관련
+          'pdf': ['pdfjs-dist'],
+          // 상태 관리
+          'state': ['zustand']
+        }
+      }
+    }
   },
   resolve: {
     alias: {

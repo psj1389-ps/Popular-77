@@ -18,8 +18,10 @@
 
     { "source": "/rss.xml", "destination": "/api/rss" },
     { "source": "/sitemap.xml", "destination": "/sitemap.xml" },
-    { "source": "/api/(.*)", "destination": "/api/$1" },
-    { "source": "/:path((?!api/|rss\\.xml|sitemap\\.xml).*)", "destination": "/index.html" }
+    { "source": "/api/(.*)", "destination": "/api/$1" }
+  ],
+  "routes": [
+    { "src": "/(.*)", "dest": "/index.html" }
   ],
   "headers": [
     {

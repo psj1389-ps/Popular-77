@@ -1,40 +1,49 @@
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter as Router, Routes, Route } from "react-router-dom";
-
-import Home from "@/pages/HomePage"; // 홈 페이지 파일 이름이 HomePage.tsx 라면 이렇게
-import PdfToDocPage from "@/pages/pdf-to-doc"; // pdf-to-doc.tsx 파일 경로
-import PdfToJpgPage from "@/pages/pdf-to-jpg"; // pdf-to-jpg.tsx 파일 경로
-import PdfToAiPage from "@/pages/pdf-to-ai";
-import PdfToBmpPage from "@/pages/pdf-to-bmp";
-import PdfToGifPage from "@/pages/pdf-to-gif";
-import PdfToPngPage from "@/pages/pdf-to-png";
-import PdfToPptxPage from "@/pages/pdf-to-pptx";
-import PdfToSvgPage from "@/pages/pdf-to-svg";
-import PdfToTiffPage from "@/pages/pdf-to-tiff";
-import PdfToXlsPage from "@/pages/pdf-to-xls";
-import PdfVectorPage from "@/pages/pdf-vector";
-import PdfImagePage from "@/pages/pdf-image";
-import DocxPdfPage from "@/pages/docx-pdf";
-import PptxPdfPage from "@/pages/pptx-pdf";
-import XlsPdfPage from "@/pages/xls-pdf";
 import MainLayout from '@/components/MainLayout';
-import ImageJpgPage from "@/pages/image-jpg";
-import ImagesWebpPage from "@/pages/images-webp";
-import ImagesPngPage from "@/pages/images-png";
-import ImagesGifPage from "@/pages/images-gif";
-import ImagesAllPage from "@/pages/images-all";
+import { AuthProvider } from '@/contexts/AuthContext';
+
+// 로딩 컴포넌트
+const LoadingSpinner = () => (
+  <div className="flex items-center justify-center min-h-screen">
+    <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-blue-600"></div>
+  </div>
+);
+
+// 동적 import를 사용한 코드 분할
+const Home = lazy(() => import("@/pages/HomePage"));
+const PdfToDocPage = lazy(() => import("@/pages/pdf-to-doc"));
+const PdfToJpgPage = lazy(() => import("@/pages/pdf-to-jpg"));
+const PdfToAiPage = lazy(() => import("@/pages/pdf-to-ai"));
+const PdfToBmpPage = lazy(() => import("@/pages/pdf-to-bmp"));
+const PdfToGifPage = lazy(() => import("@/pages/pdf-to-gif"));
+const PdfToPngPage = lazy(() => import("@/pages/pdf-to-png"));
+const PdfToPptxPage = lazy(() => import("@/pages/pdf-to-pptx"));
+const PdfToSvgPage = lazy(() => import("@/pages/pdf-to-svg"));
+const PdfToTiffPage = lazy(() => import("@/pages/pdf-to-tiff"));
+const PdfToXlsPage = lazy(() => import("@/pages/pdf-to-xls"));
+const PdfVectorPage = lazy(() => import("@/pages/pdf-vector"));
+const PdfImagePage = lazy(() => import("@/pages/pdf-image"));
+const DocxPdfPage = lazy(() => import("@/pages/docx-pdf"));
+const PptxPdfPage = lazy(() => import("@/pages/pptx-pdf"));
+const XlsPdfPage = lazy(() => import("@/pages/xls-pdf"));
+const ImageJpgPage = lazy(() => import("@/pages/image-jpg"));
+const ImagesWebpPage = lazy(() => import("@/pages/images-webp"));
+const ImagesPngPage = lazy(() => import("@/pages/images-png"));
+const ImagesGifPage = lazy(() => import("@/pages/images-gif"));
+const ImagesAllPage = lazy(() => import("@/pages/images-all"));
 
 // 인증 관련 컴포넌트
-import { AuthProvider } from '@/contexts/AuthContext';
-import Login from '@/pages/Login';
-import Profile from '@/pages/Profile';
-import AuthCallback from '@/pages/AuthCallback';
+const Login = lazy(() => import('@/pages/Login'));
+const Profile = lazy(() => import('@/pages/Profile'));
+const AuthCallback = lazy(() => import('@/pages/AuthCallback'));
 
 function App() {
   return (
     <Router>
       <AuthProvider>
-        <Routes>
+        <Suspense fallback={<LoadingSpinner />}>
+          <Routes>
         <Route
           path="/"
           element={
@@ -208,7 +217,8 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route path="/profile" element={<Profile />} />
         <Route path="/auth/callback" element={<AuthCallback />} />
-        </Routes>
+          </Routes>
+        </Suspense>
       </AuthProvider>
     </Router>
   )
