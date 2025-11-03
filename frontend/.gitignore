@@ -43,3 +43,5 @@ Icon?
 *.tmp
 *.temp
 .vercel
+
+.vercel
