@@ -149,17 +149,19 @@ const Login: React.FC = () => {
                 로그인하면 서비스 이용약관에 동의하게 됩니다
               </span>
             </div>
-            {/* 구글 로그인 링크 안내 */}
+            {/* 구글 로그인 링크 안내: div 버튼화 */}
             <div className="mt-3 text-center text-sm text-gray-600">
               이미 계정이 있으신가요? (
-              <a
-                href="#"
-                className="text-blue-600 hover:text-blue-500 font-medium"
+              <div
+                role="button"
+                tabIndex={0}
+                className="inline text-blue-600 hover:text-blue-500 font-medium cursor-pointer"
                 title="Google 로그인"
-                onClick={(e) => { e.preventDefault(); handleGoogleLogin(); }}
+                onClick={() => { handleGoogleLogin(); }}
+                onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { handleGoogleLogin(); } }}
               >
                 로그인
-              </a>
+              </div>
               )
             </div>
           </div>
