@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuthContext, withAuth } from '../contexts/AuthContext';
 
 const Profile: React.FC = () => {
@@ -133,8 +133,8 @@ const Profile: React.FC = () => {
                 </div>
               </div>
             </div>
-          </div>
         </div>
+      </div>
 
         {/* 계정 정보 */}
         <div className="bg-white shadow rounded-lg mb-6">
@@ -168,6 +168,41 @@ const Profile: React.FC = () => {
                 </dd>
               </div>
             </dl>
+          </div>
+        </div>
+
+        {/* 빠른 이동 - 텍스트 링크 */}
+        <div className="mt-8 text-sm text-gray-700">
+          <h3 className="font-semibold mb-2">빠른 이동</h3>
+          <div className="flex flex-wrap gap-3">
+            <Link to="/dashboard" className="px-3 py-2 rounded-md hover:bg-blue-50 hover:text-blue-600 transition">
+              대시보드
+            </Link>
+            <Link to="/history" className="px-3 py-2 rounded-md hover:bg-blue-50 hover:text-blue-600 transition">
+              기록
+            </Link>
+            <Link to="/settings" className="px-3 py-2 rounded-md hover:bg-blue-50 hover:text-blue-600 transition">
+              설정
+            </Link>
+          </div>
+        </div>
+
+        {/* 빠른 이동 - 카드 링크 */}
+        <div className="mt-8">
+          <h3 className="text-sm font-semibold text-gray-900 mb-3">빠른 이동</h3>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+            <Link to="/dashboard" className="border rounded-md p-4 hover:bg-gray-50 transition">
+              <div className="font-medium text-gray-900 mb-1">대시보드</div>
+              <div className="text-xs text-gray-600">요약과 최근 활동 보기</div>
+            </Link>
+            <Link to="/history" className="border rounded-md p-4 hover:bg-gray-50 transition">
+              <div className="font-medium text-gray-900 mb-1">기록</div>
+              <div className="text-xs text-gray-600">처리 내역과 상태 확인</div>
+            </Link>
+            <Link to="/settings" className="border rounded-md p-4 hover:bg-gray-50 transition">
+              <div className="font-medium text-gray-900 mb-1">설정</div>
+              <div className="text-xs text-gray-600">계정 및 환경 설정 변경</div>
+            </Link>
           </div>
         </div>
 
