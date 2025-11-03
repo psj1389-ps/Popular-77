@@ -1,0 +1,15 @@
+node_modules
+build
+dist
+.git
+.venv/
+__pycache__/
+uploads/
+outputs/
+.env
+*.log
+*.pyc
+.pytest_cache/
+.coverage
+.DS_Store
+Thumbs.db
