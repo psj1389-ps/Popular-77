@@ -1,12 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuthContext } from '../contexts/AuthContext';
+import { isInAppBrowser, openInExternalBrowser, isAndroid, isIOS } from '@/utils/inAppBrowser';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
   const { user, loading, error, signInWithGoogle } = useAuthContext();
   const [isLoading, setIsLoading] = useState(false);
   const [authError, setAuthError] = useState<string | null>(null);
+  const [inApp, setInApp] = useState(false);
 
   // 이미 로그인된 사용자는 홈으로 리다이렉트
   useEffect(() => {
@@ -15,10 +17,25 @@ const Login: React.FC = () => {
     }
   }, [user, loading, navigate]);
 
+  // 인앱(WebView) 브라우저 감지: Google이 disallowed_useragent로 차단하는 환경
+  useEffect(() => {
+    try {
+      setInApp(isInAppBrowser());
+    } catch {}
+  }, []);
+
   const handleGoogleLogin = async () => {
+    // 인앱(WebView)에서는 Google이 로그인을 차단(disallowed_useragent)
+    if (inApp) {
+      setAuthError('현재 앱 내 브라우저에서는 Google 로그인이 차단됩니다. 외부 브라우저에서 다시 시도해주세요.');
+      // 현재 페이지를 외부 브라우저로 열기 시도
+      openInExternalBrowser(window.location.href);
+      return;
+    }
+
     setIsLoading(true);
     setAuthError(null);
-    
+
     try {
       const { error } = await signInWithGoogle();
       if (error) {
@@ -69,6 +86,40 @@ const Login: React.FC = () => {
         </div>
 
         <div className="mt-8 space-y-4">
+          {/* 인앱 브라우저 경고 및 외부 브라우저로 열기 가이드 */}
+          {inApp && (
+            <div className="rounded-md bg-yellow-50 p-4">
+              <div className="flex">
+                <div className="flex-shrink-0">
+                  <svg
+                    className="h-5 w-5 text-yellow-400"
+                    viewBox="0 0 20 20"
+                    fill="currentColor"
+                  >
+                    <path
+                      fillRule="evenodd"
+                      d="M18 10A8 8 0 11.001 10 8 8 0 0118 10zM9 5a1 1 0 112 0v4a1 1 0 11-2 0V5zm1 8a1 1 0 100 2 1 1 0 000-2z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                </div>
+                <div className="ml-3">
+                  <h3 className="text-sm font-medium text-yellow-800">앱 내 브라우저에서 Google 로그인이 차단됩니다</h3>
+                  <div className="mt-1 text-sm text-yellow-700">
+                    disallowed_useragent 오류를 피하려면 외부 브라우저(Chrome/Safari)에서 다시 시도해주세요.
+                  </div>
+                  <div className="mt-3">
+                    <button
+                      onClick={() => openInExternalBrowser(window.location.href)}
+                      className="inline-flex items-center px-3 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+                    >
+                      {isAndroid() ? 'Chrome에서 열기' : isIOS() ? 'Safari에서 열기' : '브라우저에서 열기'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
           {/* 에러 메시지 */}
           {(error || authError) && (
             <div className="rounded-md bg-red-50 p-4">
