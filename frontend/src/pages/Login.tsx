@@ -190,6 +190,17 @@ const Login: React.FC = () => {
             <div className="absolute inset-0 flex items-center">
               <div className="w-full border-t border-gray-300" />
             </div>
+            {/* 홈으로 돌아가기 링크 (구글 로그인 글자크기와 동일, 파란색) */}
+            <div className="relative flex justify-center text-sm mb-2">
+              <a
+                href="https://77-tools.xyz/"
+                className="px-2 bg-gray-50 text-blue-600 hover:text-blue-500 font-medium"
+                style={{ fontSize: '115%' }}
+                title="홈으로 돌아가기"
+              >
+                홈으로 돌아가기
+              </a>
+            </div>
             <div className="relative flex justify-center text-sm">
               <span
                 role="button"

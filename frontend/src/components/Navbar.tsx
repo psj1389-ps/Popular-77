@@ -30,34 +30,7 @@ const Navbar = () => {
             </span>
           </Link>
 
-          {/* 네비게이션 메뉴 */}
-          <div className="hidden md:flex items-center space-x-6">
-            {user && (
-              <>
-                <Link
-                  to="/dashboard"
-                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
-                >
-                  <BarChart3 className="w-4 h-4" />
-                  <span>대시보드</span>
-                </Link>
-                <Link
-                  to="/history"
-                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
-                >
-                  <History className="w-4 h-4" />
-                  <span>기록</span>
-                </Link>
-                <Link
-                  to="/settings"
-                  className="flex items-center space-x-1 px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-colors duration-200"
-                >
-                  <Settings className="w-4 h-4" />
-                  <span>설정</span>
-                </Link>
-              </>
-            )}
-          </div>
+          {/* 상단 네비게이션의 대시보드/기록/설정 링크 제거 (드롭다운으로만 제공) */}
 
           {/* 검색창 */}
           <div className="flex-1 flex justify-center px-2 lg:ml-6 lg:justify-end">
@@ -116,8 +89,8 @@ const Navbar = () => {
                       내 프로필
                     </Link>
                     
-                    {/* 모바일에서만 보이는 메뉴들 */}
-                    <div className="md:hidden border-t border-gray-100 mt-1 pt-1">
+                    {/* 프로필 아래 메뉴들: 대시보드/기록/설정 (모든 화면에서 표시) */}
+                    <div className="border-t border-gray-100 mt-1 pt-1">
                       <Link
                         to="/dashboard"
                         onClick={() => setIsUserMenuOpen(false)}
